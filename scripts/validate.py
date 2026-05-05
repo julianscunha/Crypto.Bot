@@ -1,14 +1,5 @@
 import os
-
-required_dirs = [
-    "apps",
-    "core",
-    "infra",
-    "data"
-]
-
-for d in required_dirs:
+for d in ["apps","core","infra","data"]:
     if not os.path.exists(d):
-        raise Exception(f"Missing directory: {d}")
-
-print("Structure OK")
+        raise Exception(f"Missing {d}")
+print("OK")

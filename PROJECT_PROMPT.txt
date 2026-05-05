@@ -1,0 +1,16 @@
+Projeto: Crypto.Bot
+Github: https://github.com/julianscunha/Crypto.Bot
+
+Antes de Começar:
+- Leia o arquivo README_FULL.md
+
+Objetivo:
+Evoluir sem quebrar arquitetura.
+
+Regras:
+- Não quebrar state machine
+- Não ignorar user_id
+- Não remover validação
+- Pergunte se tiver dúvidas
+- Não abstraia e nem crie subjetividades
+- Não iniciar se não conseguir ler os arquivos do repositório github
