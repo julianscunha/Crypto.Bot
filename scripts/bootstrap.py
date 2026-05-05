@@ -1,5 +1,10 @@
+# -*- coding: utf-8 -*-
+
 import os
 import sys
+from colorama import Fore, Style, init
+
+init(autoreset=True)
 
 ROOT = os.getcwd()
 
@@ -22,12 +27,19 @@ REQUIRED_FILES = [
     "apps/api/main.py",
 ]
 
+
 def warn(msg):
-    print(f"[WARN] {msg}")
+    print(f"{Fore.YELLOW}[WARN]{Style.RESET_ALL} {msg}")
+
 
 def error(msg):
-    print(f"[ERROR] {msg}")
+    print(f"{Fore.RED}[ERROR]{Style.RESET_ALL} {msg}")
     sys.exit(1)
+
+
+def ok(msg):
+    print(f"{Fore.GREEN}[OK]{Style.RESET_ALL} {msg}")
+
 
 def ensure_dirs():
     for d in REQUIRED_DIRS:
@@ -36,20 +48,23 @@ def ensure_dirs():
             os.makedirs(path)
             warn(f"Created missing directory: {d}")
 
+
 def ensure_init_files():
     for root, dirs, files in os.walk(ROOT):
+
         if "__pycache__" in root:
             continue
 
-        if any(x in root for x in ["scripts", ".git"]):
+        if any(skip in root for skip in [".git", "scripts"]):
             continue
 
         init_file = os.path.join(root, "__init__.py")
 
         if not os.path.exists(init_file):
-            with open(init_file, "w") as f:
+            with open(init_file, "w", encoding="utf-8") as f:
                 f.write("")
             warn(f"Created __init__.py in {root}")
+
 
 def validate_files():
     for f in REQUIRED_FILES:
@@ -57,10 +72,12 @@ def validate_files():
         if not os.path.exists(path):
             error(f"Missing required file: {f}")
 
+
 def validate_requirements():
     path = os.path.join(ROOT, "requirements.txt")
     if not os.path.exists(path):
         error("requirements.txt not found")
+
 
 def main():
     ensure_dirs()
@@ -68,7 +85,8 @@ def main():
     validate_files()
     validate_requirements()
 
-    print("[OK] Environment ready")
+    ok("Environment ready")
+
 
 if __name__ == "__main__":
     main()

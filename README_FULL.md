@@ -38,9 +38,34 @@ Arquivos:
 scripts/start.bat
 scripts/bootstrap.py
 
+## Binance Integration (IMPLEMENTED)
+
+- WebSocket real conectado
+- Streaming BTCUSDT (1m)
+- Evento MARKET_DATA integrado ao WorkRoom
+- Pipeline completo ativo em tempo real
+
+Arquivo:
+data/ingestion/binance_ws.py
+
+
+## Runtime Unificado
+
+O sistema roda via um único entrypoint:
+
+apps/main.py
+
+Responsável por:
+- subir API (FastAPI)
+- iniciar trader (Binance WS + agents)
+- gerenciar processos paralelos
+
+Execução:
+scripts/start.bat
+
 ## Estrutura das pastas
 crypto.bot/
-```
+
 ├── apps/
 │   ├── api/
 │   │   └── main.py
@@ -94,7 +119,8 @@ crypto.bot/
 ├── requirements.txt
 ├── README.md
 ├── README_FULL.md
-```
+└── PROJECT_PROMPT.txt
+
 ## DESCRIÇÃO DE CADA MÓDULO
 📁 /apps
 
