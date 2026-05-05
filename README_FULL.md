@@ -27,6 +27,17 @@ IDLE → ANALYZING → SIGNAL_GENERATED → RISK_APPROVED → ORDER_SENT → ORD
 - UI
 - IA
 
+## Bootstrap Automático
+O projeto possui um sistema de bootstrap que:
+
+- cria diretórios automaticamente
+- garante __init__.py em todos módulos
+- valida arquivos obrigatórios
+- prepara ambiente Python
+Arquivos:
+scripts/start.bat
+scripts/bootstrap.py
+
 ## Estrutura das pastas
 crypto.bot/
 
