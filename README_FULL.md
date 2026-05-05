@@ -40,7 +40,7 @@ scripts/bootstrap.py
 
 ## Estrutura das pastas
 crypto.bot/
-
+```
 ├── apps/
 │   ├── api/
 │   │   └── main.py
@@ -94,8 +94,7 @@ crypto.bot/
 ├── requirements.txt
 ├── README.md
 ├── README_FULL.md
-└── PROJECT_PROMPT.txt
-
+```
 ## DESCRIÇÃO DE CADA MÓDULO
 📁 /apps
 
