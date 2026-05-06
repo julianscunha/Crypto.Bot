@@ -167,3 +167,69 @@ class EquityCurve(Base):
         default=datetime.utcnow,
         nullable=False
     )
+    
+class PortfolioSnapshot(Base):
+
+    __tablename__ = "portfolio_snapshots"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    user_id = Column(
+        Integer,
+        nullable=False,
+        index=True
+    )
+
+    balance = Column(
+        Float,
+        default=0.0
+    )
+
+    equity = Column(
+        Float,
+        default=0.0
+    )
+
+    realized_pnl = Column(
+        Float,
+        default=0.0
+    )
+
+    unrealized_pnl = Column(
+        Float,
+        default=0.0
+    )
+
+    total_pnl = Column(
+        Float,
+        default=0.0
+    )
+
+    open_positions = Column(
+        Integer,
+        default=0
+    )
+
+    closed_positions = Column(
+        Integer,
+        default=0
+    )
+
+    exposure = Column(
+        Float,
+        default=0.0
+    )
+
+    drawdown = Column(
+        Float,
+        default=0.0
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )

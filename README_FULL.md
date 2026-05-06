@@ -262,3 +262,87 @@ Nunca manter:
 - session global
 - session persistente
 - transaction aberta entre eventos
+
+# =========================================================
+# PORTFOLIO CONSISTENCY ENGINE
+# =========================================================
+
+## COMPONENTS
+
+- PortfolioSnapshot
+- PortfolioRepository
+- PortfolioService
+- Equity Tracking
+- Exposure Tracking
+- Drawdown Engine
+- Unrealized PnL Tracking
+
+## FLOW
+
+OPEN TRADE
+    -> snapshot update
+
+PRICE UPDATE
+    -> unrealized pnl update
+
+CLOSE TRADE
+    -> realized pnl update
+
+## METRICS
+
+- equity
+- exposure
+- drawdown
+- realized pnl
+- unrealized pnl
+- total pnl
+- open positions
+- closed positions
+
+
+# =========================================================
+# SIGNAL QUALITY ENGINE
+# =========================================================
+
+## COMPONENTS
+
+- SignalQualityService
+- Confidence Threshold
+- Cooldown Engine
+- Drawdown Protection
+- Position Limiter
+- Frontend Config Ready
+
+## FLOW
+
+StrategySignal
+    -> SignalQualityService
+    -> RiskAgent
+    -> ExecutionAgent
+
+## VALIDATIONS
+
+- confidence threshold
+- cooldown validation
+- max open positions
+- drawdown guard
+
+## FRONTEND READY
+
+Arquivo:
+core/config/signal_quality_config.py
+
+Variáveis:
+- confidence_threshold
+- cooldown_seconds
+- max_open_positions
+- daily_drawdown_limit
+- ema_fast_period
+- ema_slow_period
+- min_atr_percent
+
+Todos os parâmetros podem ser:
+- editados manualmente
+- controlados pelo frontend
+- ajustados por IA
+- persistidos futuramente em banco
