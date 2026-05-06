@@ -199,15 +199,15 @@ scripts/
 # Current Operational Status
 
 ```text
-Core Infrastructure .......... 90%
-Trading Engine ............... 84%
-Lifecycle Engine ............. 86%
-Portfolio Engine ............. 80%
-Exchange Integration ......... 25%
-Risk Infrastructure .......... 82%
-Production Hardening ......... 42%
+Core Infrastructure .......... 96%
+Trading Engine ............... 93%
+Lifecycle Engine ............. 94%
+Portfolio Engine ............. 90%
+Persistence Layer ............ 84%
+Exchange Integration ......... 35%
+Production Hardening ......... 70%
 
-TOTAL: ~81%
+TOTAL: ~89%
 ```
 
 ---
@@ -243,3 +243,22 @@ TOTAL: ~81%
 - Não ignorar user_id
 - Não misturar payload contracts
 - Manter arquitetura async consistente
+
+---
+
+# Repository Layer
+
+## Current Architecture
+
+- Stateless repositories
+- Session-per-operation
+- Transaction isolation
+- Rollback safety
+- Lifecycle-safe persistence
+
+## Repository Rules
+
+Nunca manter:
+- session global
+- session persistente
+- transaction aberta entre eventos
