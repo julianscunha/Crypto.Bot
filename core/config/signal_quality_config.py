@@ -14,7 +14,7 @@ SIGNAL_QUALITY_CONFIG = {
 
     "enable_cooldown": True,
 
-    "cooldown_seconds": 120,
+    "cooldown_seconds": 15,
 
     # =====================================================
     # TREND FILTER
