@@ -1,0 +1,6 @@
+timestamp
+equity
+balance
+open_pnl
+closed_pnl
+drawdown

@@ -13,44 +13,20 @@ from data.storage.database import init_db
 
 async def main():
 
-    # =========================
-    # INIT DATABASE
-    # =========================
-
     init_db()
 
-    # =========================
-    # EVENT BUS
-    # =========================
-
     bus = EventBus()
-
-    # =========================
-    # AGENTS
-    # =========================
 
     analyst = AnalystAgent("analyst", bus)
     strategy = StrategyAgent("strategy", bus)
     risk = RiskAgent("risk", bus)
     execution = ExecutionAgent("execution", bus)
 
-    # =========================
-    # REGISTER
-    # =========================
-
     bus.subscribe(analyst)
     bus.subscribe(strategy)
     bus.subscribe(risk)
     bus.subscribe(execution)
 
-    # =========================
-    # WEBSOCKET
-    # =========================
-
     ws = BinanceWS(bus)
-
-    # =========================
-    # START
-    # =========================
 
     await ws.start()

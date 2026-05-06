@@ -9,6 +9,7 @@ from core.contracts.messages import (
 from data.storage.positions_repository import (
     open_position,
     get_open_position,
+    update_position,
     close_position
 )
 
@@ -26,45 +27,79 @@ class ExecutionAgent(BaseAgent):
 
         user_id = message.user_id
 
+        symbol = payload.symbol
+
         action = payload.action
         approved = payload.approved
 
         price = payload.price
         quantity = payload.quantity
 
-        if not approved:
+        if not approved and action != "HOLD":
             return
 
-        position = get_open_position(user_id)
+        position = get_open_position(
+            user_id,
+            symbol
+        )
 
-        # ==================================================
+        # ==========================================
         # OPEN
-        # ==================================================
+        # ==========================================
 
         if action == "OPEN" and position is None:
 
             open_position(
                 user_id=user_id,
+                symbol=symbol,
                 action="BUY",
-                price=price,
-                quantity=quantity
+
+                entry_price=price,
+
+                quantity=quantity,
+
+                stop_loss=payload.stop_loss,
+                take_profit=payload.take_profit,
+
+                trailing_stop=payload.trailing_stop,
+
+                breakeven_enabled=False
             )
 
             print(
-                f"[EXECUTION] OPEN BUY @ {round(price,2)} "
-                f"| qty={round(quantity,2)}"
+                f"[EXECUTION] "
+                f"{symbol} "
+                f"OPEN BUY @ {round(price,2)} "
+                f"| SL={payload.stop_loss} "
+                f"| TP={payload.take_profit}"
             )
 
-        # ==================================================
+        # ==========================================
+        # POSITION MANAGEMENT
+        # ==========================================
+
+        elif action == "HOLD" and position is not None:
+
+            update_position(
+                position_id=position["id"],
+
+                current_price=price,
+
+                stop_loss=payload.stop_loss,
+
+                trailing_stop=payload.trailing_stop,
+
+                breakeven_enabled=payload.breakeven_enabled
+            )
+
+        # ==========================================
         # CLOSE
-        # ==================================================
+        # ==========================================
 
         elif action == "CLOSE" and position is not None:
 
-            entry_price = position["price"]
-
             pnl = (
-                (price - entry_price)
+                (price - position["entry_price"])
                 * position["quantity"]
             )
 
@@ -76,7 +111,9 @@ class ExecutionAgent(BaseAgent):
             metrics = calculate_metrics(user_id)
 
             print(
-                f"[EXECUTION] CLOSE @ {round(price,2)} "
+                f"[EXECUTION] "
+                f"{symbol} "
+                f"CLOSE @ {round(price,2)} "
                 f"| PnL={round(pnl,2)} "
                 f"| {metrics}"
             )

@@ -35,6 +35,7 @@ class MarketDataMessage(BaseMessage):
 
 @dataclass
 class MarketAnalysisPayload:
+    symbol: str
     trend: str
     confidence: float
     price: float
@@ -51,8 +52,10 @@ class MarketAnalysisMessage(BaseMessage):
 
 @dataclass
 class StrategySignalPayload:
+    symbol: str
     signal: str
     price: float
+    atr: float
 
 
 @dataclass
@@ -66,12 +69,22 @@ class StrategySignalMessage(BaseMessage):
 
 @dataclass
 class RiskDecisionPayload:
+    symbol: str
+
     action: str
     approved: bool
+
     price: float
     quantity: float
+
     stop_loss: float | None = None
     take_profit: float | None = None
+
+    trailing_stop: float | None = None
+
+    atr: float | None = None
+
+    breakeven_enabled: bool = False
 
 
 @dataclass

@@ -103,6 +103,51 @@ crypto.bot/
 - winrate
 - total trades
 
+## Multi-Symbol Engine (IMPLEMENTED)
+
+Symbols:
+- BTCUSDT
+- ETHUSDT
+- SOLUSDT
+- BNBUSDT
+
+Features:
+- multi-symbol runtime
+- isolated positions
+- symbol-aware contracts
+- portfolio-ready architecture
+
+Position isolation:
+positions[user_id][symbol]
+
+Arquivos:
+core/contracts/messages.py
+data/ingestion/binance_ws.py
+data/storage/positions_repository.py
+core/agents/strategy_agent.py
+core/agents/risk_agent.py
+core/agents/execution_agent.py
+
+## Trailing Stop + Breakeven (IMPLEMENTED)
+
+Features:
+- dynamic trailing stop
+- breakeven protection
+- ATR-based risk management
+- symbol-aware risk engine
+
+Rules:
+- breakeven at 1R
+- trailing stop using ATR
+- dynamic stop update
+- isolated position management
+
+Arquivos:
+core/agents/risk_agent.py
+core/agents/execution_agent.py
+data/storage/positions_repository.py
+data/storage/database.py
+
 ---
 
 # Fluxo Operacional

@@ -20,6 +20,7 @@ REQUIRED_DIRS = [
     "data",
     "data/ingestion",
     "infra",
+    "data/features",
 ]
 
 REQUIRED_FILES = [

@@ -12,9 +12,10 @@ from core.contracts.messages import (
 class AnalystAgent(BaseAgent):
 
     def __init__(self, name, bus):
+
         super().__init__(name, bus)
 
-        self.last_price = {}
+        self.price_history = {}
 
     def on_message(self, message):
 
@@ -22,34 +23,44 @@ class AnalystAgent(BaseAgent):
             return
 
         user_id = message.user_id
+
+        symbol = message.payload.symbol
         price = message.payload.price
 
-        previous = self.last_price.get(user_id)
+        key = f"{user_id}:{symbol}"
 
-        if previous is None:
-            self.last_price[user_id] = price
+        if key not in self.price_history:
+            self.price_history[key] = []
+
+        history = self.price_history[key]
+
+        history.append(price)
+
+        history[:] = history[-20:]
+
+        if len(history) < 5:
             return
 
         trend = "SIDEWAYS"
-        confidence = 0.5
 
-        if price > previous:
-            trend = "BULLISH"
-            confidence = 0.8
+        if history[-1] > history[0]:
+            trend = "UP"
 
-        elif price < previous:
-            trend = "BEARISH"
-            confidence = 0.8
+        elif history[-1] < history[0]:
+            trend = "DOWN"
 
-        self.last_price[user_id] = price
-
-        analysis = MarketAnalysisMessage(
-            user_id=user_id,
-            payload=MarketAnalysisPayload(
-                trend=trend,
-                confidence=confidence,
-                price=price
-            )
+        confidence = abs(
+            history[-1] - history[0]
         )
 
-        self.bus.publish(analysis)
+        self.bus.publish(
+            MarketAnalysisMessage(
+                user_id=user_id,
+                payload=MarketAnalysisPayload(
+                    symbol=symbol,
+                    trend=trend,
+                    confidence=round(confidence, 2),
+                    price=price
+                )
+            )
+        )
