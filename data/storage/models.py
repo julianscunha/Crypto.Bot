@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from datetime import datetime
-
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
@@ -17,10 +15,10 @@ from datetime import datetime
 from sqlalchemy import (
     Column,
     Integer,
-    Float,
-    DateTime,
     String,
-    Boolean
+    Float,
+    Boolean,
+    DateTime
 )
 
 

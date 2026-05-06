@@ -41,7 +41,7 @@ class RiskAgent:
         if existing_position:
             return
 
-        entry_price = payload.price
+        entry_price = payload.entry_price
 
         stop_loss = round(
             entry_price * 0.98,
@@ -64,11 +64,12 @@ class RiskAgent:
             user_id=payload.user_id,
             symbol=payload.symbol,
             signal=payload.signal,
-            price=entry_price,
+            entry_price=entry_price,
             quantity=quantity,
             stop_loss=stop_loss,
             take_profit=take_profit,
-            trailing_stop=trailing_stop
+            trailing_stop=trailing_stop,
+            risk_reward=2.0
         )
 
         decision_message = RiskDecisionMessage(

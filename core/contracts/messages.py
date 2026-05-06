@@ -26,9 +26,9 @@ class MarketDataPayload:
     symbol: str
 
     open: float
-    close: float
     high: float
     low: float
+    close: float
 
     volume: float
 
@@ -51,7 +51,9 @@ class MarketAnalysisPayload:
 
     analysis: str
 
-    price: float
+    reference_price: float
+
+    confidence: float
 
 
 @dataclass
@@ -72,7 +74,9 @@ class StrategySignalPayload:
 
     signal: str
 
-    price: float
+    entry_price: float
+
+    signal_strength: float
 
 
 @dataclass
@@ -93,7 +97,7 @@ class RiskDecisionPayload:
 
     signal: str
 
-    price: float
+    entry_price: float
 
     quantity: float
 
@@ -102,7 +106,12 @@ class RiskDecisionPayload:
 
     trailing_stop: float
 
+    risk_reward: float
+
 
 @dataclass
 class RiskDecisionMessage(BaseMessage):
     pass
+    
+
+

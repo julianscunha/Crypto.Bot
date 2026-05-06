@@ -20,13 +20,17 @@ class ExecutionAgent:
         self.bus = bus
 
         self.positions = PositionsRepository()
+
         self.metrics = MetricsStorage()
 
         self.bus.subscribe(self)
 
-    def on_message(self, message):
+    async def on_message(self, message):
 
-        if not isinstance(message, RiskDecisionMessage):
+        if not isinstance(
+            message,
+            RiskDecisionMessage
+        ):
             return
 
         payload = message.payload
@@ -34,11 +38,17 @@ class ExecutionAgent:
         if payload.signal != "BUY":
             return
 
-        trade = self.positions.create_position(
+        if self.positions.has_open_position(
+            payload.user_id,
+            payload.symbol
+        ):
+            return
+
+        self.positions.create_position(
             user_id=payload.user_id,
             symbol=payload.symbol,
             action=payload.signal,
-            entry_price=payload.price,
+            entry_price=payload.entry_price,
             quantity=payload.quantity,
             stop_loss=payload.stop_loss,
             take_profit=payload.take_profit,
@@ -49,7 +59,7 @@ class ExecutionAgent:
         print(
             f"[EXECUTION] OPEN BUY "
             f"{payload.symbol} "
-            f"@ {payload.price} "
+            f"@ {payload.entry_price} "
             f"| qty={payload.quantity}"
         )
 

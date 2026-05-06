@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from datetime import datetime
-
-from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from data.storage.database import SessionLocal
+
 from data.storage.models import Trade
 
 
@@ -12,7 +11,7 @@ class PositionsRepository:
 
     def __init__(self):
 
-        self.db = SessionLocal()
+        self.session: Session = SessionLocal()
 
     def create_position(
         self,
@@ -24,71 +23,39 @@ class PositionsRepository:
         stop_loss: float,
         take_profit: float,
         trailing_stop: float,
-        breakeven_enabled: bool = False
+        breakeven_enabled: bool = True
     ):
 
-        trade = Trade(
-            user_id=user_id,
-            symbol=symbol,
-            action=action,
+        try:
 
-            entry_price=entry_price,
-            current_price=entry_price,
+            position = Trade(
+                user_id=user_id,
+                symbol=symbol,
+                action=action,
+                entry_price=entry_price,
+                current_price=entry_price,
+                quantity=quantity,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                trailing_stop=trailing_stop,
+                breakeven_enabled=breakeven_enabled,
+                status="OPEN",
+                pnl=0.0
+            )
 
-            quantity=quantity,
+            self.session.add(position)
 
-            stop_loss=stop_loss,
-            take_profit=take_profit,
-            trailing_stop=trailing_stop,
+            self.session.commit()
 
-            highest_price=entry_price,
-            lowest_price=entry_price,
+            self.session.refresh(position)
 
-            breakeven_enabled=breakeven_enabled,
+            return position
 
-            status="OPEN",
+        except Exception:
 
-            pnl=0.0,
-            unrealized_pnl=0.0,
-            realized_pnl=0.0
-        )
+            self.session.rollback()
 
-        self.db.add(trade)
-
-        self.db.commit()
-
-        self.db.refresh(trade)
-
-        return trade
-
-    def close_position(
-        self,
-        trade_id: int,
-        exit_price: float,
-        pnl: float,
-        reason: str
-    ):
-
-        trade = self.db.get(
-            Trade,
-            trade_id
-        )
-
-        if not trade:
-            return
-
-        trade.current_price = exit_price
-
-        trade.pnl = pnl
-        trade.realized_pnl = pnl
-
-        trade.status = "CLOSED"
-
-        trade.exit_reason = reason
-
-        trade.closed_at = datetime.utcnow()
-
-        self.db.commit()
+            raise
 
     def get_open_position(
         self,
@@ -96,24 +63,112 @@ class PositionsRepository:
         symbol: str
     ):
 
-        stmt = (
-            select(Trade)
-            .where(Trade.user_id == user_id)
-            .where(Trade.symbol == symbol)
-            .where(Trade.status == "OPEN")
-        )
+        try:
 
-        return self.db.execute(stmt).scalar_one_or_none()
+            return (
+                self.session.query(Trade)
+                .filter(
+                    Trade.user_id == user_id,
+                    Trade.symbol == symbol,
+                    Trade.status == "OPEN"
+                )
+                .first()
+            )
 
+        except Exception:
+
+            self.session.rollback()
+
+            raise
+
+    def has_open_position(
+        self,
+        user_id: int,
+        symbol: str
+    ) -> bool:
+
+        try:
+
+            position = (
+                self.session.query(Trade)
+                .filter(
+                    Trade.user_id == user_id,
+                    Trade.symbol == symbol,
+                    Trade.status == "OPEN"
+                )
+                .first()
+            )
+
+            return position is not None
+
+        except Exception:
+
+            self.session.rollback()
+
+            raise
+            
+            
+          
     def get_open_positions(
         self,
         user_id: int
     ):
-
-        stmt = (
-            select(Trade)
-            .where(Trade.user_id == user_id)
-            .where(Trade.status == "OPEN")
-        )
-
-        return self.db.execute(stmt).scalars().all()
+    
+        try:
+    
+            return (
+                self.session.query(Trade)
+                .filter(
+                    Trade.user_id == user_id,
+                    Trade.status == "OPEN"
+                )
+                .all()
+            )
+    
+        except Exception:
+    
+            self.session.rollback()
+    
+            raise              
+            
+            
+            
+    def close_position(
+        self,
+        trade_id: int,
+        exit_price: float,
+        pnl: float,
+        reason: str
+    ):
+    
+        try:
+    
+            trade = (
+                self.session.query(Trade)
+                .filter(
+                    Trade.id == trade_id
+                )
+                .first()
+            )
+    
+            if not trade:
+                return None
+    
+            trade.current_price = exit_price
+            trade.pnl = pnl
+            trade.status = "CLOSED"
+    
+            if hasattr(trade, "close_reason"):
+                trade.close_reason = reason
+    
+            self.session.commit()
+    
+            self.session.refresh(trade)
+    
+            return trade
+    
+        except Exception:
+    
+            self.session.rollback()
+    
+            raise

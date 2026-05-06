@@ -27,11 +27,15 @@ class StrategyAgent:
         if payload.analysis == "BULLISH":
             signal = "BUY"
 
+        if signal == "HOLD":
+            return
+
         signal_payload = StrategySignalPayload(
             user_id=payload.user_id,
             symbol=payload.symbol,
             signal=signal,
-            price=payload.price
+            entry_price=payload.reference_price,
+            signal_strength=payload.confidence
         )
 
         signal_message = StrategySignalMessage(

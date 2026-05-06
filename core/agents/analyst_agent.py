@@ -31,7 +31,8 @@ class AnalystAgent:
             user_id=payload.user_id,
             symbol=payload.symbol,
             analysis=analysis,
-            price=payload.close
+            reference_price=payload.close,
+            confidence=0.85
         )
 
         analysis_message = MarketAnalysisMessage(

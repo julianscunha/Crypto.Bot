@@ -75,6 +75,40 @@ Portfolio Analytics
 
 ---
 
+# Async Hardening
+
+## Implementado
+
+- coroutine-safe event bus
+- exception isolation
+- subscriber protection
+- await validation
+
+---
+
+# Contract Stabilization
+
+## Padrão Oficial
+
+MarketDataPayload:
+- open
+- high
+- low
+- close
+- volume
+
+StrategySignalPayload:
+- entry_price
+
+RiskDecisionPayload:
+- entry_price
+- risk_reward
+
+Nunca utilizar:
+- payload.price
+
+---
+
 # Multi-Tenant
 
 `user_id` é obrigatório em:
