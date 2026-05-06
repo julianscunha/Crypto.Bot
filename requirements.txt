@@ -4,3 +4,5 @@ pydantic
 python-dotenv
 websockets
 colorama
+alembic==1.13.1
+sqlalchemy==2.0.29

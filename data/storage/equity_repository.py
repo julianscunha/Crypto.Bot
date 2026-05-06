@@ -1,81 +1,48 @@
 # -*- coding: utf-8 -*-
 
-from data.storage.database import get_connection
+from sqlalchemy.orm import Session
+
+from data.storage.database import SessionLocal
+from data.storage.models import EquityCurve
 
 
-INITIAL_BALANCE = 10000.0
+class EquityRepository:
 
+    def __init__(self):
 
-def insert_equity_snapshot(
-    user_id,
-    equity,
-    realized_pnl,
-    unrealized_pnl,
-    drawdown
-):
+        self.db: Session = SessionLocal()
 
-    conn = get_connection()
+    def save_snapshot(
+        self,
+        user_id: int,
+        equity: float,
+        realized_pnl: float,
+        unrealized_pnl: float,
+        drawdown: float
+    ):
 
-    cursor = conn.cursor()
+        row = EquityCurve(
+            user_id=user_id,
+            equity=equity,
+            realized_pnl=realized_pnl,
+            unrealized_pnl=unrealized_pnl,
+            drawdown=drawdown
+        )
 
-    cursor.execute("""
-    INSERT INTO equity_curve (
-        user_id,
-        equity,
-        realized_pnl,
-        unrealized_pnl,
-        drawdown
-    )
-    VALUES (?, ?, ?, ?, ?)
-    """, (
-        user_id,
-        equity,
-        realized_pnl,
-        unrealized_pnl,
-        drawdown
-    ))
+        self.db.add(row)
 
-    conn.commit()
+        self.db.commit()
 
-    conn.close()
+    def get_latest(
+        self,
+        user_id: int
+    ):
 
-
-def get_equity_curve(user_id):
-
-    conn = get_connection()
-
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    SELECT *
-    FROM equity_curve
-    WHERE user_id = ?
-    ORDER BY id ASC
-    """, (user_id,))
-
-    rows = cursor.fetchall()
-
-    conn.close()
-
-    return rows
-
-
-def get_latest_equity(user_id):
-
-    conn = get_connection()
-
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    SELECT *
-    FROM equity_curve
-    WHERE user_id = ?
-    ORDER BY id DESC
-    LIMIT 1
-    """, (user_id,))
-
-    row = cursor.fetchone()
-
-    conn.close()
-
-    return row
+        return (
+            self.db.query(EquityCurve)
+            .filter(
+                EquityCurve.user_id == user_id
+            )
+            .order_by(EquityCurve.id.desc())
+            .first()
+        )

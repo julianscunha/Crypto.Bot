@@ -181,6 +181,53 @@ Metrics:
 Architecture:
 portfolio-aware analytics engine
 
+# =========================================================
+# DATABASE MIGRATIONS (IMPLEMENTED)
+# =========================================================
+
+Stack:
+- SQLAlchemy
+- Alembic
+
+Features:
+- schema versioning
+- auto migration
+- migration history
+- schema evolution
+- production-ready persistence
+
+Arquivos:
+- alembic.ini
+- alembic/env.py
+- data/storage/models.py
+- scripts/migrate.py
+
+Comandos:
+alembic revision --autogenerate -m "migration_name"
+alembic upgrade head
+
+Objetivo:
+eliminar schema drift entre código e SQLite
+
+# =========================================================
+# SQLALCHEMY MIGRATION (IMPLEMENTED)
+# =========================================================
+
+Storage Layer:
+- SQLAlchemy ORM
+- Alembic migrations
+- SessionLocal architecture
+- ORM repositories
+- schema versioning
+
+Repositories:
+- positions_repository.py
+- equity_repository.py
+- metrics.py
+
+Objetivo:
+eliminar sqlite3 procedural layer
+
 ---
 
 # Fluxo Operacional

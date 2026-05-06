@@ -1,93 +1,39 @@
 # -*- coding: utf-8 -*-
 
-import os
+import subprocess
 import sys
-from colorama import Fore, Style, init
-
-init(autoreset=True)
-
-ROOT = os.getcwd()
-
-REQUIRED_DIRS = [
-    "apps",
-    "apps/api",
-    "apps/trader",
-    "core",
-    "core/workroom",
-    "core/agents",
-    "core/orchestrator",
-    "core/contracts",
-    "data",
-    "data/ingestion",
-    "infra",
-    "data/features",
-]
-
-REQUIRED_FILES = [
-    "requirements.txt",
-    "apps/api/main.py",
-]
+from pathlib import Path
 
 
-def warn(msg):
-    print(f"{Fore.YELLOW}[WARN]{Style.RESET_ALL} {msg}")
+ROOT = Path(__file__).resolve().parent.parent
 
 
-def error(msg):
-    print(f"{Fore.RED}[ERROR]{Style.RESET_ALL} {msg}")
-    sys.exit(1)
+def ensure():
 
+    requirements = ROOT / "requirements.txt"
 
-def ok(msg):
-    print(f"{Fore.GREEN}[OK]{Style.RESET_ALL} {msg}")
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "-r",
+            str(requirements)
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
 
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/migrate.py"
+        ]
+    )
 
-def ensure_dirs():
-    for d in REQUIRED_DIRS:
-        path = os.path.join(ROOT, d)
-        if not os.path.exists(path):
-            os.makedirs(path)
-            warn(f"Created missing directory: {d}")
-
-
-def ensure_init_files():
-    for root, dirs, files in os.walk(ROOT):
-
-        if "__pycache__" in root:
-            continue
-
-        if any(skip in root for skip in [".git", "scripts"]):
-            continue
-
-        init_file = os.path.join(root, "__init__.py")
-
-        if not os.path.exists(init_file):
-            with open(init_file, "w", encoding="utf-8") as f:
-                f.write("")
-            warn(f"Created __init__.py in {root}")
-
-
-def validate_files():
-    for f in REQUIRED_FILES:
-        path = os.path.join(ROOT, f)
-        if not os.path.exists(path):
-            error(f"Missing required file: {f}")
-
-
-def validate_requirements():
-    path = os.path.join(ROOT, "requirements.txt")
-    if not os.path.exists(path):
-        error("requirements.txt not found")
-
-
-def main():
-    ensure_dirs()
-    ensure_init_files()
-    validate_files()
-    validate_requirements()
-
-    ok("Environment ready")
+    print("\033[92m[OK]\033[0m Environment ready")
 
 
 if __name__ == "__main__":
-    main()
+    ensure()

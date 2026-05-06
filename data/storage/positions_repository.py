@@ -1,132 +1,102 @@
 # -*- coding: utf-8 -*-
 
-from data.storage.database import get_connection
+from sqlalchemy.orm import Session
+
+from data.storage.database import SessionLocal
+from data.storage.models import Trade
 
 
-def open_position(
-    user_id,
-    symbol,
-    action,
-    entry_price,
-    quantity,
-    stop_loss,
-    take_profit,
-    trailing_stop,
-    breakeven_enabled
-):
+class PositionsRepository:
 
-    conn = get_connection()
+    def __init__(self):
 
-    cursor = conn.cursor()
+        self.db: Session = SessionLocal()
 
-    cursor.execute("""
-    INSERT INTO trades (
-        user_id,
-        symbol,
-        action,
-        entry_price,
-        current_price,
-        quantity,
-        stop_loss,
-        take_profit,
-        trailing_stop,
-        breakeven_enabled,
-        status,
-        pnl
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', 0)
-    """, (
-        user_id,
-        symbol,
-        action,
-        entry_price,
-        entry_price,
-        quantity,
-        stop_loss,
-        take_profit,
-        trailing_stop,
-        int(breakeven_enabled)
-    ))
+    def create_position(
+        self,
+        user_id: int,
+        symbol: str,
+        action: str,
+        entry_price: float,
+        quantity: float,
+        stop_loss: float,
+        take_profit: float,
+        trailing_stop: float
+    ):
 
-    conn.commit()
+        trade = Trade(
+            user_id=user_id,
+            symbol=symbol,
+            action=action,
+            entry_price=entry_price,
+            current_price=entry_price,
+            quantity=quantity,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            trailing_stop=trailing_stop,
+            status="OPEN",
+            pnl=0
+        )
 
-    conn.close()
+        self.db.add(trade)
+        self.db.commit()
+        self.db.refresh(trade)
 
+        return trade
 
-def get_open_position(user_id, symbol):
+    def get_open_position(
+        self,
+        user_id: int,
+        symbol: str
+    ):
 
-    conn = get_connection()
+        return (
+            self.db.query(Trade)
+            .filter(
+                Trade.user_id == user_id,
+                Trade.symbol == symbol,
+                Trade.status == "OPEN"
+            )
+            .first()
+        )
 
-    cursor = conn.cursor()
+    def close_position(
+        self,
+        trade_id: int,
+        exit_price: float,
+        pnl: float
+    ):
 
-    cursor.execute("""
-    SELECT *
-    FROM trades
-    WHERE user_id = ?
-    AND symbol = ?
-    AND status = 'OPEN'
-    ORDER BY id DESC
-    LIMIT 1
-    """, (
-        user_id,
-        symbol
-    ))
+        trade = (
+            self.db.query(Trade)
+            .filter(Trade.id == trade_id)
+            .first()
+        )
 
-    row = cursor.fetchone()
+        if not trade:
+            return
 
-    conn.close()
+        trade.current_price = exit_price
+        trade.pnl = pnl
+        trade.status = "CLOSED"
 
-    return row
+        self.db.commit()
 
+    def update_price(
+        self,
+        trade_id: int,
+        price: float
+    ):
 
-def update_position(
-    position_id,
-    current_price,
-    stop_loss,
-    trailing_stop,
-    breakeven_enabled
-):
+        trade = (
+            self.db.query(Trade)
+            .filter(Trade.id == trade_id)
+            .first()
+        )
 
-    conn = get_connection()
+        if not trade:
+            return
 
-    cursor = conn.cursor()
+        trade.current_price = price
 
-    cursor.execute("""
-    UPDATE trades
-    SET current_price = ?,
-        stop_loss = ?,
-        trailing_stop = ?,
-        breakeven_enabled = ?
-    WHERE id = ?
-    """, (
-        current_price,
-        stop_loss,
-        trailing_stop,
-        int(breakeven_enabled),
-        position_id
-    ))
-
-    conn.commit()
-
-    conn.close()
-
-
-def close_position(position_id, pnl):
-
-    conn = get_connection()
-
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    UPDATE trades
-    SET status = 'CLOSED',
-        pnl = ?
-    WHERE id = ?
-    """, (
-        pnl,
-        position_id
-    ))
-
-    conn.commit()
-
-    conn.close()
+        self.db.commit()
