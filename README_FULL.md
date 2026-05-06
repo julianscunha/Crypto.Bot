@@ -97,6 +97,48 @@ Fluxo:
 - calcula PnL real
 - atualiza métricas
 
+## Strategy & Risk Engine (IMPLEMENTED)
+
+Strategy:
+- Momentum simples (price delta)
+
+Risk:
+- Perfis: conservative, balanced, aggressive
+- Stop loss
+- Take profit
+- Position sizing
+
+Fluxo:
+Market → Strategy → Risk → Execution
+
+Arquivos:
+core/agents/strategy_agent.py
+core/agents/risk_agent.py
+core/agents/execution_agent.py
+
+## Statistical Edge Engine (IMPLEMENTED)
+
+Indicators:
+- EMA 9
+- EMA 21
+- RSI 14
+- ATR 14
+
+Filters:
+- volatility filter
+- cooldown
+- trend confirmation
+
+Risk:
+- ATR stop loss
+- ATR take profit
+- dynamic position sizing
+
+Arquivos:
+data/features/indicators.py
+core/agents/strategy_agent.py
+core/agents/risk_agent.py
+
 ## Estrutura das pastas
 crypto.bot/
 

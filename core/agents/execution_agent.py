@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 
 from core.agents.base_agent import BaseAgent
-from core.contracts.messages import RiskDecisionMessage, MarketDataMessage
+
+from core.contracts.messages import (
+    RiskDecisionMessage
+)
 
 from data.storage.positions_repository import (
     open_position,
@@ -14,48 +17,66 @@ from data.storage.metrics import calculate_metrics
 
 class ExecutionAgent(BaseAgent):
 
-    def __init__(self, name, bus):
-        super().__init__(name, bus)
-        self.last_price = {}
-
     def on_message(self, message):
 
-        # Atualiza preço atual
-        if isinstance(message, MarketDataMessage):
-            self.last_price[message.user_id] = message.payload.price
+        if not isinstance(message, RiskDecisionMessage):
+            return
 
-        if isinstance(message, RiskDecisionMessage):
+        payload = message.payload
 
-            user_id = message.user_id
-            price = self.last_price.get(user_id)
+        user_id = message.user_id
 
-            if price is None:
-                return
+        action = payload.action
+        approved = payload.approved
 
-            position = get_open_position(user_id)
+        price = payload.price
+        quantity = payload.quantity
 
-            # === ABRIR POSIÇÃO ===
-            if message.payload.approved and position is None:
+        if not approved:
+            return
 
-                open_position(
-                    user_id=user_id,
-                    action="BUY",
-                    price=price,
-                    quantity=1
-                )
+        position = get_open_position(user_id)
 
-                print(f"[EXECUTION] OPEN BUY @ {price}")
+        # ==================================================
+        # OPEN
+        # ==================================================
 
-            # === FECHAR POSIÇÃO ===
-            elif position is not None:
+        if action == "OPEN" and position is None:
 
-                entry_price = position["price"]
-                quantity = position["quantity"]
+            open_position(
+                user_id=user_id,
+                action="BUY",
+                price=price,
+                quantity=quantity
+            )
 
-                pnl = (price - entry_price) * quantity
+            print(
+                f"[EXECUTION] OPEN BUY @ {round(price,2)} "
+                f"| qty={round(quantity,2)}"
+            )
 
-                close_position(position["id"], pnl)
+        # ==================================================
+        # CLOSE
+        # ==================================================
 
-                metrics = calculate_metrics(user_id)
+        elif action == "CLOSE" and position is not None:
 
-                print(f"[EXECUTION] CLOSE @ {price} | PnL: {round(pnl,2)} | Metrics: {metrics}")
+            entry_price = position["price"]
+
+            pnl = (
+                (price - entry_price)
+                * position["quantity"]
+            )
+
+            close_position(
+                position["id"],
+                pnl
+            )
+
+            metrics = calculate_metrics(user_id)
+
+            print(
+                f"[EXECUTION] CLOSE @ {round(price,2)} "
+                f"| PnL={round(pnl,2)} "
+                f"| {metrics}"
+            )
