@@ -1,388 +1,167 @@
-# CRYPTO.BOT — MASTER DOCUMENT
+# CRYPTO.BOT — MASTER ARCHITECTURE DOCUMENT
 
 ## Visão Geral
-Sistema profissional de trading automatizado baseado em:
-- Multi-agentes (Work Room)
+
+Crypto.Bot é um sistema profissional de automação de trade em criptomoedas baseado em:
+
 - Arquitetura event-driven
-- State machine de trades
-- Orchestrator central
-- IA plugável (futuro)
-- Multi-tenant (user_id isolado)
+- Multi-agentes (WorkRoom)
+- Engine de execução
+- Persistência de trades
+- Métricas operacionais
+- Risk engine
+- State machine
+- Runtime unificado
+- Preparação para IA futura
+- Multi-tenant via user_id
 
-## Estados do Trade
-IDLE → ANALYZING → SIGNAL_GENERATED → RISK_APPROVED → ORDER_SENT → ORDER_FILLED → POSITION_OPEN → POSITION_CLOSED
+Objetivo principal:
+transformar sinais operacionais em edge estatística consistente.
 
-## Modos
-- Paper Trading
-- Live Trading
+---
 
-## Segurança
-- user_id obrigatório
-- isolamento total
-- validação tipada
+# Arquitetura Geral
 
-## Roadmap
-- Binance integração
-- Paper trading real
-- UI
-- IA
+Market Data
+↓
+Analyst Agent
+↓
+Strategy Agent
+↓
+Risk Agent
+↓
+Execution Agent
+↓
+Persistence
+↓
+Metrics Engine
 
-## Bootstrap Automático
-O projeto possui um sistema de bootstrap que:
+---
 
-- cria diretórios automaticamente
-- garante __init__.py em todos módulos
-- valida arquivos obrigatórios
-- prepara ambiente Python
-Arquivos:
-scripts/start.bat
-scripts/bootstrap.py
+# Runtime
 
-## Binance Integration (IMPLEMENTED)
-
-- WebSocket real conectado
-- Streaming BTCUSDT (1m)
-- Evento MARKET_DATA integrado ao WorkRoom
-- Pipeline completo ativo em tempo real
-
-Arquivo:
-data/ingestion/binance_ws.py
-
-
-## Runtime Unificado
-
-O sistema roda via um único entrypoint:
-
+EntryPoint:
 apps/main.py
 
 Responsável por:
-- subir API (FastAPI)
-- iniciar trader (Binance WS + agents)
-- gerenciar processos paralelos
+- subir API FastAPI
+- iniciar trader runtime
+- controlar multiprocessing
+- lifecycle/shutdown
+- runtime unificado
 
-Execução:
-scripts/start.bat
+---
 
-## Persistence & Metrics (IMPLEMENTED)
+# Estrutura Atual do Projeto
 
-- SQLite database for trades
-- Trade persistence per user_id
-- Metrics:
-  - total_trades
-  - winrate
-  - pnl
-
-Arquivos:
-data/storage/database.py
-data/storage/trades_repository.py
-data/storage/metrics.py
-
-Integração:
-core/agents/execution_agent.py
-
-## Position Management & Real PnL (IMPLEMENTED)
-
-- Controle de posição aberta
-- Fechamento baseado em preço real
-- Cálculo de PnL real (entry vs exit)
-- Apenas 1 posição ativa por user_id
-
-Arquivos:
-data/storage/positions_repository.py
-core/agents/execution_agent.py
-
-Fluxo:
-- abre posição quando aprovado
-- fecha na próxima decisão
-- calcula PnL real
-- atualiza métricas
-
-## Strategy & Risk Engine (IMPLEMENTED)
-
-Strategy:
-- Momentum simples (price delta)
-
-Risk:
-- Perfis: conservative, balanced, aggressive
-- Stop loss
-- Take profit
-- Position sizing
-
-Fluxo:
-Market → Strategy → Risk → Execution
-
-Arquivos:
-core/agents/strategy_agent.py
-core/agents/risk_agent.py
-core/agents/execution_agent.py
-
-## Statistical Edge Engine (IMPLEMENTED)
-
-Indicators:
-- EMA 9
-- EMA 21
-- RSI 14
-- ATR 14
-
-Filters:
-- volatility filter
-- cooldown
-- trend confirmation
-
-Risk:
-- ATR stop loss
-- ATR take profit
-- dynamic position sizing
-
-Arquivos:
-data/features/indicators.py
-core/agents/strategy_agent.py
-core/agents/risk_agent.py
-
-## Estrutura das pastas
 crypto.bot/
 
 ├── apps/
-│   ├── api/
-│   │   └── main.py
-│   │
-│   ├── trader/
-│   │   └── runner.py
-│   │
-│   └── ui/ (futuro)
-│
 ├── core/
-│   ├── workroom/
-│   │   ├── bus.py
-│   │   └── message.py
-│   │
-│   ├── agents/
-│   │   ├── base_agent.py
-│   │   ├── analyst_agent.py
-│   │   ├── strategy_agent.py
-│   │   ├── risk_agent.py
-│   │   └── execution_agent.py
-│   │
-│   ├── orchestrator/
-│   │   ├── trade_orchestrator.py
-│   │   ├── state_machine.py
-│   │   └── error_handler.py
-│   │
-│   ├── contracts/
-│   │   ├── base.py
-│   │   ├── messages.py
-│   │   ├── strategy.py
-│   │   ├── risk.py
-│   │   └── execution.py
-│   │
-│   └── learning/ (futuro)
-│
 ├── data/
-│   ├── ingestion/
-│   ├── features/
-│   └── storage/
-│            database.py
-│            trades_repository.py
-│            metrics.py
-│
 ├── infra/
-│   ├── config/
-│   ├── logging/
-│   └── database/
-│
 ├── scripts/
-│   ├── start.sh
-│   ├── start.bat
-│   └── validate.py
-│
 ├── requirements.txt
 ├── README.md
 ├── README_FULL.md
 └── PROJECT_PROMPT.txt
 
-## DESCRIÇÃO DE CADA MÓDULO
-📁 /apps
+---
 
-🔹apps/api/main.py
-Responsável por:
-subir o servidor FastAPI
-expor endpoints (status, config, controle)
-futuramente:
-controle do bot
-métricas
-integração com UI
+# Core Atual Implementado
 
-🔹 apps/trader/runner.py
-Responsável por:
-inicializar o sistema de trading
-subir:
-WorkRoom
-Agents
-Orchestrator
-iniciar ciclo de mercado
+## Event Driven
+- EventBus
+- publish/subscribe
+- mensagens tipadas
 
-📁 /core (CÉREBRO DO SISTEMA)
-🔹 /core/workroom
-bus.py
-Event bus interno
-responsável por:
-distribuir mensagens entre agentes
-simular “conversa”
+## Trading Engine
+- Strategy Engine
+- Risk Engine
+- Execution Engine
 
-message.py
-estrutura base das mensagens
-padrão:
-{
-  "type": "...",
-  "sender": "...",
-  "user_id": 0,
-  "payload": {},
-  "explanation": ""
-}
+## Persistência
+- SQLite
+- trades
+- positions
+- metrics
 
-🔹 /core/agents
-base_agent.py
-classe base de todos agentes
-define:
-on_message
-publish
+## Indicadores
+- EMA 9
+- EMA 21
+- RSI 14
+- ATR 14
 
-analyst_agent.py
-analisa mercado
-output:
-tendência
-volatilidade
+## Risk
+- stop loss
+- take profit
+- dynamic sizing
+- volatility filter
 
-strategy_agent.py
-gera sinais de trade
-output:
-BUY / SELL
-entry / stop / take
+## Metrics
+- pnl
+- winrate
+- total trades
 
-risk_agent.py
-controla risco (CRÍTICO)
-pode:
-aprovar
-reduzir posição
-bloquear trade
+---
 
-execution_agent.py
-executa ordens
-modos:
-paper (simulado)
-live (real)
+# Fluxo Operacional
 
-🔹 /core/orchestrator
-trade_orchestrator.py
-coordena o ciclo do trade
-mantém contexto por trade
+BinanceWS
+↓
+MarketDataMessage
+↓
+AnalystAgent
+↓
+StrategySignalMessage
+↓
+RiskDecisionMessage
+↓
+ExecutionAgent
+↓
+Database
 
-state_machine.py
-controla estados do trade
-impede transições inválidas
+---
 
-error_handler.py
-captura falhas
-define fallback seguro
+# Objetivo Atual
 
-🔹 /core/contracts
-base.py
-modelo base (Pydantic)
-validação global
+Transformar sinais em edge estatística:
+- reduzir ruído
+- reduzir overtrading
+- melhorar consistência
+- melhorar expectancy
 
-messages.py
-tipos de mensagens:
-MARKET_ANALYSIS
-TRADE_PROPOSAL
-etc
+---
 
-strategy.py
-schema de estratégia
+# Próximos Passos
 
-risk.py
-schema de risco
+## Engine
+- trailing stop
+- breakeven
+- equity curve
+- exposure engine
 
-execution.py
-schema de execução
+## Strategy
+- multi timeframe
+- market structure
+- volume profile
 
-🔹 /core/learning (futuro)
-treinamento automático
-otimização de parâmetros
-versionamento de modelos
+## Metrics
+- sharpe
+- profit factor
+- drawdown
 
-📁 /data
-ingestion
-coleta dados (Binance WS)
-features
-indicadores técnicos
-storage
-persistência (SQLite/Postgres)
+## Infra
+- Binance real
+- UI profissional
+- IA colaborativa
 
-📁 /infra
-config
-configs globais
-configs por usuário
-logging
-logs estruturados
-database
-acesso ao banco
-isolamento por user_id (CRÍTICO)
+---
 
-📁 /scripts
-start.sh
-inicia sistema (Linux/mac)
-start.bat
-inicia sistema (Windows)
-validate.py
-valida estrutura do projeto
+# Regras Arquiteturais
 
-🔷 CONCEITOS FUNDAMENTAIS
-
-🧠 Work Room
-agentes se comunicam via mensagens
-simula “time de traders”
-
-🔄 State Machine
-controla ciclo do trade
-evita bugs e decisões inválidas
-
-🎯 Orchestrator
-garante ordem do fluxo
-conecta agentes + estado
-
-🔒 Multi-tenant
-user_id obrigatório
-isolamento total entre usuários
-
-🧪 Modos
-Paper → simulação
-Live → dinheiro real
-
-🤖 IA (futuro)
-agente adicional
-sugere melhorias
-nunca executa sem aprovação
-
-🔷 REGRAS DO SISTEMA (IMPORTANTÍSSIMO)
-- Risk sempre pode bloquear trade
-- Nenhum trade executa sem validação
-- Nenhuma mensagem sem schema
-- Nenhum dado sem user_id
-- Nenhuma transição inválida de estado
-
-🔷 FLUXO COMPLETO
-Market Data
-   ↓
-Analyst Agent
-   ↓
-Strategy Agent
-   ↓
-Risk Agent
-   ↓
-Orchestrator
-   ↓
-Execution Agent
-   ↓
-Trade Result
-   ↓
-Learning (futuro)
+- não remover user_id
+- não quebrar contracts
+- não quebrar state machine
+- manter event-driven
+- manter isolamento por usuário
