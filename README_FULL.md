@@ -148,6 +148,39 @@ core/agents/execution_agent.py
 data/storage/positions_repository.py
 data/storage/database.py
 
+# =========================================================
+# PORTFOLIO ANALYTICS (IMPLEMENTED)
+# =========================================================
+
+Features:
+- equity curve
+- realized pnl
+- unrealized pnl
+- max drawdown
+- profit factor
+- average win/loss
+- portfolio analytics
+
+Arquivos:
+- data/storage/equity_repository.py
+- data/storage/metrics.py
+- data/storage/database.py
+- core/agents/execution_agent.py
+
+Tables:
+- equity_curve
+
+Metrics:
+- equity
+- drawdown
+- profit factor
+- avg win
+- avg loss
+- winrate
+
+Architecture:
+portfolio-aware analytics engine
+
 ---
 
 # Fluxo Operacional

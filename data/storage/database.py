@@ -22,6 +22,10 @@ def init_db():
 
     cursor = conn.cursor()
 
+    # =====================================================
+    # TRADES
+    # =====================================================
+
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS trades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,6 +50,26 @@ def init_db():
         status TEXT,
 
         pnl REAL,
+
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # =====================================================
+    # EQUITY CURVE
+    # =====================================================
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS equity_curve (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+        user_id INTEGER,
+
+        equity REAL,
+        realized_pnl REAL,
+        unrealized_pnl REAL,
+
+        drawdown REAL,
 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )

@@ -43,15 +43,17 @@ class ExecutionAgent(BaseAgent):
             symbol
         )
 
-        # ==========================================
+        # =================================================
         # OPEN
-        # ==========================================
+        # =================================================
 
         if action == "OPEN" and position is None:
 
             open_position(
                 user_id=user_id,
+
                 symbol=symbol,
+
                 action="BUY",
 
                 entry_price=price,
@@ -59,6 +61,7 @@ class ExecutionAgent(BaseAgent):
                 quantity=quantity,
 
                 stop_loss=payload.stop_loss,
+
                 take_profit=payload.take_profit,
 
                 trailing_stop=payload.trailing_stop,
@@ -74,9 +77,9 @@ class ExecutionAgent(BaseAgent):
                 f"| TP={payload.take_profit}"
             )
 
-        # ==========================================
-        # POSITION MANAGEMENT
-        # ==========================================
+        # =================================================
+        # HOLD
+        # =================================================
 
         elif action == "HOLD" and position is not None:
 
@@ -92,15 +95,18 @@ class ExecutionAgent(BaseAgent):
                 breakeven_enabled=payload.breakeven_enabled
             )
 
-        # ==========================================
+        # =================================================
         # CLOSE
-        # ==========================================
+        # =================================================
 
         elif action == "CLOSE" and position is not None:
 
-            pnl = (
-                (price - position["entry_price"])
-                * position["quantity"]
+            pnl = round(
+                (
+                    price
+                    - position["entry_price"]
+                ) * position["quantity"],
+                2
             )
 
             close_position(
@@ -115,5 +121,8 @@ class ExecutionAgent(BaseAgent):
                 f"{symbol} "
                 f"CLOSE @ {round(price,2)} "
                 f"| PnL={round(pnl,2)} "
-                f"| {metrics}"
+                f"| Equity={metrics['equity']} "
+                f"| DD={metrics['max_drawdown']} "
+                f"| PF={metrics['profit_factor']} "
+                f"| WR={metrics['winrate']}"
             )
