@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from data.storage.database import SessionLocal
 from data.storage.models import Trade
@@ -10,7 +10,7 @@ class PositionsRepository:
 
     def __init__(self):
 
-        self.db: Session = SessionLocal()
+        self.db = SessionLocal()
 
     def create_position(
         self,
@@ -21,44 +21,37 @@ class PositionsRepository:
         quantity: float,
         stop_loss: float,
         take_profit: float,
-        trailing_stop: float
+        trailing_stop: float,
+        breakeven_enabled: bool = False
     ):
 
         trade = Trade(
             user_id=user_id,
             symbol=symbol,
             action=action,
+
             entry_price=entry_price,
             current_price=entry_price,
+
             quantity=quantity,
+
             stop_loss=stop_loss,
             take_profit=take_profit,
             trailing_stop=trailing_stop,
+
+            breakeven_enabled=breakeven_enabled,
+
             status="OPEN",
-            pnl=0
+            pnl=0.0
         )
 
         self.db.add(trade)
+
         self.db.commit()
+
         self.db.refresh(trade)
 
         return trade
-
-    def get_open_position(
-        self,
-        user_id: int,
-        symbol: str
-    ):
-
-        return (
-            self.db.query(Trade)
-            .filter(
-                Trade.user_id == user_id,
-                Trade.symbol == symbol,
-                Trade.status == "OPEN"
-            )
-            .first()
-        )
 
     def close_position(
         self,
@@ -67,10 +60,9 @@ class PositionsRepository:
         pnl: float
     ):
 
-        trade = (
-            self.db.query(Trade)
-            .filter(Trade.id == trade_id)
-            .first()
+        trade = self.db.get(
+            Trade,
+            trade_id
         )
 
         if not trade:
@@ -82,21 +74,30 @@ class PositionsRepository:
 
         self.db.commit()
 
-    def update_price(
+    def get_open_position(
         self,
-        trade_id: int,
-        price: float
+        user_id: int,
+        symbol: str
     ):
 
-        trade = (
-            self.db.query(Trade)
-            .filter(Trade.id == trade_id)
-            .first()
+        stmt = (
+            select(Trade)
+            .where(Trade.user_id == user_id)
+            .where(Trade.symbol == symbol)
+            .where(Trade.status == "OPEN")
         )
 
-        if not trade:
-            return
+        return self.db.execute(stmt).scalar_one_or_none()
 
-        trade.current_price = price
+    def get_open_positions(
+        self,
+        user_id: int
+    ):
 
-        self.db.commit()
+        stmt = (
+            select(Trade)
+            .where(Trade.user_id == user_id)
+            .where(Trade.status == "OPEN")
+        )
+
+        return self.db.execute(stmt).scalars().all()

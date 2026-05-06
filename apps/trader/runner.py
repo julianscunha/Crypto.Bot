@@ -17,16 +17,14 @@ async def main():
 
     bus = EventBus()
 
-    analyst = AnalystAgent("analyst", bus)
-    strategy = StrategyAgent("strategy", bus)
-    risk = RiskAgent("risk", bus)
-    execution = ExecutionAgent("execution", bus)
+    AnalystAgent(bus)
+    StrategyAgent(bus)
+    RiskAgent(bus)
+    ExecutionAgent(bus)
 
-    bus.subscribe(analyst)
-    bus.subscribe(strategy)
-    bus.subscribe(risk)
-    bus.subscribe(execution)
-
-    ws = BinanceWS(bus)
+    ws = BinanceWS(
+        bus=bus,
+        user_id=0
+    )
 
     await ws.start()

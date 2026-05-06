@@ -1,92 +1,108 @@
 # -*- coding: utf-8 -*-
 
 from dataclasses import dataclass
-from typing import Any
 
 
 # =========================================================
-# BASE
+# BASE MESSAGE
 # =========================================================
 
 @dataclass
 class BaseMessage:
-    user_id: int
-    payload: Any
+
+    sender: str
+    payload: object
 
 
 # =========================================================
-# MARKET
+# MARKET DATA
 # =========================================================
 
 @dataclass
 class MarketDataPayload:
+
+    user_id: int
+
     symbol: str
-    price: float
+
+    open: float
+    close: float
+    high: float
+    low: float
+
+    volume: float
 
 
 @dataclass
 class MarketDataMessage(BaseMessage):
-    payload: MarketDataPayload
+    pass
 
 
 # =========================================================
-# ANALYSIS
+# MARKET ANALYSIS
 # =========================================================
 
 @dataclass
 class MarketAnalysisPayload:
+
+    user_id: int
+
     symbol: str
-    trend: str
-    confidence: float
+
+    analysis: str
+
     price: float
 
 
 @dataclass
 class MarketAnalysisMessage(BaseMessage):
-    payload: MarketAnalysisPayload
+    pass
 
 
 # =========================================================
-# STRATEGY
+# STRATEGY SIGNAL
 # =========================================================
 
 @dataclass
 class StrategySignalPayload:
+
+    user_id: int
+
     symbol: str
+
     signal: str
+
     price: float
-    atr: float
 
 
 @dataclass
 class StrategySignalMessage(BaseMessage):
-    payload: StrategySignalPayload
+    pass
 
 
 # =========================================================
-# RISK
+# RISK DECISION
 # =========================================================
 
 @dataclass
 class RiskDecisionPayload:
+
+    user_id: int
+
     symbol: str
 
-    action: str
-    approved: bool
+    signal: str
 
     price: float
+
     quantity: float
 
-    stop_loss: float | None = None
-    take_profit: float | None = None
+    stop_loss: float
+    take_profit: float
 
-    trailing_stop: float | None = None
-
-    atr: float | None = None
-
-    breakeven_enabled: bool = False
+    trailing_stop: float
 
 
 @dataclass
 class RiskDecisionMessage(BaseMessage):
-    payload: RiskDecisionPayload
+    pass

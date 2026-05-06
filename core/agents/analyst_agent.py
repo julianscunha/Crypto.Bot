@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from core.agents.base_agent import BaseAgent
-
 from core.contracts.messages import (
     MarketDataMessage,
     MarketAnalysisMessage,
@@ -9,58 +7,36 @@ from core.contracts.messages import (
 )
 
 
-class AnalystAgent(BaseAgent):
+class AnalystAgent:
 
-    def __init__(self, name, bus):
+    def __init__(self, bus):
 
-        super().__init__(name, bus)
+        self.bus = bus
 
-        self.price_history = {}
+        self.bus.subscribe(self)
 
     def on_message(self, message):
 
         if not isinstance(message, MarketDataMessage):
             return
 
-        user_id = message.user_id
+        payload = message.payload
 
-        symbol = message.payload.symbol
-        price = message.payload.price
+        analysis = "BULLISH"
 
-        key = f"{user_id}:{symbol}"
+        if payload.close < payload.open:
+            analysis = "BEARISH"
 
-        if key not in self.price_history:
-            self.price_history[key] = []
-
-        history = self.price_history[key]
-
-        history.append(price)
-
-        history[:] = history[-20:]
-
-        if len(history) < 5:
-            return
-
-        trend = "SIDEWAYS"
-
-        if history[-1] > history[0]:
-            trend = "UP"
-
-        elif history[-1] < history[0]:
-            trend = "DOWN"
-
-        confidence = abs(
-            history[-1] - history[0]
+        result = MarketAnalysisPayload(
+            user_id=payload.user_id,
+            symbol=payload.symbol,
+            analysis=analysis,
+            price=payload.close
         )
 
         self.bus.publish(
             MarketAnalysisMessage(
-                user_id=user_id,
-                payload=MarketAnalysisPayload(
-                    symbol=symbol,
-                    trend=trend,
-                    confidence=round(confidence, 2),
-                    price=price
-                )
+                sender="AnalystAgent",
+                payload=result
             )
         )
