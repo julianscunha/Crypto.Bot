@@ -1,292 +1,211 @@
-# CRYPTO.BOT — MASTER ARCHITECTURE DOCUMENT
+# CRYPTO.BOT
 
-## Visão Geral
+## Overview
 
-Crypto.Bot é um sistema profissional de automação de trade em criptomoedas baseado em:
-
-- Arquitetura event-driven
-- Multi-agentes (WorkRoom)
-- Engine de execução
-- Persistência de trades
-- Métricas operacionais
-- Risk engine
-- State machine
-- Runtime unificado
-- Preparação para IA futura
-- Multi-tenant via user_id
-
-Objetivo principal:
-transformar sinais operacionais em edge estatística consistente.
+Crypto.Bot é uma plataforma modular de trading algorítmico orientada a eventos, baseada em arquitetura async/event-driven com isolamento multi-tenant via `user_id`.
 
 ---
 
-# Arquitetura Geral
+# Architecture
 
-Market Data
-↓
-Analyst Agent
-↓
-Strategy Agent
-↓
-Risk Agent
-↓
-Execution Agent
-↓
-Persistence
-↓
-Metrics Engine
+## Event Flow
 
----
-
-# Runtime
-
-EntryPoint:
-apps/main.py
-
-Responsável por:
-- subir API FastAPI
-- iniciar trader runtime
-- controlar multiprocessing
-- lifecycle/shutdown
-- runtime unificado
-
----
-
-# Estrutura Atual do Projeto
-
-crypto.bot/
-
-├── apps/
-├── core/
-├── data/
-├── infra/
-├── scripts/
-├── requirements.txt
-├── README.md
-├── README_FULL.md
-└── PROJECT_PROMPT.txt
-
----
-
-# Core Atual Implementado
-
-## Event Driven
-- EventBus
-- publish/subscribe
-- mensagens tipadas
-
-## Trading Engine
-- Strategy Engine
-- Risk Engine
-- Execution Engine
-
-## Persistência
-- SQLite
-- trades
-- positions
-- metrics
-
-## Indicadores
-- EMA 9
-- EMA 21
-- RSI 14
-- ATR 14
-
-## Risk
-- stop loss
-- take profit
-- dynamic sizing
-- volatility filter
-
-## Metrics
-- pnl
-- winrate
-- total trades
-
-## Multi-Symbol Engine (IMPLEMENTED)
-
-Symbols:
-- BTCUSDT
-- ETHUSDT
-- SOLUSDT
-- BNBUSDT
-
-Features:
-- multi-symbol runtime
-- isolated positions
-- symbol-aware contracts
-- portfolio-ready architecture
-
-Position isolation:
-positions[user_id][symbol]
-
-Arquivos:
-core/contracts/messages.py
-data/ingestion/binance_ws.py
-data/storage/positions_repository.py
-core/agents/strategy_agent.py
-core/agents/risk_agent.py
-core/agents/execution_agent.py
-
-## Trailing Stop + Breakeven (IMPLEMENTED)
-
-Features:
-- dynamic trailing stop
-- breakeven protection
-- ATR-based risk management
-- symbol-aware risk engine
-
-Rules:
-- breakeven at 1R
-- trailing stop using ATR
-- dynamic stop update
-- isolated position management
-
-Arquivos:
-core/agents/risk_agent.py
-core/agents/execution_agent.py
-data/storage/positions_repository.py
-data/storage/database.py
-
-# =========================================================
-# PORTFOLIO ANALYTICS (IMPLEMENTED)
-# =========================================================
-
-Features:
-- equity curve
-- realized pnl
-- unrealized pnl
-- max drawdown
-- profit factor
-- average win/loss
-- portfolio analytics
-
-Arquivos:
-- data/storage/equity_repository.py
-- data/storage/metrics.py
-- data/storage/database.py
-- core/agents/execution_agent.py
-
-Tables:
-- equity_curve
-
-Metrics:
-- equity
-- drawdown
-- profit factor
-- avg win
-- avg loss
-- winrate
-
-Architecture:
-portfolio-aware analytics engine
-
-# =========================================================
-# DATABASE MIGRATIONS (IMPLEMENTED)
-# =========================================================
-
-Stack:
-- SQLAlchemy
-- Alembic
-
-Features:
-- schema versioning
-- auto migration
-- migration history
-- schema evolution
-- production-ready persistence
-
-Arquivos:
-- alembic.ini
-- alembic/env.py
-- data/storage/models.py
-- scripts/migrate.py
-
-Comandos:
-alembic revision --autogenerate -m "migration_name"
-alembic upgrade head
-
-Objetivo:
-eliminar schema drift entre código e SQLite
-
-# =========================================================
-# SQLALCHEMY MIGRATION (IMPLEMENTED)
-# =========================================================
-
-Storage Layer:
-- SQLAlchemy ORM
-- Alembic migrations
-- SessionLocal architecture
-- ORM repositories
-- schema versioning
-
-Repositories:
-- positions_repository.py
-- equity_repository.py
-- metrics.py
-
-Objetivo:
-eliminar sqlite3 procedural layer
-
----
-
-# Fluxo Operacional
-
+```text
 BinanceWS
 ↓
-MarketDataMessage
+EventBus
 ↓
 AnalystAgent
 ↓
-StrategySignalMessage
+StrategyAgent
 ↓
-RiskDecisionMessage
+RiskAgent
 ↓
 ExecutionAgent
 ↓
-Database
+PositionManagerAgent
+↓
+Portfolio Analytics
+```
 
 ---
 
-# Objetivo Atual
+# Core Stack
 
-Transformar sinais em edge estatística:
-- reduzir ruído
-- reduzir overtrading
-- melhorar consistência
-- melhorar expectancy
+- Python 3.11
+- AsyncIO
+- SQLAlchemy
+- Alembic
+- SQLite
+- Event-Driven Architecture
+- Multi-Agent Trading Engine
 
 ---
 
-# Próximos Passos
+# Current Features
 
-## Engine
+## Trading Engine
+
+- Multi-symbol
+- BUY signal flow
+- Risk management
+- Position lifecycle
+- Portfolio analytics
+- Async message bus
+
+---
+
+# Position Lifecycle Engine
+
+## States
+
+- OPEN
+- ACTIVE
+- TAKE_PROFIT
+- STOP_LOSS
+- CLOSED
+
+## Features
+
 - trailing stop
-- breakeven
-- equity curve
-- exposure engine
-
-## Strategy
-- multi timeframe
-- market structure
-- volume profile
-
-## Metrics
-- sharpe
-- profit factor
-- drawdown
-
-## Infra
-- Binance real
-- UI profissional
-- IA colaborativa
+- stop loss
+- take profit
+- pnl realization
+- breakeven preparation
 
 ---
 
-# Regras Arquiteturais
+# Multi-Tenant
 
-- não remover user_id
-- não quebrar contracts
-- não quebrar state machine
-- manter event-driven
-- manter isolamento por usuário
+`user_id` é obrigatório em:
+
+- payloads
+- repositories
+- positions
+- metrics
+- analytics
+
+Nunca realizar queries sem `user_id`.
+
+---
+
+# Event Bus
+
+## Rules
+
+Todos os agentes devem usar:
+
+```python
+async def on_message(self, message)
+```
+
+E:
+
+```python
+await bus.publish(message)
+```
+
+---
+
+# Database
+
+## Stack
+
+- SQLAlchemy ORM
+- Alembic migrations
+- SQLite
+
+## Migration
+
+```powershell
+alembic upgrade head
+```
+
+---
+
+# Project Structure
+
+```text
+apps/
+core/
+data/
+alembic/
+scripts/
+```
+
+---
+
+# Main Modules
+
+## core/
+
+- agents/
+- bus/
+- contracts/
+- services/
+
+## data/
+
+- ingestion/
+- storage/
+
+---
+
+# Portfolio Analytics
+
+## Current Metrics
+
+- total_trades
+- winrate
+- pnl
+- equity curve
+
+---
+
+# Current Operational Status
+
+```text
+Core Infrastructure .......... 90%
+Trading Engine ............... 84%
+Lifecycle Engine ............. 86%
+Portfolio Engine ............. 80%
+Exchange Integration ......... 25%
+Risk Infrastructure .......... 82%
+Production Hardening ......... 42%
+
+TOTAL: ~81%
+```
+
+---
+
+# Known Issues
+
+- BinanceWS ainda mockado
+- Sem orderbook real
+- Sem exchange execution real
+- Sem distributed lock
+- Sem retry engine robusto
+- Necessário hardening async completo
+
+---
+
+# Next Priorities
+
+- Exchange Adapter real Binance
+- Websocket real
+- PostgreSQL
+- Redis event streaming
+- Distributed locking
+- Strategy engine avançado
+- Backtesting
+- AI-assisted signals
+
+---
+
+# Important Rules
+
+- Não quebrar state machine
+- Não remover validações
+- Não ignorar user_id
+- Não misturar payload contracts
+- Manter arquitetura async consistente
