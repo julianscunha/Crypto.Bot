@@ -63,6 +63,40 @@ Responsável por:
 Execução:
 scripts/start.bat
 
+## Persistence & Metrics (IMPLEMENTED)
+
+- SQLite database for trades
+- Trade persistence per user_id
+- Metrics:
+  - total_trades
+  - winrate
+  - pnl
+
+Arquivos:
+data/storage/database.py
+data/storage/trades_repository.py
+data/storage/metrics.py
+
+Integração:
+core/agents/execution_agent.py
+
+## Position Management & Real PnL (IMPLEMENTED)
+
+- Controle de posição aberta
+- Fechamento baseado em preço real
+- Cálculo de PnL real (entry vs exit)
+- Apenas 1 posição ativa por user_id
+
+Arquivos:
+data/storage/positions_repository.py
+core/agents/execution_agent.py
+
+Fluxo:
+- abre posição quando aprovado
+- fecha na próxima decisão
+- calcula PnL real
+- atualiza métricas
+
 ## Estrutura das pastas
 crypto.bot/
 
@@ -105,6 +139,9 @@ crypto.bot/
 │   ├── ingestion/
 │   ├── features/
 │   └── storage/
+│            database.py
+│            trades_repository.py
+│            metrics.py
 │
 ├── infra/
 │   ├── config/
