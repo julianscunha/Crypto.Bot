@@ -22,9 +22,9 @@ SIGNAL_QUALITY_CONFIG = {
 
     "enable_trend_filter": True,
 
-    "ema_fast_period": 9,
+    "ema_fast_period": 3,
 
-    "ema_slow_period": 21,
+    "ema_slow_period": 7,
 
     # =====================================================
     # VOLATILITY FILTER

@@ -1,5 +1,161 @@
 # -*- coding: utf-8 -*-
 
+# =========================================================
+# TREND FILTER REAL
+# =========================================================
+#
+# Objetivo:
+# - Implementar EMA Trend Engine
+# - Adicionar direção real de mercado
+# - Reduzir BUY contra tendência
+# - Integrar no SignalQualityService
+#
+# Execução:
+# python .\scripts\trend_filter_real.py
+#
+# =========================================================
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+# =========================================================
+# HELPERS
+# =========================================================
+
+def write_file(path: Path, content: str):
+
+    path.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    path.write_text(
+        content.strip() + "\n",
+        encoding="utf-8"
+    )
+
+    print(f"[OK] {path}")
+
+
+# =========================================================
+# EMA SERVICE
+# =========================================================
+
+EMA_TREND_SERVICE = r'''
+# -*- coding: utf-8 -*-
+
+from collections import defaultdict
+
+
+class EmaTrendService:
+
+    def __init__(self):
+
+        self.market_history = defaultdict(list)
+
+    # =====================================================
+    # UPDATE PRICE
+    # =====================================================
+
+    def update_price(
+        self,
+        user_id: int,
+        symbol: str,
+        price: float
+    ):
+
+        key = (
+            user_id,
+            symbol
+        )
+
+        history = self.market_history[key]
+
+        history.append(price)
+
+        if len(history) > 200:
+
+            history.pop(0)
+
+    # =====================================================
+    # EMA
+    # =====================================================
+
+    def calculate_ema(
+        self,
+        prices: list,
+        period: int
+    ):
+
+        if len(prices) < period:
+            return None
+
+        multiplier = (
+            2 / (period + 1)
+        )
+
+        ema = (
+            sum(prices[:period]) / period
+        )
+
+        for price in prices[period:]:
+
+            ema = (
+                (price - ema)
+                * multiplier
+            ) + ema
+
+        return ema
+
+    # =====================================================
+    # TREND VALIDATION
+    # =====================================================
+
+    def is_bullish(
+        self,
+        user_id: int,
+        symbol: str,
+        fast_period: int,
+        slow_period: int
+    ):
+
+        key = (
+            user_id,
+            symbol
+        )
+
+        prices = self.market_history[key]
+
+        ema_fast = self.calculate_ema(
+            prices,
+            fast_period
+        )
+
+        ema_slow = self.calculate_ema(
+            prices,
+            slow_period
+        )
+
+        if ema_fast is None:
+            return False
+
+        if ema_slow is None:
+            return False
+
+        return ema_fast > ema_slow
+'''
+
+
+# =========================================================
+# SIGNAL QUALITY SERVICE
+# =========================================================
+
+SIGNAL_QUALITY_SERVICE = r'''
+# -*- coding: utf-8 -*-
+
 from datetime import datetime
 
 from core.config.signal_quality_config import (
@@ -266,3 +422,119 @@ class SignalQualityService:
             )
 
         return True, "OK"
+'''
+
+
+# =========================================================
+# ANALYST AGENT
+# =========================================================
+
+ANALYST_AGENT_APPEND = r'''
+
+# =====================================================
+# TREND UPDATE
+# =====================================================
+
+self.signal_quality.update_market_data(
+    payload
+)
+'''
+
+
+# =========================================================
+# README
+# =========================================================
+
+README_APPEND = r'''
+
+# =========================================================
+# EMA TREND ENGINE
+# =========================================================
+
+## COMPONENTS
+
+- EmaTrendService
+- EMA Fast
+- EMA Slow
+- Bullish Trend Validation
+
+## FLOW
+
+MarketData
+    -> update_price()
+    -> EMA Calculation
+    -> Trend Validation
+    -> SignalQualityService
+
+## VALIDATION
+
+BUY permitido apenas quando:
+
+EMA_FAST > EMA_SLOW
+
+## CONFIG
+
+Arquivo:
+core/config/signal_quality_config.py
+
+Variáveis:
+- ema_fast_period
+- ema_slow_period
+- enable_trend_filter
+'''
+
+
+# =========================================================
+# MAIN
+# =========================================================
+
+def main():
+
+    print()
+    print("========================================")
+    print("TREND FILTER REAL")
+    print("========================================")
+    print()
+
+    write_file(
+        ROOT / "core/services/ema_trend_service.py",
+        EMA_TREND_SERVICE
+    )
+
+    write_file(
+        ROOT / "core/services/signal_quality_service.py",
+        SIGNAL_QUALITY_SERVICE
+    )
+
+    readme_path = ROOT / "README_FULL.md"
+
+    if readme_path.exists():
+
+        content = readme_path.read_text(
+            encoding="utf-8"
+        )
+
+        if "EMA TREND ENGINE" not in content:
+
+            content += README_APPEND
+
+            readme_path.write_text(
+                content,
+                encoding="utf-8"
+            )
+
+            print("[OK] README_FULL.md updated")
+
+    print()
+    print("[DONE] Trend Filter REAL generated")
+    print()
+    print("NEXT:")
+    print("1. integrar update_market_data()")
+    print("2. reduzir cooldown")
+    print("3. validar EMA crossover")
+    print()
+
+
+if __name__ == "__main__":
+
+    main()

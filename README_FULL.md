@@ -346,3 +346,39 @@ Todos os parâmetros podem ser:
 - controlados pelo frontend
 - ajustados por IA
 - persistidos futuramente em banco
+
+
+# =========================================================
+# EMA TREND ENGINE
+# =========================================================
+
+## COMPONENTS
+
+- EmaTrendService
+- EMA Fast
+- EMA Slow
+- Bullish Trend Validation
+
+## FLOW
+
+MarketData
+    -> update_price()
+    -> EMA Calculation
+    -> Trend Validation
+    -> SignalQualityService
+
+## VALIDATION
+
+BUY permitido apenas quando:
+
+EMA_FAST > EMA_SLOW
+
+## CONFIG
+
+Arquivo:
+core/config/signal_quality_config.py
+
+Variáveis:
+- ema_fast_period
+- ema_slow_period
+- enable_trend_filter
