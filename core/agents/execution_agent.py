@@ -4,8 +4,8 @@ from core.contracts.messages import (
     RiskDecisionMessage
 )
 
-from data.storage.positions_repository import (
-    PositionsRepository
+from data.storage.repositories.trades_repository import (
+    TradesRepository
 )
 
 from data.storage.metrics import (
@@ -19,7 +19,7 @@ class ExecutionAgent:
 
         self.bus = bus
 
-        self.positions = PositionsRepository()
+        self.positions = TradesRepository()
 
         self.metrics = MetricsStorage()
 
@@ -38,13 +38,13 @@ class ExecutionAgent:
         if payload.signal != "BUY":
             return
 
-        if self.positions.has_open_position(
+        if self.positions.has_open_trade(
             payload.user_id,
             payload.symbol
         ):
             return
 
-        self.positions.create_position(
+        self.positions.create_trade(
             user_id=payload.user_id,
             symbol=payload.symbol,
             action=payload.signal,

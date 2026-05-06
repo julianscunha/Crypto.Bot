@@ -6,8 +6,8 @@ from core.contracts.messages import (
     MarketDataMessage
 )
 
-from data.storage.positions_repository import (
-    PositionsRepository
+from data.storage.repositories.trades_repository import (
+    TradesRepository
 )
 
 from services.position_lifecycle_service import (
@@ -21,7 +21,7 @@ class PositionManagerAgent:
 
         self.bus = bus
 
-        self.positions = PositionsRepository()
+        self.positions = TradesRepository()
 
         self.bus.subscribe(self)
 
@@ -32,7 +32,7 @@ class PositionManagerAgent:
 
         payload = message.payload
 
-        positions = self.positions.get_open_positions(
+        positions = self.positions.get_open_trades(
             user_id=payload.user_id
         )
 
@@ -69,7 +69,7 @@ class PositionManagerAgent:
 
             if payload.close <= trade.stop_loss:
 
-                self.positions.close_position(
+                self.positions.close_trade(
                     trade_id=trade.id,
                     exit_price=payload.close,
                     pnl=trade.unrealized_pnl,
@@ -84,7 +84,7 @@ class PositionManagerAgent:
 
             elif payload.close >= trade.take_profit:
 
-                self.positions.close_position(
+                self.positions.close_trade(
                     trade_id=trade.id,
                     exit_price=payload.close,
                     pnl=trade.unrealized_pnl,
@@ -99,7 +99,7 @@ class PositionManagerAgent:
 
             elif payload.close <= trailing_price:
 
-                self.positions.close_position(
+                self.positions.close_trade(
                     trade_id=trade.id,
                     exit_price=payload.close,
                     pnl=trade.unrealized_pnl,

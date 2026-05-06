@@ -1,4 +1,51 @@
+# scripts/repository_refactor.py
+
 # -*- coding: utf-8 -*-
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+OLD_IMPORT = """
+from data.storage.positions_repository import (
+    PositionsRepository
+)
+"""
+
+NEW_IMPORT = """
+from data.storage.repositories.trades_repository import (
+    TradesRepository
+)
+"""
+
+
+FILES_TO_UPDATE = [
+    ROOT / "core/agents/execution_agent.py",
+    ROOT / "core/agents/risk_agent.py",
+    ROOT / "core/agents/position_manager_agent.py",
+]
+
+
+REPLACEMENTS = {
+    "PositionsRepository()": "TradesRepository()",
+
+    "create_position(": "create_trade(",
+
+    "get_open_position(": "get_open_trade(",
+
+    "get_open_positions(": "get_open_trades(",
+
+    "has_open_position(": "has_open_trade(",
+
+    "update_price(": "update_trade_price(",
+
+    "close_position(": "close_trade(",
+}
+
+
+TRADES_REPOSITORY_CONTENT = '''# -*- coding: utf-8 -*-
 
 from datetime import datetime
 
@@ -9,13 +56,13 @@ from data.storage.database import SessionLocal
 from data.storage.models import Trade
 
 
-class PositionsRepository:
+class TradesRepository:
 
     def _session(self) -> Session:
 
         return SessionLocal()
 
-    def create_position(
+    def create_trade(
         self,
         user_id: int,
         symbol: str,
@@ -32,7 +79,7 @@ class PositionsRepository:
 
         try:
 
-            position = Trade(
+            trade = Trade(
                 user_id=user_id,
                 symbol=symbol,
                 action=action,
@@ -51,13 +98,13 @@ class PositionsRepository:
                 lowest_price=entry_price
             )
 
-            session.add(position)
+            session.add(trade)
 
             session.commit()
 
-            session.refresh(position)
+            session.refresh(trade)
 
-            return position
+            return trade
 
         except Exception:
 
@@ -69,7 +116,7 @@ class PositionsRepository:
 
             session.close()
 
-    def get_open_position(
+    def get_open_trade(
         self,
         user_id: int,
         symbol: str
@@ -93,7 +140,7 @@ class PositionsRepository:
 
             session.close()
 
-    def get_open_positions(
+    def get_open_trades(
         self,
         user_id: int
     ):
@@ -115,20 +162,20 @@ class PositionsRepository:
 
             session.close()
 
-    def has_open_position(
+    def has_open_trade(
         self,
         user_id: int,
         symbol: str
     ) -> bool:
 
-        position = self.get_open_position(
+        trade = self.get_open_trade(
             user_id=user_id,
             symbol=symbol
         )
 
-        return position is not None
+        return trade is not None
 
-    def update_price(
+    def update_trade_price(
         self,
         trade_id: int,
         current_price: float,
@@ -151,12 +198,17 @@ class PositionsRepository:
                 return None
 
             trade.current_price = current_price
+
             trade.unrealized_pnl = unrealized_pnl
 
-            if current_price > (trade.highest_price or current_price):
+            if current_price > (
+                trade.highest_price or current_price
+            ):
                 trade.highest_price = current_price
 
-            if current_price < (trade.lowest_price or current_price):
+            if current_price < (
+                trade.lowest_price or current_price
+            ):
                 trade.lowest_price = current_price
 
             session.commit()
@@ -175,7 +227,7 @@ class PositionsRepository:
 
             session.close()
 
-    def close_position(
+    def close_trade(
         self,
         trade_id: int,
         exit_price: float,
@@ -227,3 +279,102 @@ class PositionsRepository:
         finally:
 
             session.close()
+'''
+
+
+INIT_CONTENT = '''# -*- coding: utf-8 -*-
+'''
+
+
+def ensure_repository_structure():
+
+    repo_dir = ROOT / "data/storage/repositories"
+
+    repo_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    init_file = repo_dir / "__init__.py"
+
+    init_file.write_text(
+        INIT_CONTENT,
+        encoding="utf-8"
+    )
+
+    trades_file = repo_dir / "trades_repository.py"
+
+    trades_file.write_text(
+        TRADES_REPOSITORY_CONTENT,
+        encoding="utf-8"
+    )
+
+    print("[OK] repositories created")
+
+
+def update_agents():
+
+    for file_path in FILES_TO_UPDATE:
+
+        if not file_path.exists():
+
+            print(f"[SKIP] {file_path}")
+            continue
+
+        content = file_path.read_text(
+            encoding="utf-8"
+        )
+
+        content = content.replace(
+            OLD_IMPORT,
+            NEW_IMPORT
+        )
+
+        for old, new in REPLACEMENTS.items():
+
+            content = content.replace(
+                old,
+                new
+            )
+
+        file_path.write_text(
+            content,
+            encoding="utf-8"
+        )
+
+        print(f"[OK] updated {file_path.name}")
+
+
+def remove_legacy_repository():
+
+    legacy = ROOT / "data/storage/positions_repository.py"
+
+    if legacy.exists():
+
+        legacy.unlink()
+
+        print("[OK] removed positions_repository.py")
+
+
+def main():
+
+    print()
+    print("===================================")
+    print("Repository Layer Refactor")
+    print("===================================")
+    print()
+
+    ensure_repository_structure()
+
+    update_agents()
+
+    remove_legacy_repository()
+
+    print()
+    print("[DONE] Repository Layer Refactor Complete")
+    print()
+
+
+if __name__ == "__main__":
+
+    main()

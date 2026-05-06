@@ -6,8 +6,8 @@ from core.contracts.messages import (
     RiskDecisionPayload
 )
 
-from data.storage.positions_repository import (
-    PositionsRepository
+from data.storage.repositories.trades_repository import (
+    TradesRepository
 )
 
 
@@ -17,7 +17,7 @@ class RiskAgent:
 
         self.bus = bus
 
-        self.positions = PositionsRepository()
+        self.positions = TradesRepository()
 
         self.bus.subscribe(self)
 
@@ -32,7 +32,7 @@ class RiskAgent:
             return
 
         existing_position = (
-            self.positions.get_open_position(
+            self.positions.get_open_trade(
                 user_id=payload.user_id,
                 symbol=payload.symbol
             )
