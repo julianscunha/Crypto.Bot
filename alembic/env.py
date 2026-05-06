@@ -5,8 +5,19 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from data.storage.database import Base
-from data.storage.models import *
+import os
+import sys
+
+sys.path.append(
+    os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            ".."
+        )
+    )
+)
+
+from data.storage.models import Base
 
 config = context.config
 
@@ -22,7 +33,9 @@ def run_migrations_offline():
 
     context.configure(
         url=url,
-        target_metadata=target_metadata
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
     )
 
     with context.begin_transaction():
@@ -32,7 +45,7 @@ def run_migrations_offline():
 def run_migrations_online():
 
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
+        config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

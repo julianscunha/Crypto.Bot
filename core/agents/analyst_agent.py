@@ -15,7 +15,7 @@ class AnalystAgent:
 
         self.bus.subscribe(self)
 
-    def on_message(self, message):
+    async def on_message(self, message):
 
         if not isinstance(message, MarketDataMessage):
             return
@@ -27,16 +27,18 @@ class AnalystAgent:
         if payload.close < payload.open:
             analysis = "BEARISH"
 
-        result = MarketAnalysisPayload(
+        analysis_payload = MarketAnalysisPayload(
             user_id=payload.user_id,
             symbol=payload.symbol,
             analysis=analysis,
             price=payload.close
         )
 
-        self.bus.publish(
-            MarketAnalysisMessage(
-                sender="AnalystAgent",
-                payload=result
-            )
+        analysis_message = MarketAnalysisMessage(
+            sender="AnalystAgent",
+            payload=analysis_payload
+        )
+
+        await self.bus.publish(
+            analysis_message
         )

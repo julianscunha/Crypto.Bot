@@ -1,19 +1,31 @@
-# -*- coding: utf-8 -*-
+import asyncio
+import inspect
+
 
 class EventBus:
 
     def __init__(self):
         self.subscribers = []
 
-    def subscribe(self, agent):
-        self.subscribers.append(agent)
+    def subscribe(self, subscriber):
+        self.subscribers.append(subscriber)
 
-    def publish(self, message):
+    async def publish(self, message):
 
         for subscriber in self.subscribers:
 
             try:
-                subscriber.on_message(message)
+
+                if inspect.iscoroutinefunction(
+                    subscriber.on_message
+                ):
+                    await subscriber.on_message(message)
+
+                else:
+                    subscriber.on_message(message)
 
             except Exception as e:
-                print(f"[BUS ERROR] {subscriber.__class__.__name__}: {e}")
+                print(
+                    f"[BUS ERROR] "
+                    f"{subscriber.__class__.__name__}: {e}"
+                )

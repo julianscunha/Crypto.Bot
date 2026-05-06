@@ -10,10 +10,6 @@ from data.storage.positions_repository import (
     PositionsRepository
 )
 
-from data.storage.metrics import (
-    MetricsStorage
-)
-
 
 class RiskAgent:
 
@@ -22,48 +18,64 @@ class RiskAgent:
         self.bus = bus
 
         self.positions = PositionsRepository()
-        self.metrics = MetricsStorage()
-
-        self.max_portfolio_exposure = 10000
 
         self.bus.subscribe(self)
 
-    def on_message(self, message):
+    async def on_message(self, message):
 
         if not isinstance(message, StrategySignalMessage):
             return
 
         payload = message.payload
 
-        existing = self.positions.get_open_position(
-            user_id=payload.user_id,
-            symbol=payload.symbol
-        )
-
-        if existing:
+        if payload.signal != "BUY":
             return
 
-        exposure = self.metrics.total_open_exposure(
-            user_id=payload.user_id
+        existing_position = (
+            self.positions.get_open_position(
+                user_id=payload.user_id,
+                symbol=payload.symbol
+            )
         )
 
-        if exposure >= self.max_portfolio_exposure:
+        if existing_position:
             return
 
-        result = RiskDecisionPayload(
+        entry_price = payload.price
+
+        stop_loss = round(
+            entry_price * 0.98,
+            2
+        )
+
+        take_profit = round(
+            entry_price * 1.02,
+            2
+        )
+
+        trailing_stop = round(
+            entry_price * 0.015,
+            4
+        )
+
+        quantity = 2.0
+
+        decision_payload = RiskDecisionPayload(
             user_id=payload.user_id,
             symbol=payload.symbol,
             signal=payload.signal,
-            price=payload.price,
-            quantity=2.0,
-            stop_loss=payload.price * 0.98,
-            take_profit=payload.price * 1.04,
-            trailing_stop=payload.price * 0.015
+            price=entry_price,
+            quantity=quantity,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            trailing_stop=trailing_stop
         )
 
-        self.bus.publish(
-            RiskDecisionMessage(
-                sender="RiskAgent",
-                payload=result
-            )
+        decision_message = RiskDecisionMessage(
+            sender="RiskAgent",
+            payload=decision_payload
+        )
+
+        await self.bus.publish(
+            decision_message
         )

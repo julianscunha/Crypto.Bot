@@ -43,7 +43,6 @@ class ExecutionAgent:
             stop_loss=payload.stop_loss,
             take_profit=payload.take_profit,
             trailing_stop=payload.trailing_stop,
-
             breakeven_enabled=True
         )
 
@@ -54,26 +53,13 @@ class ExecutionAgent:
             f"| qty={payload.quantity}"
         )
 
-        exit_price = payload.price * 1.02
-
-        pnl = (
-            exit_price - payload.price
-        ) * payload.quantity
-
-        self.positions.close_position(
-            trade_id=trade.id,
-            exit_price=exit_price,
-            pnl=pnl
-        )
-
         metrics = self.metrics.get_metrics(
             user_id=payload.user_id
         )
 
         print(
-            f"[EXECUTION] CLOSE "
-            f"{payload.symbol} "
-            f"@ {round(exit_price, 2)} "
-            f"| PnL={round(pnl, 2)} "
-            f"| {metrics}"
+            f"[PORTFOLIO] "
+            f"Trades={metrics['total_trades']} "
+            f"| Winrate={metrics['winrate']} "
+            f"| PnL={metrics['pnl']}"
         )

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from datetime import datetime
+
 from sqlalchemy import select
 
 from data.storage.database import SessionLocal
@@ -39,10 +41,16 @@ class PositionsRepository:
             take_profit=take_profit,
             trailing_stop=trailing_stop,
 
+            highest_price=entry_price,
+            lowest_price=entry_price,
+
             breakeven_enabled=breakeven_enabled,
 
             status="OPEN",
-            pnl=0.0
+
+            pnl=0.0,
+            unrealized_pnl=0.0,
+            realized_pnl=0.0
         )
 
         self.db.add(trade)
@@ -57,7 +65,8 @@ class PositionsRepository:
         self,
         trade_id: int,
         exit_price: float,
-        pnl: float
+        pnl: float,
+        reason: str
     ):
 
         trade = self.db.get(
@@ -69,8 +78,15 @@ class PositionsRepository:
             return
 
         trade.current_price = exit_price
+
         trade.pnl = pnl
+        trade.realized_pnl = pnl
+
         trade.status = "CLOSED"
+
+        trade.exit_reason = reason
+
+        trade.closed_at = datetime.utcnow()
 
         self.db.commit()
 

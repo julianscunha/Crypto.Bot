@@ -1,71 +1,171 @@
 # -*- coding: utf-8 -*-
 
+from datetime import datetime
+
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import mapped_column
+
+from sqlalchemy import Integer
+from sqlalchemy import String
+from sqlalchemy import Float
+from sqlalchemy import Boolean
+from sqlalchemy import DateTime
+
+from datetime import datetime
+
 from sqlalchemy import (
     Column,
     Integer,
     Float,
+    DateTime,
     String,
-    TIMESTAMP
+    Boolean
 )
 
-from sqlalchemy.sql import func
 
-from data.storage.database import Base
+class Base(DeclarativeBase):
+    pass
 
 
 class Trade(Base):
 
     __tablename__ = "trades"
 
-    id = Column(Integer, primary_key=True)
-
-    user_id = Column(Integer, nullable=False)
-
-    symbol = Column(String, nullable=False)
-
-    action = Column(String, nullable=False)
-
-    entry_price = Column(Float, nullable=False)
-
-    current_price = Column(Float, nullable=False)
-
-    quantity = Column(Float, nullable=False)
-
-    stop_loss = Column(Float)
-
-    take_profit = Column(Float)
-
-    trailing_stop = Column(Float)
-
-    breakeven_enabled = Column(Integer)
-
-    status = Column(String)
-
-    pnl = Column(Float)
-
-    created_at = Column(
-        TIMESTAMP,
-        server_default=func.now()
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True
     )
 
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        index=True
+    )
 
+    symbol: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        index=True
+    )
+
+    action: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    entry_price: Mapped[float] = mapped_column(
+        Float,
+        nullable=False
+    )
+
+    current_price: Mapped[float] = mapped_column(
+        Float,
+        nullable=False
+    )
+
+    quantity: Mapped[float] = mapped_column(
+        Float,
+        nullable=False
+    )
+
+    stop_loss: Mapped[float] = mapped_column(
+        Float,
+        nullable=False
+    )
+
+    take_profit: Mapped[float] = mapped_column(
+        Float,
+        nullable=False
+    )
+
+    trailing_stop: Mapped[float] = mapped_column(
+        Float,
+        nullable=False
+    )
+
+    highest_price: Mapped[float] = mapped_column(
+        Float,
+        nullable=True
+    )
+
+    lowest_price: Mapped[float] = mapped_column(
+        Float,
+        nullable=True
+    )
+
+    breakeven_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False
+    )
+
+    status: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    pnl: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=0
+    )
+
+    unrealized_pnl: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=0
+    )
+
+    realized_pnl: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=0
+    )
+
+    exit_reason: Mapped[str] = mapped_column(
+        String,
+        nullable=True
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+    closed_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+    
 class EquityCurve(Base):
-
     __tablename__ = "equity_curve"
 
     id = Column(Integer, primary_key=True)
 
-    user_id = Column(Integer, nullable=False)
+    user_id = Column(
+        Integer,
+        nullable=False,
+        index=True
+    )
 
-    equity = Column(Float)
+    equity = Column(
+        Float,
+        nullable=False
+    )
 
-    realized_pnl = Column(Float)
+    balance = Column(
+        Float,
+        nullable=False
+    )
 
-    unrealized_pnl = Column(Float)
-
-    drawdown = Column(Float)
+    unrealized_pnl = Column(
+        Float,
+        nullable=False
+    )
 
     created_at = Column(
-        TIMESTAMP,
-        server_default=func.now()
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
     )

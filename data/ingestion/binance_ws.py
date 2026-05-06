@@ -11,11 +11,7 @@ from core.contracts.messages import (
 
 class BinanceWS:
 
-    def __init__(
-        self,
-        bus,
-        user_id
-    ):
+    def __init__(self, bus, user_id):
 
         self.bus = bus
         self.user_id = user_id
@@ -33,22 +29,27 @@ class BinanceWS:
             for symbol in self.symbols:
 
                 open_price = round(
-                    random.uniform(90, 110),
+                    random.uniform(90, 120),
                     2
                 )
 
                 close_price = round(
-                    open_price + random.uniform(-5, 5),
+                    open_price * random.uniform(0.98, 1.02),
                     2
                 )
 
-                high_price = round(
-                    max(open_price, close_price) + random.uniform(0, 2),
-                    2
-                )
+                high_price = max(
+                    open_price,
+                    close_price
+                ) * random.uniform(1.0, 1.01)
 
-                low_price = round(
-                    min(open_price, close_price) - random.uniform(0, 2),
+                low_price = min(
+                    open_price,
+                    close_price
+                ) * random.uniform(0.99, 1.0)
+
+                volume = round(
+                    random.uniform(100, 1000),
                     2
                 )
 
@@ -57,16 +58,18 @@ class BinanceWS:
                     symbol=symbol,
                     open=open_price,
                     close=close_price,
-                    high=high_price,
-                    low=low_price,
-                    volume=random.uniform(100, 1000)
+                    high=round(high_price, 2),
+                    low=round(low_price, 2),
+                    volume=volume
                 )
 
-                self.bus.publish(
-                    MarketDataMessage(
-                        sender="BinanceWS",
-                        payload=payload
-                    )
+                message = MarketDataMessage(
+                    sender="BinanceWS",
+                    payload=payload
+                )
+
+                await self.bus.publish(
+                    message
                 )
 
             await asyncio.sleep(2)
