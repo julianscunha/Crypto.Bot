@@ -74,10 +74,11 @@ class BinanceWS:
         )
 
         print(
-            Fore.GREEN +
-            f"[BINANCE] Connected "
-            f"{stream_url}" +
-            Style.RESET_ALL
+            Fore.LIGHTCYAN_EX +
+            "[BINANCE]" +
+            Style.RESET_ALL +
+            f" Connected "
+            f"{stream_url}"
         )
 
         while True:
