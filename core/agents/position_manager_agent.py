@@ -100,11 +100,12 @@ class PositionManagerAgent:
                 )
 
                 print(
-                    Fore.RED +
-                    f"[POSITION] STOP LOSS "
+                    Fore.LIGHTRED_EX +
+                    "[POSITION]" +
+                    Style.RESET_ALL +
+                    f" STOP LOSS "
                     f"{trade.symbol} "
-                    f"PnL={round(trade.unrealized_pnl, 2)}" +
-                    Style.RESET_ALL
+                    f"PnL={round(trade.unrealized_pnl, 2)}"
                 )
 
             # =====================================================
@@ -122,10 +123,11 @@ class PositionManagerAgent:
 
                 print(
                     Fore.CYAN +
-                    f"[POSITION] TAKE PROFIT "
+                    "[POSITION]" +
+                    Style.RESET_ALL +
+                    f" TAKE PROFIT "
                     f"{trade.symbol} "
-                    f"PnL={round(trade.unrealized_pnl, 2)}" +
-                    Style.RESET_ALL
+                    f"PnL={round(trade.unrealized_pnl, 2)}"
                 )
 
             # =====================================================
@@ -143,8 +145,9 @@ class PositionManagerAgent:
 
                 print(
                     Fore.YELLOW +
-                    f"[POSITION] TRAILING STOP "
+                    "[POSITION]" +
+                    Style.RESET_ALL +
+                    f" TRAILING STOP "
                     f"{trade.symbol} "
-                    f"PnL={round(trade.unrealized_pnl, 2)}" +
-                    Style.RESET_ALL
+                    f"PnL={round(trade.unrealized_pnl, 2)}"
                 )

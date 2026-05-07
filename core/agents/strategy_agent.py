@@ -51,9 +51,9 @@ class StrategyAgent:
 
         print(
             Fore.CYAN +
-            f"[STRATEGY] "
-            f"{payload.symbol}" +
-            Style.RESET_ALL
+            "[STRATEGY]" +
+            Style.RESET_ALL +
+            f" {payload.symbol}"
         )
 
         # =====================================================
@@ -74,11 +74,11 @@ class StrategyAgent:
         )
 
         print(
-            Fore.MAGENTA +
-            f"[STRUCTURE DATA] "
-            f"{payload.symbol} "
-            f"candles={candles_count}" +
-            Style.RESET_ALL
+            Fore.LIGHTMAGENTA_EX +
+            "[STRUCTURE DATA]" +
+            Style.RESET_ALL +
+            f" {payload.symbol} "
+            f"candles={candles_count}"
         )
 
         # =====================================================
@@ -118,11 +118,11 @@ class StrategyAgent:
         if not structure["valid"]:
 
             print(
-                Fore.YELLOW +
-                f"[STRUCTURE BLOCKED] "
-                f"{payload.symbol} "
-                f"| {structure['reason']}" +
-                Style.RESET_ALL
+                Fore.LIGHTYELLOW_EX +
+                "[STRUCTURE BLOCKED]" +
+                Style.RESET_ALL +
+                f" {payload.symbol} "
+                f"| {structure['reason']}"
             )
 
             return
@@ -140,21 +140,21 @@ class StrategyAgent:
         if not valid:
 
             print(
-                Fore.RED +
-                f"[SIGNAL BLOCKED] "
-                f"{payload.symbol} "
-                f"| {reason}" +
-                Style.RESET_ALL
+                Fore.LIGHTRED_EX +
+                "[SIGNAL BLOCKED]" +
+                Style.RESET_ALL +
+                f" {payload.symbol} "
+                f"| {reason}"
             )
 
             return
 
         print(
-            Fore.GREEN +
-            f"[SIGNAL] "
-            f"{payload.symbol} "
-            f"strength={signal_strength}" +
-            Style.RESET_ALL
+            Fore.LIGHTGREEN_EX +
+            "[SIGNAL]" +
+            Style.RESET_ALL +
+            f" {payload.symbol} "
+            f"strength={signal_strength}"
         )
 
         # =====================================================

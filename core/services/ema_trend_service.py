@@ -131,11 +131,11 @@ class EmaTrendService:
 
         print(
             Fore.MAGENTA +
-            f"[EMA] "
-            f"{symbol} "
+            "[EMA]" +
+            Style.RESET_ALL +
+            f" {symbol} "
             f"fast={round(ema_fast, 2)} "
-            f"slow={round(ema_slow, 2)}" +
-            Style.RESET_ALL
+            f"slow={round(ema_slow, 2)}"
         )
 
         return (

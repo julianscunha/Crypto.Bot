@@ -37,10 +37,10 @@ class RiskAgent:
             return
     
         print(
-            Fore.YELLOW +
-            f"[RISK] "
-            f"{message.payload.symbol}" +
-            Style.RESET_ALL
+            Fore.LIGHTYELLOW_EX +
+            "[RISK]" +
+            Style.RESET_ALL +
+            f" {message.payload.symbol}"
         )
     
         payload = message.payload

@@ -62,11 +62,12 @@ class ExecutionAgent:
 
         print(
             Fore.LIGHTGREEN_EX +
-            f"[EXECUTION] OPEN BUY "
+            "[EXECUTION]" +
+            Style.RESET_ALL +
+            f" OPEN BUY "
             f"{payload.symbol} "
             f"@ {payload.entry_price} "
-            f"| qty={payload.quantity}" +
-            Style.RESET_ALL
+            f"| qty={payload.quantity}"
         )
 
         metrics = self.metrics.get_metrics(
@@ -74,8 +75,10 @@ class ExecutionAgent:
         )
 
         print(
-            f"[PORTFOLIO] "
-            f"Trades={metrics['total_trades']} "
+            Fore.LIGHTBLUE_EX +
+            "[PORTFOLIO]" +
+            Style.RESET_ALL +
+            f" Trades={metrics['total_trades']} "
             f"| Winrate={metrics['winrate']} "
             f"| PnL={metrics['pnl']}"
         )

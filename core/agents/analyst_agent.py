@@ -89,10 +89,10 @@ class AnalystAgent:
         
         print(
             Fore.WHITE +
-            f"[MARKET] "
-            f"{payload.symbol} "
-            f"close={payload.close}" +
-            Style.RESET_ALL
+            "[MARKET]" +
+            Style.RESET_ALL +
+            f" {payload.symbol} "
+            f"close={payload.close}"
         )
 
         await self.bus.publish(

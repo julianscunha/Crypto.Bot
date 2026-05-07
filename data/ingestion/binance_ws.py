@@ -129,11 +129,11 @@ class BinanceWS:
                         )
 
                         print(
-                            Fore.WHITE +
-                            f"[KLINE] "
-                            f"{symbol} "
-                            f"close={payload.close}" +
-                            Style.RESET_ALL
+                            Fore.LIGHTWHITE_EX +
+                            "[KLINE]" +
+                            Style.RESET_ALL +
+                            f" {symbol} "
+                            f"close={payload.close}"
                         )
 
                         await self.bus.publish(
@@ -144,9 +144,9 @@ class BinanceWS:
 
                 print(
                     Fore.RED +
-                    f"[BINANCE ERROR] "
-                    f"{e}" +
-                    Style.RESET_ALL
+                    "[BINANCE ERROR]" +
+                    Style.RESET_ALL +
+                    f" {e}"
                 )
 
                 await asyncio.sleep(5)
