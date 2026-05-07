@@ -2,6 +2,14 @@
 
 from collections import defaultdict
 
+from colorama import (
+    Fore,
+    Style,
+    init
+)
+
+init(autoreset=True)
+
 
 class EmaTrendService:
 
@@ -29,9 +37,30 @@ class EmaTrendService:
 
         history.append(price)
 
-        if len(history) > 200:
+        # LIMIT HISTORY
+        self.market_history[key] = (
+            history[-200:]
+        )
 
-            history.pop(0)
+    # =====================================================
+    # GET PRICES
+    # =====================================================
+
+    def get_prices(
+        self,
+        user_id: int,
+        symbol: str
+    ):
+
+        key = (
+            user_id,
+            symbol
+        )
+
+        return self.market_history.get(
+            key,
+            []
+        )
 
     # =====================================================
     # EMA
@@ -42,6 +71,9 @@ class EmaTrendService:
         prices: list,
         period: int
     ):
+
+        if not prices:
+            return 0.0
 
         if len(prices) < period:
             return None
@@ -75,27 +107,37 @@ class EmaTrendService:
         slow_period: int
     ):
 
-        key = (
-            user_id,
-            symbol
+        prices = self.get_prices(
+            user_id=user_id,
+            symbol=symbol
         )
 
-        prices = self.market_history[key]
-
         ema_fast = self.calculate_ema(
-            prices,
-            fast_period
+            prices=prices,
+            period=fast_period
         )
 
         ema_slow = self.calculate_ema(
-            prices,
-            slow_period
+            prices=prices,
+            period=slow_period
         )
 
+        # NOT ENOUGH DATA
         if ema_fast is None:
             return False
 
         if ema_slow is None:
             return False
 
-        return ema_fast > ema_slow
+        print(
+            Fore.MAGENTA +
+            f"[EMA] "
+            f"{symbol} "
+            f"fast={round(ema_fast, 2)} "
+            f"slow={round(ema_slow, 2)}" +
+            Style.RESET_ALL
+        )
+
+        return (
+            ema_fast >= ema_slow
+        )

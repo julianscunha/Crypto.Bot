@@ -2,6 +2,12 @@
 
 from datetime import datetime
 
+from colorama import (
+    Fore,
+    Style,
+    init
+)
+
 from core.contracts.messages import (
     MarketDataMessage
 )
@@ -13,6 +19,8 @@ from data.storage.repositories.trades_repository import (
 from services.position_lifecycle_service import (
     PositionLifecycleService
 )
+
+init(autoreset=True)
 
 
 class PositionManagerAgent:
@@ -27,7 +35,10 @@ class PositionManagerAgent:
 
     async def on_message(self, message):
 
-        if not isinstance(message, MarketDataMessage):
+        if not isinstance(
+            message,
+            MarketDataMessage
+        ):
             return
 
         payload = message.payload
@@ -52,11 +63,19 @@ class PositionManagerAgent:
                 )
             )
 
+            # =====================================================
+            # HIGHEST PRICE
+            # =====================================================
+
             if (
                 trade.highest_price is None or
                 payload.close > trade.highest_price
             ):
                 trade.highest_price = payload.close
+
+            # =====================================================
+            # TRAILING STOP
+            # =====================================================
 
             trailing_price = (
                 PositionLifecycleService
@@ -66,6 +85,10 @@ class PositionManagerAgent:
                     trailing_percent=0.02
                 )
             )
+
+            # =====================================================
+            # STOP LOSS
+            # =====================================================
 
             if payload.close <= trade.stop_loss:
 
@@ -77,10 +100,16 @@ class PositionManagerAgent:
                 )
 
                 print(
+                    Fore.RED +
                     f"[POSITION] STOP LOSS "
                     f"{trade.symbol} "
-                    f"PnL={round(trade.unrealized_pnl, 2)}"
+                    f"PnL={round(trade.unrealized_pnl, 2)}" +
+                    Style.RESET_ALL
                 )
+
+            # =====================================================
+            # TAKE PROFIT
+            # =====================================================
 
             elif payload.close >= trade.take_profit:
 
@@ -92,10 +121,16 @@ class PositionManagerAgent:
                 )
 
                 print(
+                    Fore.CYAN +
                     f"[POSITION] TAKE PROFIT "
                     f"{trade.symbol} "
-                    f"PnL={round(trade.unrealized_pnl, 2)}"
+                    f"PnL={round(trade.unrealized_pnl, 2)}" +
+                    Style.RESET_ALL
                 )
+
+            # =====================================================
+            # TRAILING STOP
+            # =====================================================
 
             elif payload.close <= trailing_price:
 
@@ -107,7 +142,9 @@ class PositionManagerAgent:
                 )
 
                 print(
+                    Fore.YELLOW +
                     f"[POSITION] TRAILING STOP "
                     f"{trade.symbol} "
-                    f"PnL={round(trade.unrealized_pnl, 2)}"
+                    f"PnL={round(trade.unrealized_pnl, 2)}" +
+                    Style.RESET_ALL
                 )

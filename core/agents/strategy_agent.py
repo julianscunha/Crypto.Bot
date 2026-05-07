@@ -10,6 +10,14 @@ from core.services.signal_quality_service import (
     SignalQualityService
 )
 
+from colorama import (
+    Fore,
+    Style,
+    init
+)
+
+init(autoreset=True)
+
 
 class StrategyAgent:
 
@@ -32,6 +40,13 @@ class StrategyAgent:
             return
 
         payload = message.payload
+
+        print(
+            Fore.CYAN +
+            f"[STRATEGY] "
+            f"{payload.symbol}" +
+            Style.RESET_ALL
+        )
 
         # =====================================================
         # SIMPLE STRATEGY
@@ -66,15 +81,23 @@ class StrategyAgent:
         )
 
         if not valid:
-
+        
             print(
+                Fore.RED +
                 f"[SIGNAL BLOCKED] "
                 f"{payload.symbol} "
-                f"| {reason}"
+                f"| {reason}" +
+                Style.RESET_ALL
             )
-
+        
             return
-
+            print(
+                Fore.GREEN +
+                f"[SIGNAL] "
+                f"{payload.symbol} "
+                f"strength={signal_strength}" +
+                Style.RESET_ALL
+            )
         # =====================================================
         # PUBLISH
         # =====================================================
@@ -89,3 +112,5 @@ class StrategyAgent:
         await self.bus.publish(
             signal_message
         )
+        
+        

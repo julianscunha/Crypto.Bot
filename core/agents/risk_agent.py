@@ -10,6 +10,13 @@ from data.storage.repositories.trades_repository import (
     TradesRepository
 )
 
+from colorama import (
+    Fore,
+    Style,
+    init
+)
+
+init(autoreset=True)
 
 class RiskAgent:
 
@@ -22,10 +29,20 @@ class RiskAgent:
         self.bus.subscribe(self)
 
     async def on_message(self, message):
-
-        if not isinstance(message, StrategySignalMessage):
+    
+        if not isinstance(
+            message,
+            StrategySignalMessage
+        ):
             return
-
+    
+        print(
+            Fore.YELLOW +
+            f"[RISK] "
+            f"{message.payload.symbol}" +
+            Style.RESET_ALL
+        )
+    
         payload = message.payload
 
         if payload.signal != "BUY":

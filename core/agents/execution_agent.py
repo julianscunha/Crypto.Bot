@@ -13,6 +13,10 @@ from data.storage.metrics import (
 )
 
 
+from colorama import Fore, Style, init
+
+init(autoreset=True)
+
 class ExecutionAgent:
 
     def __init__(self, bus):
@@ -57,10 +61,12 @@ class ExecutionAgent:
         )
 
         print(
+            Fore.LIGHTGREEN_EX +
             f"[EXECUTION] OPEN BUY "
             f"{payload.symbol} "
             f"@ {payload.entry_price} "
-            f"| qty={payload.quantity}"
+            f"| qty={payload.quantity}" +
+            Style.RESET_ALL
         )
 
         metrics = self.metrics.get_metrics(

@@ -104,33 +104,57 @@ class SignalQualityService:
         self,
         payload
     ):
-
+    
         if not self.config[
             "enable_trend_filter"
         ]:
-
+    
             return True, "DISABLED"
-
-        bullish = (
-            self.trend_service.is_bullish(
-                user_id=payload.user_id,
-                symbol=payload.symbol,
-                fast_period=self.config[
-                    "ema_fast_period"
-                ],
-                slow_period=self.config[
-                    "ema_slow_period"
-                ]
-            )
+    
+        prices = self.trend_service.get_prices(
+            user_id=payload.user_id,
+            symbol=payload.symbol
         )
-
-        if not bullish:
-
+    
+        slow_period = self.config[
+            "ema_slow_period"
+        ]
+    
+        # =====================================================
+        # NOT ENOUGH DATA
+        # =====================================================
+    
+        if len(prices) < slow_period:
+    
+            return True, "WARMUP"
+    
+        ema_fast = self.trend_service.calculate_ema(
+            prices=prices,
+            period=self.config[
+                "ema_fast_period"
+            ]
+        )
+    
+        ema_slow = self.trend_service.calculate_ema(
+            prices=prices,
+            period=slow_period
+        )
+    
+        trend_diff = (
+            ema_fast - ema_slow
+        )
+    
+        # =====================================================
+        # SOFT FILTER
+        # =====================================================
+    
+        if trend_diff < -0.50:
+    
             return (
                 False,
                 "BEARISH_TREND"
             )
-
+    
         return True, "OK"
 
     # =====================================================

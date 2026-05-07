@@ -10,6 +10,14 @@ from core.services.signal_quality_service import (
     SignalQualityService
 )
 
+from colorama import (
+    Fore,
+    Style,
+    init
+)
+
+init(autoreset=True)
+
 
 class AnalystAgent:
 
@@ -64,6 +72,14 @@ class AnalystAgent:
                 sender="AnalystAgent",
                 payload=analysis_payload
             )
+        )
+        
+        print(
+            Fore.WHITE +
+            f"[MARKET] "
+            f"{payload.symbol} "
+            f"close={payload.close}" +
+            Style.RESET_ALL
         )
 
         await self.bus.publish(
