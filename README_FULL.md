@@ -449,3 +449,19 @@ Features:
 
 Arquivo:
 - data/ingestion/binance_ws.py
+
+
+## REAL ATR ENGINE
+
+Engine responsável por volatilidade real baseada em OHLC.
+
+Features:
+- True Range
+- Wilder ATR
+- ATR Percent
+- Volatility Filter
+- Multi-user safe
+- Binance Kline compatible
+
+Arquivos:
+- core/services/atr_service.py

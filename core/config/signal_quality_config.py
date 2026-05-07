@@ -32,6 +32,8 @@ SIGNAL_QUALITY_CONFIG = {
 
     "enable_volatility_filter": True,
 
+    "atr_period": 14,
+
     "min_atr_percent": 0.60,
 
     # =====================================================

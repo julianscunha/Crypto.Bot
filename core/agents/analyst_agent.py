@@ -14,6 +14,10 @@ from core.services.market_structure_service import (
     MarketStructureService
 )
 
+from core.services.atr_service import (
+    AtrService
+)
+
 from colorama import (
     Fore,
     Style,
@@ -26,14 +30,19 @@ init(autoreset=True)
 class AnalystAgent:
 
     def __init__(self, bus):
-        self.market_structure = (
-            MarketStructureService()
-        )
 
         self.bus = bus
 
         self.signal_quality = (
             SignalQualityService()
+        )
+
+        self.market_structure = (
+            MarketStructureService()
+        )
+
+        self.atr_service = (
+            AtrService()
         )
 
         self.bus.subscribe(self)
@@ -56,10 +65,26 @@ class AnalystAgent:
             payload
         )
 
+        # =====================================================
+        # UPDATE MARKET STRUCTURE
+        # =====================================================
+
         self.market_structure.update_market_data(
             user_id=payload.user_id,
             symbol=payload.symbol,
             price=payload.close
+        )
+
+        # =====================================================
+        # UPDATE ATR ENGINE
+        # =====================================================
+
+        self.atr_service.update_candle(
+            user_id=payload.user_id,
+            symbol=payload.symbol,
+            high=payload.high,
+            low=payload.low,
+            close=payload.close
         )
 
         # =====================================================
@@ -86,7 +111,7 @@ class AnalystAgent:
                 payload=analysis_payload
             )
         )
-        
+
         print(
             Fore.WHITE +
             "[MARKET]" +

@@ -2,12 +2,22 @@
 
 from datetime import datetime
 
+from colorama import (
+    Fore,
+    Style,
+    init
+)
+
 from core.config.signal_quality_config import (
     SIGNAL_QUALITY_CONFIG
 )
 
 from core.services.ema_trend_service import (
     EmaTrendService
+)
+
+from core.services.atr_service import (
+    AtrService
 )
 
 from data.storage.repositories.trades_repository import (
@@ -17,6 +27,8 @@ from data.storage.repositories.trades_repository import (
 from data.storage.repositories.portfolio_repository import (
     PortfolioRepository
 )
+
+init(autoreset=True)
 
 
 class SignalQualityService:
@@ -35,6 +47,10 @@ class SignalQualityService:
             EmaTrendService()
         )
 
+        self.atr_service = (
+            AtrService()
+        )
+
     # =====================================================
     # MARKET UPDATE
     # =====================================================
@@ -50,6 +66,14 @@ class SignalQualityService:
             price=payload.close
         )
 
+        self.atr_service.update_candle(
+            user_id=payload.user_id,
+            symbol=payload.symbol,
+            high=payload.high,
+            low=payload.low,
+            close=payload.close
+        )
+
     # =====================================================
     # MAIN VALIDATION
     # =====================================================
@@ -60,6 +84,13 @@ class SignalQualityService:
     ) -> tuple[bool, str]:
 
         valid, reason = self._validate_trend(
+            payload
+        )
+
+        if not valid:
+            return valid, reason
+
+        valid, reason = self._validate_atr(
             payload
         )
 
@@ -104,57 +135,109 @@ class SignalQualityService:
         self,
         payload
     ):
-    
+
         if not self.config[
             "enable_trend_filter"
         ]:
-    
+
             return True, "DISABLED"
-    
+
         prices = self.trend_service.get_prices(
             user_id=payload.user_id,
             symbol=payload.symbol
         )
-    
+
         slow_period = self.config[
             "ema_slow_period"
         ]
-    
+
         # =====================================================
         # NOT ENOUGH DATA
         # =====================================================
-    
+
         if len(prices) < slow_period:
-    
+
             return True, "WARMUP"
-    
+
         ema_fast = self.trend_service.calculate_ema(
             prices=prices,
             period=self.config[
                 "ema_fast_period"
             ]
         )
-    
+
         ema_slow = self.trend_service.calculate_ema(
             prices=prices,
             period=slow_period
         )
-    
+
         trend_diff = (
             ema_fast - ema_slow
         )
-    
+
         # =====================================================
         # SOFT FILTER
         # =====================================================
-    
+
         if trend_diff < -0.50:
-    
+
             return (
                 False,
                 "BEARISH_TREND"
             )
-    
+
+        return True, "OK"
+
+    # =====================================================
+    # ATR
+    # =====================================================
+
+    def _validate_atr(
+        self,
+        payload
+    ):
+
+        if not self.config[
+            "enable_volatility_filter"
+        ]:
+
+            return True, "DISABLED"
+
+        atr_percent = (
+            self.atr_service
+            .calculate_atr_percent(
+                user_id=payload.user_id,
+                symbol=payload.symbol,
+                period=self.config[
+                    "atr_period"
+                ]
+            )
+        )
+
+        if atr_percent is None:
+
+            return (
+                False,
+                "ATR_NOT_READY"
+            )
+
+        print(
+            Fore.MAGENTA +
+            "[ATR]" +
+            Style.RESET_ALL +
+            f" {payload.symbol} "
+            f"atr={round(atr_percent, 2)}%"
+        )
+
+        if atr_percent < self.config[
+            "min_atr_percent"
+        ]:
+
+            return (
+                False,
+                "LOW_VOLATILITY"
+            )
+
         return True, "OK"
 
     # =====================================================
