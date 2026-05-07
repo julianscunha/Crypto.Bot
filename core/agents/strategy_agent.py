@@ -10,6 +10,10 @@ from core.services.signal_quality_service import (
     SignalQualityService
 )
 
+from core.services.market_structure_service import (
+    MarketStructureService
+)
+
 from colorama import (
     Fore,
     Style,
@@ -29,6 +33,10 @@ class StrategyAgent:
             SignalQualityService()
         )
 
+        self.market_structure = (
+            MarketStructureService()
+        )
+
         self.bus.subscribe(self)
 
     async def on_message(self, message):
@@ -45,6 +53,31 @@ class StrategyAgent:
             Fore.CYAN +
             f"[STRATEGY] "
             f"{payload.symbol}" +
+            Style.RESET_ALL
+        )
+
+        # =====================================================
+        # UPDATE STRUCTURE ENGINE
+        # =====================================================
+
+        self.market_structure.update_market_data(
+            user_id=payload.user_id,
+            symbol=payload.symbol,
+            price=payload.reference_price
+        )
+
+        candles_count = len(
+            self.market_structure.get_prices(
+                payload.user_id,
+                payload.symbol
+            )
+        )
+
+        print(
+            Fore.MAGENTA +
+            f"[STRUCTURE DATA] "
+            f"{payload.symbol} "
+            f"candles={candles_count}" +
             Style.RESET_ALL
         )
 
@@ -71,6 +104,30 @@ class StrategyAgent:
         )
 
         # =====================================================
+        # MARKET STRUCTURE VALIDATION
+        # =====================================================
+
+        structure = (
+            self.market_structure
+            .analyze_structure(
+                user_id=payload.user_id,
+                symbol=payload.symbol
+            )
+        )
+
+        if not structure["valid"]:
+
+            print(
+                Fore.YELLOW +
+                f"[STRUCTURE BLOCKED] "
+                f"{payload.symbol} "
+                f"| {structure['reason']}" +
+                Style.RESET_ALL
+            )
+
+            return
+
+        # =====================================================
         # SIGNAL QUALITY VALIDATION
         # =====================================================
 
@@ -81,7 +138,7 @@ class StrategyAgent:
         )
 
         if not valid:
-        
+
             print(
                 Fore.RED +
                 f"[SIGNAL BLOCKED] "
@@ -89,15 +146,17 @@ class StrategyAgent:
                 f"| {reason}" +
                 Style.RESET_ALL
             )
-        
+
             return
-            print(
-                Fore.GREEN +
-                f"[SIGNAL] "
-                f"{payload.symbol} "
-                f"strength={signal_strength}" +
-                Style.RESET_ALL
-            )
+
+        print(
+            Fore.GREEN +
+            f"[SIGNAL] "
+            f"{payload.symbol} "
+            f"strength={signal_strength}" +
+            Style.RESET_ALL
+        )
+
         # =====================================================
         # PUBLISH
         # =====================================================
@@ -112,5 +171,3 @@ class StrategyAgent:
         await self.bus.publish(
             signal_message
         )
-        
-        

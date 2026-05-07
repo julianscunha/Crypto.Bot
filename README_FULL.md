@@ -30,6 +30,40 @@ Portfolio Analytics
 
 ---
 
+### PAPER MODE (mock/random feed)
+
+signal_quality_config.py
+
+- cooldown_seconds = 5
+- ema_fast_period = 9
+- ema_slow_period = 21
+- min_atr_percent = 0.40
+
+market_structure_config.py
+
+- swing_window = 2
+- min_trend_strength = 1
+- consolidation_threshold = 0.001
+
+---
+
+### REAL MARKET MODE (Binance Kline)
+
+signal_quality_config.py
+
+- cooldown_seconds = 15
+- ema_fast_period = 9
+- ema_slow_period = 21
+- min_atr_percent = 0.60
+
+market_structure_config.py
+
+- swing_window = 3
+- min_trend_strength = 2
+- consolidation_threshold = 0.003
+
+---
+
 # Core Stack
 
 - Python 3.11
@@ -382,3 +416,20 @@ Variáveis:
 - ema_fast_period
 - ema_slow_period
 - enable_trend_filter
+
+
+## REAL MARKET STRUCTURE ENGINE
+
+Engine responsável por validação estrutural de tendência.
+
+Features:
+- Swing High Detection
+- Swing Low Detection
+- Trend Strength
+- Break of Structure
+- Consolidation Filter
+- Fake Breakout Prevention
+
+Arquivos:
+- core/services/market_structure_service.py
+- core/config/market_structure_config.py

@@ -10,6 +10,10 @@ from core.services.signal_quality_service import (
     SignalQualityService
 )
 
+from core.services.market_structure_service import (
+    MarketStructureService
+)
+
 from colorama import (
     Fore,
     Style,
@@ -22,6 +26,9 @@ init(autoreset=True)
 class AnalystAgent:
 
     def __init__(self, bus):
+        self.market_structure = (
+            MarketStructureService()
+        )
 
         self.bus = bus
 
@@ -47,6 +54,12 @@ class AnalystAgent:
 
         self.signal_quality.update_market_data(
             payload
+        )
+
+        self.market_structure.update_market_data(
+            user_id=payload.user_id,
+            symbol=payload.symbol,
+            price=payload.close
         )
 
         # =====================================================
