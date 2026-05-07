@@ -14,7 +14,7 @@ SIGNAL_QUALITY_CONFIG = {
 
     "enable_cooldown": True,
 
-    "cooldown_seconds": 15,
+    "cooldown_seconds": 5,
 
     # =====================================================
     # TREND FILTER
@@ -22,9 +22,9 @@ SIGNAL_QUALITY_CONFIG = {
 
     "enable_trend_filter": True,
 
-    "ema_fast_period": 2,
+    "ema_fast_period": 9,
 
-    "ema_slow_period": 5,
+    "ema_slow_period": 21,
 
     # =====================================================
     # VOLATILITY FILTER
