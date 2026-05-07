@@ -1,11 +1,25 @@
 # -*- coding: utf-8 -*-
 
+import json
 import asyncio
-import random
+import websockets
 
 from core.contracts.messages import (
     MarketDataMessage,
     MarketDataPayload
+)
+
+from colorama import (
+    Fore,
+    Style,
+    init
+)
+
+init(autoreset=True)
+
+
+BINANCE_WS_URL = (
+    "wss://stream.binance.com:9443/ws"
 )
 
 
@@ -22,42 +36,117 @@ class BinanceWS:
         self.user_id = user_id
 
         self.symbols = [
-            "BTCUSDT",
-            "ETHUSDT",
-            "SOLUSDT"
+            "btcusdt",
+            "ethusdt",
+            "solusdt"
         ]
+
+        self.interval = "1m"
+
+    # =====================================================
+    # STREAMS
+    # =====================================================
+
+    def build_stream_url(self):
+
+        streams = []
+
+        for symbol in self.symbols:
+
+            streams.append(
+                f"{symbol}@kline_{self.interval}"
+            )
+
+        return (
+            BINANCE_WS_URL
+            + "/"
+            + "/".join(streams)
+        )
+
+    # =====================================================
+    # START
+    # =====================================================
 
     async def start(self):
 
+        stream_url = (
+            self.build_stream_url()
+        )
+
+        print(
+            Fore.GREEN +
+            f"[BINANCE] Connected "
+            f"{stream_url}" +
+            Style.RESET_ALL
+        )
+
         while True:
 
-            for symbol in self.symbols:
+            try:
 
-                current_price = round(
-                    random.uniform(90, 120),
-                    2
+                async with websockets.connect(
+                    stream_url
+                ) as websocket:
+
+                    while True:
+
+                        raw_data = (
+                            await websocket.recv()
+                        )
+
+                        data = json.loads(
+                            raw_data
+                        )
+
+                        if "k" not in data:
+                            continue
+
+                        kline = data["k"]
+
+                        # ONLY CLOSED CANDLES
+                        if not kline["x"]:
+                            continue
+
+                        symbol = kline["s"]
+
+                        payload = (
+                            MarketDataPayload(
+                                user_id=self.user_id,
+                                symbol=symbol,
+                                open=float(kline["o"]),
+                                high=float(kline["h"]),
+                                low=float(kline["l"]),
+                                close=float(kline["c"]),
+                                volume=float(kline["v"])
+                            )
+                        )
+
+                        message = (
+                            MarketDataMessage(
+                                sender="BinanceWS",
+                                payload=payload
+                            )
+                        )
+
+                        print(
+                            Fore.WHITE +
+                            f"[KLINE] "
+                            f"{symbol} "
+                            f"close={payload.close}" +
+                            Style.RESET_ALL
+                        )
+
+                        await self.bus.publish(
+                            message
+                        )
+
+            except Exception as e:
+
+                print(
+                    Fore.RED +
+                    f"[BINANCE ERROR] "
+                    f"{e}" +
+                    Style.RESET_ALL
                 )
 
-                payload = MarketDataPayload(
-                    user_id=self.user_id,
-                    symbol=symbol,
-                    open=current_price,
-                    close=current_price,
-                    high=round(current_price * 1.01, 2),
-                    low=round(current_price * 0.99, 2),
-                    volume=round(
-                        random.uniform(1000, 5000),
-                        2
-                    )
-                )
-
-                message = MarketDataMessage(
-                    sender="BinanceWS",
-                    payload=payload
-                )
-
-                await self.bus.publish(
-                    message
-                )
-
-            await asyncio.sleep(2)
+                await asyncio.sleep(5)

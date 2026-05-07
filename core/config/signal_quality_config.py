@@ -14,7 +14,7 @@ SIGNAL_QUALITY_CONFIG = {
 
     "enable_cooldown": True,
 
-    "cooldown_seconds": 5,
+    "cooldown_seconds": 15,
 
     # =====================================================
     # TREND FILTER
@@ -32,7 +32,7 @@ SIGNAL_QUALITY_CONFIG = {
 
     "enable_volatility_filter": True,
 
-    "min_atr_percent": 0.40,
+    "min_atr_percent": 0.60,
 
     # =====================================================
     # RISK CONTROL

@@ -6,7 +6,7 @@ MARKET_STRUCTURE_CONFIG = {
     # SWING DETECTION
     # =====================================================
 
-    "swing_window": 2,
+    "swing_window": 3,
 
     # =====================================================
     # TREND STRUCTURE
@@ -14,7 +14,7 @@ MARKET_STRUCTURE_CONFIG = {
 
     "require_bos_confirmation": True,
 
-    "min_trend_strength": 1,
+    "min_trend_strength": 2,
 
     # =====================================================
     # CONSOLIDATION
@@ -22,7 +22,7 @@ MARKET_STRUCTURE_CONFIG = {
 
     "enable_consolidation_filter": True,
 
-    "consolidation_threshold": 0.001,
+    "consolidation_threshold": 0.003,
 
     # =====================================================
     # BREAKOUT FILTER

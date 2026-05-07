@@ -433,3 +433,19 @@ Features:
 Arquivos:
 - core/services/market_structure_service.py
 - core/config/market_structure_config.py
+
+## REAL BINANCE KLINE ENGINE
+
+Engine responsável por ingestão real de candles Binance.
+
+Features:
+- Websocket Binance
+- Real OHLC
+- Closed Candle Validation
+- Multi-symbol streaming
+- Real volume
+- Real EMA input
+- Real market structure input
+
+Arquivo:
+- data/ingestion/binance_ws.py

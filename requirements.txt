@@ -2,7 +2,7 @@ fastapi
 uvicorn
 pydantic
 python-dotenv
-websockets
+websockets==12.0
 colorama
 alembic==1.13.1
 sqlalchemy==2.0.29
