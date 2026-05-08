@@ -5,11 +5,15 @@ from core.contracts.messages import (
 )
 
 from data.storage.repositories.trades_repository import (
-    TradesRepository
+    trades_repository
 )
 
 from data.storage.metrics import (
     MetricsStorage
+)
+
+from core.services.signal_quality_service import (
+    signal_quality_service
 )
 
 
@@ -20,10 +24,14 @@ init(autoreset=True)
 class ExecutionAgent:
 
     def __init__(self, bus):
-
+    
         self.bus = bus
+        
+        self.signal_quality = (
+            signal_quality_service
+        )  
 
-        self.positions = TradesRepository()
+        self.positions = trades_repository
 
         self.metrics = MetricsStorage()
 
@@ -68,6 +76,11 @@ class ExecutionAgent:
             f"{payload.symbol} "
             f"@ {payload.entry_price} "
             f"| qty={payload.quantity}"
+        )
+        
+        self.signal_quality.register_trade(
+            payload.user_id,
+            payload.symbol
         )
 
         metrics = self.metrics.get_metrics(

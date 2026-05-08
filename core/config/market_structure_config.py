@@ -6,15 +6,15 @@ MARKET_STRUCTURE_CONFIG = {
     # SWING DETECTION
     # =====================================================
 
-    "swing_window": 3,
+    "swing_window": 2,#3
 
     # =====================================================
     # TREND STRUCTURE
     # =====================================================
 
-    "require_bos_confirmation": True,
+    "require_bos_confirmation": False,
 
-    "min_trend_strength": 2,
+    "min_trend_strength": 1,#2
 
     # =====================================================
     # CONSOLIDATION

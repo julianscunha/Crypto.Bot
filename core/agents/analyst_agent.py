@@ -11,11 +11,11 @@ from core.services.signal_quality_service import (
 )
 
 from core.services.market_structure_service import (
-    MarketStructureService
+    market_structure_service
 )
 
 from core.services.atr_service import (
-    AtrService
+    atr_service
 )
 
 from colorama import (
@@ -38,12 +38,10 @@ class AnalystAgent:
         )
 
         self.market_structure = (
-            MarketStructureService()
+            market_structure_service
         )
 
-        self.atr_service = (
-            AtrService()
-        )
+        self.atr_service = atr_service
 
         self.bus.subscribe(self)
 

@@ -232,3 +232,7 @@ class TradesRepository:
         finally:
 
             session.close()
+
+trades_repository = (
+    TradesRepository()
+)

@@ -166,3 +166,5 @@ class AtrService:
         ) * 100
 
         return atr_percent
+        
+atr_service = AtrService()

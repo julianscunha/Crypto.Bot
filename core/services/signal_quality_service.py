@@ -13,11 +13,11 @@ from core.config.signal_quality_config import (
 )
 
 from core.services.ema_trend_service import (
-    EmaTrendService
+    ema_trend_service
 )
 
 from core.services.atr_service import (
-    AtrService
+    atr_service
 )
 
 from data.storage.repositories.trades_repository import (
@@ -44,12 +44,31 @@ class SignalQualityService:
         self.cooldowns = {}
 
         self.trend_service = (
-            EmaTrendService()
+            ema_trend_service
         )
 
-        self.atr_service = (
-            AtrService()
+        self.atr_service = atr_service
+        
+        
+    # =====================================================
+    # REGISTER TRADE
+    # =====================================================
+
+    def register_trade(
+        self,
+        user_id: int,
+        symbol: str
+    ):
+
+        key = (
+            user_id,
+            symbol
         )
+
+        self.cooldowns[key] = (
+            datetime.utcnow()
+        )
+
 
     # =====================================================
     # MARKET UPDATE
@@ -309,7 +328,6 @@ class SignalQualityService:
                     "COOLDOWN_ACTIVE"
                 )
 
-        self.cooldowns[key] = now
 
         return True, "OK"
 
@@ -373,3 +391,8 @@ class SignalQualityService:
             )
 
         return True, "OK"
+
+
+signal_quality_service = (
+    SignalQualityService()
+)

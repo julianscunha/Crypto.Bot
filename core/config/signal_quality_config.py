@@ -34,7 +34,7 @@ SIGNAL_QUALITY_CONFIG = {
 
     "atr_period": 5,#14
 
-    "min_atr_percent": 0.60,
+    "min_atr_percent": 0.10,
 
     # =====================================================
     # RISK CONTROL

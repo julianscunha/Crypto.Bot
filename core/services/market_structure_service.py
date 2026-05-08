@@ -244,3 +244,7 @@ class MarketStructureService:
             "reason": "BULLISH_STRUCTURE",
             "trend_strength": trend_strength
         }
+
+market_structure_service = (
+    MarketStructureService()
+)

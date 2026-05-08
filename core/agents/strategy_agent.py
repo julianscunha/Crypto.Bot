@@ -11,7 +11,7 @@ from core.services.signal_quality_service import (
 )
 
 from core.services.market_structure_service import (
-    MarketStructureService
+    market_structure_service
 )
 
 from colorama import (
@@ -34,7 +34,7 @@ class StrategyAgent:
         )
 
         self.market_structure = (
-            MarketStructureService()
+            market_structure_service
         )
 
         self.bus.subscribe(self)
@@ -145,17 +145,7 @@ class StrategyAgent:
         # FINAL STRUCTURE BLOCK
         # =====================================================
 
-        if not structure_valid:
 
-            print(
-                Fore.LIGHTYELLOW_EX +
-                "[STRUCTURE BLOCKED]" +
-                Style.RESET_ALL +
-                f" {payload.symbol} "
-                f"| {structure['reason']}"
-            )
-
-            return
 
         print(
             Fore.LIGHTGREEN_EX +

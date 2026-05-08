@@ -141,3 +141,5 @@ class EmaTrendService:
         return (
             ema_fast >= ema_slow
         )
+
+ema_trend_service = EmaTrendService()

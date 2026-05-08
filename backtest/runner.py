@@ -8,6 +8,10 @@ from colorama import (
     init
 )
 
+from data.storage.repositories.trades_repository import (
+    trades_repository
+)
+
 from backtest.engine.replay_engine import (
     ReplayEngine
 )
@@ -48,6 +52,8 @@ async def main():
             user_id=USER_ID
         )
     )
+
+    trades_repository.trades = []
 
     await replay.replay()
 

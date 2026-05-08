@@ -13,7 +13,7 @@ from core.contracts.messages import (
 )
 
 from data.storage.repositories.trades_repository import (
-    TradesRepository
+    trades_repository
 )
 
 from services.position_lifecycle_service import (
@@ -29,7 +29,7 @@ class PositionManagerAgent:
 
         self.bus = bus
 
-        self.positions = TradesRepository()
+        self.positions = trades_repository
 
         self.bus.subscribe(self)
 
