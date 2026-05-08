@@ -80,6 +80,8 @@ class BinanceWS:
             f" Connected "
             f"{stream_url}"
         )
+        
+        print()
 
         while True:
 

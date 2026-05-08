@@ -115,17 +115,9 @@ class StrategyAgent:
             )
         )
 
-        if not structure["valid"]:
-
-            print(
-                Fore.LIGHTYELLOW_EX +
-                "[STRUCTURE BLOCKED]" +
-                Style.RESET_ALL +
-                f" {payload.symbol} "
-                f"| {structure['reason']}"
-            )
-
-            return
+        structure_valid = (
+            structure["valid"]
+        )
 
         # =====================================================
         # SIGNAL QUALITY VALIDATION
@@ -145,6 +137,22 @@ class StrategyAgent:
                 Style.RESET_ALL +
                 f" {payload.symbol} "
                 f"| {reason}"
+            )
+
+            return
+
+        # =====================================================
+        # FINAL STRUCTURE BLOCK
+        # =====================================================
+
+        if not structure_valid:
+
+            print(
+                Fore.LIGHTYELLOW_EX +
+                "[STRUCTURE BLOCKED]" +
+                Style.RESET_ALL +
+                f" {payload.symbol} "
+                f"| {structure['reason']}"
             )
 
             return

@@ -465,3 +465,21 @@ Features:
 
 Arquivos:
 - core/services/atr_service.py
+
+# BACKTEST ENGINE REAL
+
+Sistema de replay histórico utilizando:
+- EventBus real
+- Agents reais
+- Strategy real
+- Risk real
+- Position Manager real
+
+Fluxo:
+CSV → ReplayEngine → EventBus → Agents → Metrics
+
+Arquivos:
+- backtest/engine/replay_engine.py
+- backtest/engine/metrics_engine.py
+- backtest/engine/report_engine.py
+- backtest/runner.py
