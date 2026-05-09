@@ -144,8 +144,22 @@ class StrategyAgent:
         # =====================================================
         # FINAL STRUCTURE BLOCK
         # =====================================================
+        
+        # TODO:
+        # Reativar market structure validation
+        # após dataset real e tuning estrutural
 
-
+      # if not structure_valid:
+      #
+      #     print(
+      #         Fore.LIGHTYELLOW_EX +
+      #         "[STRUCTURE BLOCKED]" +
+      #         Style.RESET_ALL +
+      #         f" {payload.symbol} "
+      #         f"| {structure['reason']}"
+      #     )
+      #
+      #     return
 
         print(
             Fore.LIGHTGREEN_EX +

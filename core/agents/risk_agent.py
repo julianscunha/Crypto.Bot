@@ -10,6 +10,10 @@ from data.storage.repositories.trades_repository import (
     trades_repository
 )
 
+from core.config.trading_config import (
+    TRADING_CONFIG
+)
+
 from colorama import (
     Fore,
     Style,
@@ -88,25 +92,37 @@ class RiskAgent:
         # =====================================================
         # RISK CALCULATION
         # =====================================================
-
+        
         entry_price = payload.entry_price
-
+        
         stop_loss = round(
-            entry_price * 0.98,
+            entry_price * (
+                1 - TRADING_CONFIG["stop_loss_percent"]
+            ),
             2
         )
-
+        
         take_profit = round(
-            entry_price * 1.003,
+            entry_price * (
+                1 + TRADING_CONFIG["take_profit_percent"]
+            ),
             2
         )
-
+        
         trailing_stop = round(
-            entry_price * 0.015,
+            entry_price * (
+                TRADING_CONFIG[
+                    "trailing_stop_percent"
+                ]
+            ),
             4
         )
-
-        quantity = 2.0
+        
+        quantity = (
+            TRADING_CONFIG[
+                "default_quantity"
+            ]
+        )
 
         # =====================================================
         # PAYLOAD

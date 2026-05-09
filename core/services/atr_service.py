@@ -2,6 +2,10 @@
 
 from collections import defaultdict
 
+from core.config.trading_config import (
+    TRADING_CONFIG
+)
+
 
 class AtrService:
 
@@ -94,8 +98,16 @@ class AtrService:
         self,
         user_id: int,
         symbol: str,
-        period: int = 14
+        period: int = None
     ):
+
+        if period is None:
+
+            period = (
+                TRADING_CONFIG[
+                    "atr_period"
+                ]
+            )
 
         candles = self.get_candles(
             user_id,
@@ -137,8 +149,16 @@ class AtrService:
         self,
         user_id: int,
         symbol: str,
-        period: int = 14
+        period: int = None
     ):
+
+        if period is None:
+
+            period = (
+                TRADING_CONFIG[
+                    "atr_period"
+                ]
+            )
 
         candles = self.get_candles(
             user_id,
@@ -166,5 +186,6 @@ class AtrService:
         ) * 100
 
         return atr_percent
-        
+
+
 atr_service = AtrService()

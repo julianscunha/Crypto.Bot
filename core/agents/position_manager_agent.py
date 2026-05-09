@@ -14,6 +14,10 @@ from data.storage.repositories.trades_repository import (
     trades_repository
 )
 
+from core.config.trading_config import (
+    TRADING_CONFIG
+)
+
 from services.position_lifecycle_service import (
     PositionLifecycleService
 )
@@ -81,13 +85,17 @@ class PositionManagerAgent:
             # =====================================================
             # TRAILING STOP
             # =====================================================
-
+            
             trailing_price = (
                 PositionLifecycleService
                 .update_trailing_stop(
                     current_price=payload.close,
                     highest_price=trade.highest_price,
-                    trailing_percent=0.02
+                    trailing_percent=(
+                        TRADING_CONFIG[
+                            "trailing_stop_percent"
+                        ]
+                    )
                 )
             )
 

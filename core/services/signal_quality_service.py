@@ -8,8 +8,8 @@ from colorama import (
     init
 )
 
-from core.config.signal_quality_config import (
-    SIGNAL_QUALITY_CONFIG
+from core.config.trading_config import (
+    TRADING_CONFIG
 )
 
 from core.services.ema_trend_service import (
@@ -21,7 +21,7 @@ from core.services.atr_service import (
 )
 
 from data.storage.repositories.trades_repository import (
-    TradesRepository
+    trades_repository
 )
 
 from data.storage.repositories.portfolio_repository import (
@@ -35,11 +35,13 @@ class SignalQualityService:
 
     def __init__(self):
 
-        self.config = SIGNAL_QUALITY_CONFIG
+        self.config = TRADING_CONFIG
 
-        self.trades = TradesRepository()
+        self.trades = trades_repository
 
-        self.portfolio = PortfolioRepository()
+        self.portfolio = (
+            PortfolioRepository()
+        )
 
         self.cooldowns = {}
 
@@ -47,9 +49,10 @@ class SignalQualityService:
             ema_trend_service
         )
 
-        self.atr_service = atr_service
-        
-        
+        self.atr_service = (
+            atr_service
+        )
+
     # =====================================================
     # REGISTER TRADE
     # =====================================================
@@ -69,7 +72,6 @@ class SignalQualityService:
             datetime.utcnow()
         )
 
-
     # =====================================================
     # MARKET UPDATE
     # =====================================================
@@ -83,14 +85,6 @@ class SignalQualityService:
             user_id=payload.user_id,
             symbol=payload.symbol,
             price=payload.close
-        )
-
-        self.atr_service.update_candle(
-            user_id=payload.user_id,
-            symbol=payload.symbol,
-            high=payload.high,
-            low=payload.low,
-            close=payload.close
         )
 
     # =====================================================
@@ -178,16 +172,22 @@ class SignalQualityService:
 
             return True, "WARMUP"
 
-        ema_fast = self.trend_service.calculate_ema(
-            prices=prices,
-            period=self.config[
-                "ema_fast_period"
-            ]
+        ema_fast = (
+            self.trend_service
+            .calculate_ema(
+                prices=prices,
+                period=self.config[
+                    "ema_fast_period"
+                ]
+            )
         )
 
-        ema_slow = self.trend_service.calculate_ema(
-            prices=prices,
-            period=slow_period
+        ema_slow = (
+            self.trend_service
+            .calculate_ema(
+                prices=prices,
+                period=slow_period
+            )
         )
 
         trend_diff = (
@@ -327,7 +327,6 @@ class SignalQualityService:
                     False,
                     "COOLDOWN_ACTIVE"
                 )
-
 
         return True, "OK"
 
