@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from datetime import datetime
-
 from colorama import (
     Fore,
     Style,
@@ -52,9 +50,11 @@ class PositionManagerAgent:
             if trade.symbol != payload.symbol:
                 continue
 
-            trade.current_price = payload.close
+            # =====================================================
+            # UNREALIZED PNL
+            # =====================================================
 
-            trade.unrealized_pnl = (
+            unrealized_pnl = (
                 PositionLifecycleService
                 .calculate_unrealized_pnl(
                     entry_price=trade.entry_price,
@@ -64,14 +64,19 @@ class PositionManagerAgent:
             )
 
             # =====================================================
-            # HIGHEST PRICE
+            # UPDATE TRADE
             # =====================================================
 
-            if (
-                trade.highest_price is None or
-                payload.close > trade.highest_price
-            ):
-                trade.highest_price = payload.close
+            trade = (
+                self.positions.update_trade_price(
+                    trade_id=trade.id,
+                    current_price=payload.close,
+                    unrealized_pnl=unrealized_pnl
+                )
+            )
+
+            if not trade:
+                continue
 
             # =====================================================
             # TRAILING STOP

@@ -8,6 +8,10 @@ from colorama import (
     init
 )
 
+from data.storage.database import (
+    init_db
+)
+
 from data.storage.repositories.trades_repository import (
     trades_repository
 )
@@ -46,6 +50,22 @@ async def main():
         " STARTING"
     )
 
+    # =====================================================
+    # DATABASE
+    # =====================================================
+
+    init_db()
+
+    # =====================================================
+    # RESET STATE
+    # =====================================================
+
+    trades_repository.reset()
+
+    # =====================================================
+    # REPLAY ENGINE
+    # =====================================================
+
     replay = (
         ReplayEngine(
             csv_path=DATASET,
@@ -53,9 +73,11 @@ async def main():
         )
     )
 
-    trades_repository.trades = []
-
     await replay.replay()
+
+    # =====================================================
+    # METRICS
+    # =====================================================
 
     metrics = (
         MetricsEngine()
@@ -85,6 +107,10 @@ async def main():
         f" PnL={metrics['pnl']}"
     )
 
+    # =====================================================
+    # REPORT
+    # =====================================================
+
     ReportEngine().generate(
         metrics=metrics,
         output_path=(
@@ -92,6 +118,17 @@ async def main():
             "report.json"
         )
     )
+
+    print()
+
+    print(
+        Fore.CYAN +
+        "[BACKTEST REPORT]" +
+        Style.RESET_ALL +
+        " backtest/reports/report.json"
+    )
+
+    print()
 
 
 if __name__ == "__main__":

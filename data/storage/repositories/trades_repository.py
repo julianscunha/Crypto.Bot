@@ -15,6 +15,10 @@ class TradesRepository:
 
         return SessionLocal()
 
+    # =====================================================
+    # CREATE TRADE
+    # =====================================================
+
     def create_trade(
         self,
         user_id: int,
@@ -69,6 +73,10 @@ class TradesRepository:
 
             session.close()
 
+    # =====================================================
+    # GET OPEN TRADE
+    # =====================================================
+
     def get_open_trade(
         self,
         user_id: int,
@@ -93,6 +101,10 @@ class TradesRepository:
 
             session.close()
 
+    # =====================================================
+    # GET OPEN TRADES
+    # =====================================================
+
     def get_open_trades(
         self,
         user_id: int
@@ -115,6 +127,10 @@ class TradesRepository:
 
             session.close()
 
+    # =====================================================
+    # HAS OPEN TRADE
+    # =====================================================
+
     def has_open_trade(
         self,
         user_id: int,
@@ -127,6 +143,10 @@ class TradesRepository:
         )
 
         return trade is not None
+
+    # =====================================================
+    # UPDATE TRADE PRICE
+    # =====================================================
 
     def update_trade_price(
         self,
@@ -150,18 +170,34 @@ class TradesRepository:
             if not trade:
                 return None
 
+            # =====================================================
+            # PRICE
+            # =====================================================
+
             trade.current_price = current_price
 
             trade.unrealized_pnl = unrealized_pnl
 
-            if current_price > (
-                trade.highest_price or current_price
+            # =====================================================
+            # HIGHEST PRICE
+            # =====================================================
+
+            if (
+                trade.highest_price is None
+                or current_price > trade.highest_price
             ):
+
                 trade.highest_price = current_price
 
-            if current_price < (
-                trade.lowest_price or current_price
+            # =====================================================
+            # LOWEST PRICE
+            # =====================================================
+
+            if (
+                trade.lowest_price is None
+                or current_price < trade.lowest_price
             ):
+
                 trade.lowest_price = current_price
 
             session.commit()
@@ -179,6 +215,10 @@ class TradesRepository:
         finally:
 
             session.close()
+
+    # =====================================================
+    # CLOSE TRADE
+    # =====================================================
 
     def close_trade(
         self,
@@ -232,6 +272,25 @@ class TradesRepository:
         finally:
 
             session.close()
+
+    # =====================================================
+    # RESET
+    # =====================================================
+
+    def reset(self):
+
+        session = self._session()
+
+        try:
+
+            session.query(Trade).delete()
+
+            session.commit()
+
+        finally:
+
+            session.close()
+
 
 trades_repository = (
     TradesRepository()

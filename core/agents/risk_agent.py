@@ -97,7 +97,7 @@ class RiskAgent:
         )
 
         take_profit = round(
-            entry_price * 1.02,
+            entry_price * 1.003,
             2
         )
 

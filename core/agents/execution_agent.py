@@ -16,24 +16,32 @@ from core.services.signal_quality_service import (
     signal_quality_service
 )
 
-
-from colorama import Fore, Style, init
+from colorama import (
+    Fore,
+    Style,
+    init
+)
 
 init(autoreset=True)
+
 
 class ExecutionAgent:
 
     def __init__(self, bus):
-    
+
         self.bus = bus
-        
+
         self.signal_quality = (
             signal_quality_service
-        )  
+        )
 
-        self.positions = trades_repository
+        self.positions = (
+            trades_repository
+        )
 
-        self.metrics = MetricsStorage()
+        self.metrics = (
+            MetricsStorage()
+        )
 
         self.bus.subscribe(self)
 
@@ -47,26 +55,53 @@ class ExecutionAgent:
 
         payload = message.payload
 
+        # =====================================================
+        # SIGNAL FILTER
+        # =====================================================
+
         if payload.signal != "BUY":
             return
+
+        # =====================================================
+        # EXISTING POSITION
+        # =====================================================
 
         if self.positions.has_open_trade(
             payload.user_id,
             payload.symbol
         ):
+
+            print(
+                Fore.LIGHTRED_EX +
+                "[EXECUTION BLOCKED]" +
+                Style.RESET_ALL +
+                f" {payload.symbol} "
+                f"| POSITION_ALREADY_OPEN"
+            )
+
             return
 
-        self.positions.create_trade(
-            user_id=payload.user_id,
-            symbol=payload.symbol,
-            action=payload.signal,
-            entry_price=payload.entry_price,
-            quantity=payload.quantity,
-            stop_loss=payload.stop_loss,
-            take_profit=payload.take_profit,
-            trailing_stop=payload.trailing_stop,
-            breakeven_enabled=True
+        # =====================================================
+        # CREATE TRADE
+        # =====================================================
+
+        trade = (
+            self.positions.create_trade(
+                user_id=payload.user_id,
+                symbol=payload.symbol,
+                action=payload.signal,
+                entry_price=payload.entry_price,
+                quantity=payload.quantity,
+                stop_loss=payload.stop_loss,
+                take_profit=payload.take_profit,
+                trailing_stop=payload.trailing_stop,
+                breakeven_enabled=True
+            )
         )
+
+        # =====================================================
+        # EXECUTION LOG
+        # =====================================================
 
         print(
             Fore.LIGHTGREEN_EX +
@@ -77,14 +112,24 @@ class ExecutionAgent:
             f"@ {payload.entry_price} "
             f"| qty={payload.quantity}"
         )
-        
+
+        # =====================================================
+        # COOLDOWN REGISTER
+        # =====================================================
+
         self.signal_quality.register_trade(
             payload.user_id,
             payload.symbol
         )
 
-        metrics = self.metrics.get_metrics(
-            user_id=payload.user_id
+        # =====================================================
+        # PORTFOLIO
+        # =====================================================
+
+        metrics = (
+            self.metrics.get_metrics(
+                user_id=payload.user_id
+            )
         )
 
         print(

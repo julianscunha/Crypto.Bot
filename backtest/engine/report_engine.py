@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import json
+
 from pathlib import Path
 
 
@@ -30,8 +31,3 @@ class ReportEngine:
                 f,
                 indent=4
             )
-
-        print(
-            f"[BACKTEST REPORT] "
-            f"{output_path}"
-        )
