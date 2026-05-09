@@ -85,18 +85,16 @@ class ExecutionAgent:
         # CREATE TRADE
         # =====================================================
 
-        trade = (
-            self.positions.create_trade(
-                user_id=payload.user_id,
-                symbol=payload.symbol,
-                action=payload.signal,
-                entry_price=payload.entry_price,
-                quantity=payload.quantity,
-                stop_loss=payload.stop_loss,
-                take_profit=payload.take_profit,
-                trailing_stop=payload.trailing_stop,
-                breakeven_enabled=True
-            )
+        self.positions.create_trade(
+            user_id=payload.user_id,
+            symbol=payload.symbol,
+            action=payload.signal,
+            entry_price=payload.entry_price,
+            quantity=payload.quantity,
+            stop_loss=payload.stop_loss,
+            take_profit=payload.take_profit,
+            trailing_stop=payload.trailing_stop,
+            breakeven_enabled=True
         )
 
         # =====================================================

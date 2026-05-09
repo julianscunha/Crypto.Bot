@@ -8,8 +8,8 @@ from colorama import (
     init
 )
 
-from core.config.trading_config import (
-    TRADING_CONFIG
+from core.config.signal_quality_config import (
+    SIGNAL_QUALITY_CONFIG
 )
 
 from core.services.ema_trend_service import (
@@ -35,9 +35,13 @@ class SignalQualityService:
 
     def __init__(self):
 
-        self.config = TRADING_CONFIG
+        self.config = (
+            SIGNAL_QUALITY_CONFIG
+        )
 
-        self.trades = trades_repository
+        self.trades = (
+            trades_repository
+        )
 
         self.portfolio = (
             PortfolioRepository()
