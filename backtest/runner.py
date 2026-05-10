@@ -31,10 +31,16 @@ from backtest.engine.report_engine import (
 init(autoreset=True)
 
 
-DATASET = (
-    "backtest/datasets/"
-    "btcusdt_1m.csv"
-)
+DATASETS = [
+
+    "backtest/datasets/bullish.csv",
+
+    "backtest/datasets/bearish.csv",
+
+    "backtest/datasets/sideways.csv",
+
+    "backtest/datasets/volatile.csv"
+]
 
 USER_ID = 999
 
@@ -66,14 +72,25 @@ async def main():
     # REPLAY ENGINE
     # =====================================================
 
-    replay = (
-        ReplayEngine(
-            csv_path=DATASET,
-            user_id=USER_ID
+    for dataset in DATASETS:
+    
+        print()
+    
+        print(
+            Fore.YELLOW +
+            "[DATASET]" +
+            Style.RESET_ALL +
+            f" {dataset}"
         )
-    )
-
-    await replay.replay()
+    
+        replay = (
+            ReplayEngine(
+                csv_path=dataset,
+                user_id=USER_ID
+            )
+        )
+    
+        await replay.replay()
 
     # =====================================================
     # METRICS
