@@ -56,16 +56,6 @@ class StrategyAgent:
             f" {payload.symbol}"
         )
 
-        # =====================================================
-        # UPDATE STRUCTURE ENGINE
-        # =====================================================
-
-        self.market_structure.update_market_data(
-            user_id=payload.user_id,
-            symbol=payload.symbol,
-            price=payload.reference_price
-        )
-
         candles_count = len(
             self.market_structure.get_prices(
                 payload.user_id,

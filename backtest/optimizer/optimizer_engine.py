@@ -28,16 +28,20 @@ from backtest.optimizer.config_runtime import (
 
 class OptimizerEngine:
 
-    DATASETS = [
-
+    TRAIN_DATASETS = [
+    
         "backtest/datasets/bullish.csv",
-
+    
         "backtest/datasets/bearish.csv",
-
+    
         "backtest/datasets/sideways.csv",
-
+    
         "backtest/datasets/volatile.csv"
     ]
+    
+    VALIDATION_DATASET = (
+        "backtest/datasets/validation.csv"
+    )
 
     USER_ID = 999
 
@@ -98,7 +102,7 @@ class OptimizerEngine:
 
             trades_repository.reset()
 
-            for dataset in self.DATASETS:
+            for dataset in self.TRAIN_DATASETS:
 
                 replay = (
                     ReplayEngine(
@@ -249,6 +253,48 @@ class OptimizerEngine:
             )
 
         print()
+        
+        print()
+
+        print(
+            "[WALK FORWARD VALIDATION]"
+        )
+        
+        apply_config(
+            best_result["params"]
+        )
+        
+        trades_repository.reset()
+        
+        validation_replay = (
+            ReplayEngine(
+                csv_path=self.VALIDATION_DATASET,
+                user_id=self.USER_ID
+            )
+        )
+        
+        asyncio.run(
+            validation_replay.replay()
+        )
+        
+        validation_metrics = (
+            MetricsEngine()
+            .generate(
+                self.USER_ID
+            )
+        )
+        
+        print()
+        
+        print(
+            "[VALIDATION RESULT]",
+            validation_metrics
+        )
+        
+        restore_config(
+            snapshot
+        )
+        
 
         print(
             "[BEST CONFIG]",
