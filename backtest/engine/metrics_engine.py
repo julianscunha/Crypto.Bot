@@ -4,6 +4,10 @@ from data.storage.metrics import (
     MetricsStorage
 )
 
+from data.storage.repositories.trades_repository import (
+    trades_repository
+)
+
 
 class MetricsEngine:
 
@@ -24,6 +28,32 @@ class MetricsEngine:
             )
         )
 
+        trades = (
+            trades_repository.get_closed_trades(
+                user_id=user_id
+            )
+        )
+
+        equity = 0
+
+        peak = 0
+
+        max_drawdown = 0
+
+        for trade in trades:
+
+            equity += trade.pnl
+
+            if equity > peak:
+                peak = equity
+
+            drawdown = (
+                equity - peak
+            )
+
+            if drawdown < max_drawdown:
+                max_drawdown = drawdown
+
         return {
 
             "total_trades":
@@ -33,5 +63,11 @@ class MetricsEngine:
                 metrics["winrate"],
 
             "pnl":
-                metrics["pnl"]
+                metrics["pnl"],
+
+            "max_drawdown":
+                round(
+                    max_drawdown,
+                    2
+                )
         }

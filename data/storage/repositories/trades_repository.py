@@ -126,6 +126,32 @@ class TradesRepository:
         finally:
 
             session.close()
+            
+    # =====================================================
+    # GET CLOSED TRADES
+    # =====================================================
+    
+    def get_closed_trades(
+        self,
+        user_id: int
+    ):
+    
+        session = self._session()
+    
+        try:
+    
+            return (
+                session.query(Trade)
+                .filter(
+                    Trade.user_id == user_id,
+                    Trade.status == "CLOSED"
+                )
+                .all()
+            )
+    
+        finally:
+    
+            session.close()
 
     # =====================================================
     # HAS OPEN TRADE

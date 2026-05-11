@@ -1,0 +1,13 @@
+{
+    "params": {
+        "take_profit_percent": 0.005,
+        "stop_loss_percent": 0.01
+    },
+    "metrics": {
+        "total_trades": 8,
+        "winrate": 1.0,
+        "pnl": 7760.0,
+        "max_drawdown": 0
+    },
+    "score": 7760.0
+}

@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+import json
 
 from itertools import product
+
+from pathlib import Path
 
 from backtest.engine.replay_engine import (
     ReplayEngine
@@ -11,10 +14,6 @@ from backtest.engine.replay_engine import (
 from backtest.engine.metrics_engine import (
     MetricsEngine
 )
-
-import json
-
-from pathlib import Path
 
 from data.storage.repositories.trades_repository import (
     trades_repository
@@ -123,26 +122,31 @@ class OptimizerEngine:
                 "[RESULT]",
                 metrics
             )
-            
+
             if metrics["total_trades"] < 5:
+
+                restore_config(
+                    snapshot
+                )
+
                 continue
-            
+
             score = (
-            
+
                 metrics["pnl"]
-            
+
                 *
-            
+
                 metrics["winrate"]
-            
-            )
+
+            ) + metrics["max_drawdown"]
 
             results.append({
-            
+
                 "params": params,
-            
+
                 "metrics": metrics,
-            
+
                 "score": round(
                     score,
                     2
@@ -170,51 +174,85 @@ class OptimizerEngine:
             reverse=True
         )
 
+        best_result = (
+            sorted_results[0]
+        )
+
         for result in sorted_results:
-        
+
             print()
-        
+
             print(
                 result["params"]
             )
-        
+
             print(
                 result["metrics"]
             )
-            
+
             print(
                 "Score:",
                 result["score"]
             )
-        
+
         # =====================================================
-        # SAVE REPORT
+        # SAVE OPTIMIZER REPORT
         # =====================================================
-        
+
         Path(
             "backtest/reports"
         ).mkdir(
             parents=True,
             exist_ok=True
         )
-        
+
         with open(
             "backtest/reports/optimizer_report.json",
             "w",
             encoding="utf-8"
         ) as f:
-        
+
             json.dump(
                 sorted_results,
                 f,
                 indent=4
             )
-        
+
         print()
-        
+
         print(
             "[OPTIMIZER REPORT]",
             "backtest/reports/optimizer_report.json"
+        )
+
+        # =====================================================
+        # SAVE BEST CONFIG
+        # =====================================================
+
+        Path(
+            "core/config"
+        ).mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+        with open(
+            "core/config/best_config.json",
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            json.dump(
+                best_result,
+                f,
+                indent=4
+            )
+
+        print()
+
+        print(
+            "[BEST CONFIG]",
+            "core/config/best_config.json"
         )
 
 
