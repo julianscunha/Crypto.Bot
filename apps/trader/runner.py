@@ -34,6 +34,18 @@ from core.contracts.messages import (
     MarketDataMessage
 )
 
+from core.config.regime_config_loader import (
+    regime_config_loader
+)
+
+from colorama import (
+    Fore,
+    Style
+)
+
+from core.utils.console_logger import (
+    log
+)
 
 DEFAULT_USER_ID = 0
 
@@ -73,11 +85,15 @@ class MarketRegimeLogger:
             .detect_regime(
                 payload.symbol
             )
+        )     
+        
+        log(
+            "MARKET REGIME",
+            f"{payload.symbol} {regime}",
+            Fore.LIGHTBLUE_EX
         )
-
-        print(
-            "[MARKET REGIME]",
-            payload.symbol,
+        
+        regime_config_loader.load_regime(
             regime
         )
 

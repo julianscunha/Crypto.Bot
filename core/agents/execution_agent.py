@@ -22,6 +22,10 @@ from colorama import (
     init
 )
 
+from core.utils.console_logger import (
+    log
+)
+
 init(autoreset=True)
 
 
@@ -70,13 +74,11 @@ class ExecutionAgent:
             payload.user_id,
             payload.symbol
         ):
-
-            print(
-                Fore.LIGHTRED_EX +
-                "[EXECUTION BLOCKED]" +
-                Style.RESET_ALL +
-                f" {payload.symbol} "
-                f"| POSITION_ALREADY_OPEN"
+                    
+            log(
+                "EXECUTION BLOCKED",
+                f"{payload.symbol} | POSITION_ALREADY_OPEN",
+                Fore.LIGHTRED_EX
             )
 
             return
@@ -99,16 +101,12 @@ class ExecutionAgent:
 
         # =====================================================
         # EXECUTION LOG
-        # =====================================================
-
-        print(
-            Fore.LIGHTGREEN_EX +
-            "[EXECUTION]" +
-            Style.RESET_ALL +
-            f" OPEN BUY "
-            f"{payload.symbol} "
-            f"@ {payload.entry_price} "
-            f"| qty={payload.quantity}"
+        # =====================================================     
+        
+        log(
+            "EXECUTION",
+            f"OPEN BUY {payload.symbol} @ {payload.entry_price} | qty={payload.quantity}",
+            Fore.LIGHTGREEN_EX
         )
 
         # =====================================================
@@ -129,12 +127,9 @@ class ExecutionAgent:
                 user_id=payload.user_id
             )
         )
-
-        print(
-            Fore.LIGHTBLUE_EX +
-            "[PORTFOLIO]" +
-            Style.RESET_ALL +
-            f" Trades={metrics['total_trades']} "
-            f"| Winrate={metrics['winrate']} "
-            f"| PnL={metrics['pnl']}"
+        
+        log(
+            "PORTFOLIO",
+            f"Trades={metrics['total_trades']} | Winrate={metrics['winrate']} | PnL={metrics['pnl']}",
+            Fore.LIGHTBLUE_EX
         )

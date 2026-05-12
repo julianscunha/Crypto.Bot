@@ -24,6 +24,10 @@ from colorama import (
     init
 )
 
+from core.utils.console_logger import (
+    log
+)
+
 init(autoreset=True)
 
 
@@ -120,12 +124,10 @@ class AnalystAgent:
             )
         )
 
-        print(
-            Fore.WHITE +
-            "[MARKET]" +
-            Style.RESET_ALL +
-            f" {payload.symbol} "
-            f"close={payload.close}"
+        log(
+            "MARKET",
+            f"{payload.symbol} close={payload.close}",
+            Fore.WHITE
         )
 
         await self.bus.publish(

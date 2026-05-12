@@ -8,6 +8,10 @@ from colorama import (
     init
 )
 
+from core.utils.console_logger import (
+    log
+)
+
 init(autoreset=True)
 
 
@@ -128,14 +132,11 @@ class EmaTrendService:
 
         if ema_slow is None:
             return False
-
-        print(
-            Fore.MAGENTA +
-            "[EMA]" +
-            Style.RESET_ALL +
-            f" {symbol} "
-            f"fast={round(ema_fast, 2)} "
-            f"slow={round(ema_slow, 2)}"
+        
+        log(
+            "EMA",
+            f"{symbol} fast={round(ema_fast, 2)} slow={round(ema_slow, 2)}",
+            Fore.MAGENTA
         )
 
         return (

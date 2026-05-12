@@ -22,6 +22,10 @@ from services.position_lifecycle_service import (
     PositionLifecycleService
 )
 
+from core.utils.console_logger import (
+    log
+)
+
 init(autoreset=True)
 
 
@@ -111,15 +115,13 @@ class PositionManagerAgent:
                     pnl=trade.unrealized_pnl,
                     reason="STOP_LOSS"
                 )
-
-                print(
-                    Fore.LIGHTRED_EX +
-                    "[POSITION]" +
-                    Style.RESET_ALL +
-                    f" STOP LOSS "
-                    f"{trade.symbol} "
-                    f"PnL={round(trade.unrealized_pnl, 2)}"
-                )
+                
+                log(
+                    "POSITION",
+                    f"STOP LOSS {trade.symbol} PnL={round(trade.unrealized_pnl, 2)}",
+                    Fore.LIGHTRED_EX
+                )                
+                
 
             # =====================================================
             # TAKE PROFIT
@@ -133,14 +135,11 @@ class PositionManagerAgent:
                     pnl=trade.unrealized_pnl,
                     reason="TAKE_PROFIT"
                 )
-
-                print(
-                    Fore.CYAN +
-                    "[POSITION]" +
-                    Style.RESET_ALL +
-                    f" TAKE PROFIT "
-                    f"{trade.symbol} "
-                    f"PnL={round(trade.unrealized_pnl, 2)}"
+                
+                log(
+                    "POSITION",
+                    f"TAKE PROFIT {trade.symbol} PnL={round(trade.unrealized_pnl, 2)}",
+                    Fore.CYAN
                 )
 
             # =====================================================
@@ -155,12 +154,9 @@ class PositionManagerAgent:
                     pnl=trade.unrealized_pnl,
                     reason="TRAILING_STOP"
                 )
-
-                print(
-                    Fore.YELLOW +
-                    "[POSITION]" +
-                    Style.RESET_ALL +
-                    f" TRAILING STOP "
-                    f"{trade.symbol} "
-                    f"PnL={round(trade.unrealized_pnl, 2)}"
+                
+                log(
+                    "POSITION",
+                    f"TRAILING STOP {trade.symbol} PnL={round(trade.unrealized_pnl, 2)}",
+                    Fore.YELLOW
                 )

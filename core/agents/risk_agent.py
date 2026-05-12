@@ -20,6 +20,10 @@ from colorama import (
     init
 )
 
+from core.utils.console_logger import (
+    log
+)
+
 init(autoreset=True)
 
 
@@ -42,12 +46,11 @@ class RiskAgent:
             return
 
         payload = message.payload
-
-        print(
-            Fore.LIGHTYELLOW_EX +
-            "[RISK]" +
-            Style.RESET_ALL +
-            f" {payload.symbol}"
+        
+        log(
+            "RISK",
+            f"{payload.symbol}",
+            Fore.LIGHTYELLOW_EX
         )
 
         # =====================================================
@@ -55,13 +58,11 @@ class RiskAgent:
         # =====================================================
 
         if payload.signal != "BUY":
-
-            print(
-                Fore.LIGHTRED_EX +
-                "[RISK BLOCKED]" +
-                Style.RESET_ALL +
-                f" {payload.symbol} "
-                f"| INVALID_SIGNAL"
+           
+            log(
+                "RISK BLOCKED",
+                f"{payload.symbol} | INVALID_SIGNAL",
+                Fore.LIGHTRED_EX
             )
 
             return
@@ -78,13 +79,11 @@ class RiskAgent:
         )
 
         if existing_position:
-
-            print(
-                Fore.LIGHTRED_EX +
-                "[RISK BLOCKED]" +
-                Style.RESET_ALL +
-                f" {payload.symbol} "
-                f"| POSITION_ALREADY_OPEN"
+            
+            log(
+                "RISK BLOCKED",
+                f"{payload.symbol} | POSITION_ALREADY_OPEN",
+                Fore.LIGHTRED_EX
             )
 
             return
@@ -152,13 +151,12 @@ class RiskAgent:
         # =====================================================
         # PUBLISH
         # =====================================================
-
-        print(
-            Fore.LIGHTGREEN_EX +
-            "[RISK APPROVED]" +
-            Style.RESET_ALL +
-            f" {payload.symbol}"
-        )
+        
+        log(
+                "RISK APPROVED",
+                f"{payload.symbol}",
+                Fore.LIGHTGREEN_EX
+            )
 
         await self.bus.publish(
             decision_message

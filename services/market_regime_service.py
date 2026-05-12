@@ -28,12 +28,6 @@ class MarketRegimeService:
 
         prices.append(close)
         
-        print(
-            "[REGIME MEMORY]",
-            symbol,
-            len(prices)
-        )
-
         if len(prices) > 200:
             prices.pop(0)
 

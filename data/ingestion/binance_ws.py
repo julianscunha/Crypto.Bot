@@ -15,6 +15,10 @@ from colorama import (
     init
 )
 
+from core.utils.console_logger import (
+    log
+)
+
 init(autoreset=True)
 
 
@@ -72,13 +76,11 @@ class BinanceWS:
         stream_url = (
             self.build_stream_url()
         )
-
-        print(
-            Fore.LIGHTCYAN_EX +
-            "[BINANCE]" +
-            Style.RESET_ALL +
-            f" Connected "
-            f"{stream_url}"
+       
+        log(
+            "BINANCE",
+            f"Connected {stream_url}",
+            Fore.LIGHTCYAN_EX
         )
         
         print()
@@ -130,26 +132,24 @@ class BinanceWS:
                                 payload=payload
                             )
                         )
-
-                        print(
-                            Fore.LIGHTWHITE_EX +
-                            "[KLINE]" +
-                            Style.RESET_ALL +
-                            f" {symbol} "
-                            f"close={payload.close}"
+                       
+                        log(
+                            "KLINE",
+                            f"{symbol} close={payload.close}",
+                            Fore.LIGHTWHITE_EX
                         )
+                        
 
                         await self.bus.publish(
                             message
                         )
 
-            except Exception as e:
-
-                print(
-                    Fore.RED +
-                    "[BINANCE ERROR]" +
-                    Style.RESET_ALL +
-                    f" {e}"
+            except Exception as e: 
+                
+                log(
+                    "BINANCE ERROR",
+                    f"{e}",
+                    Fore.RED
                 )
 
                 await asyncio.sleep(5)

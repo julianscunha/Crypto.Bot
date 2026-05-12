@@ -20,6 +20,10 @@ from colorama import (
     init
 )
 
+from core.utils.console_logger import (
+    log
+)
+
 init(autoreset=True)
 
 
@@ -48,12 +52,11 @@ class StrategyAgent:
             return
 
         payload = message.payload
-
-        print(
-            Fore.CYAN +
-            "[STRATEGY]" +
-            Style.RESET_ALL +
-            f" {payload.symbol}"
+        
+        log(
+            "STRATEGY",
+            f"{payload.symbol}",
+            Fore.CYAN
         )
 
         candles_count = len(
@@ -62,13 +65,11 @@ class StrategyAgent:
                 payload.symbol
             )
         )
-
-        print(
-            Fore.LIGHTMAGENTA_EX +
-            "[STRUCTURE DATA]" +
-            Style.RESET_ALL +
-            f" {payload.symbol} "
-            f"candles={candles_count}"
+        
+        log(
+            "STRUCTURE DATA",
+            f"{payload.symbol} candles={candles_count}",
+            Fore.LIGHTMAGENTA_EX
         )
 
         # =====================================================
@@ -120,13 +121,11 @@ class StrategyAgent:
         )
 
         if not valid:
-
-            print(
-                Fore.LIGHTRED_EX +
-                "[SIGNAL BLOCKED]" +
-                Style.RESET_ALL +
-                f" {payload.symbol} "
-                f"| {reason}"
+            
+            log(
+                "SIGNAL BLOCKED",
+                f"{payload.symbol} | {reason}",
+                Fore.LIGHTRED_EX
             )
 
             return
@@ -150,13 +149,11 @@ class StrategyAgent:
       #     )
       #
       #     return
-
-        print(
-            Fore.LIGHTGREEN_EX +
-            "[SIGNAL]" +
-            Style.RESET_ALL +
-            f" {payload.symbol} "
-            f"strength={signal_strength}"
+        
+        log(
+            "SIGNAL",
+            f"{payload.symbol} strength={signal_strength}",
+            Fore.LIGHTGREEN_EX
         )
 
         # =====================================================

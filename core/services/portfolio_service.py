@@ -8,6 +8,9 @@ from data.storage.repositories.portfolio_repository import (
     PortfolioRepository
 )
 
+from core.utils.console_logger import (
+    log
+)
 
 class PortfolioService:
 
@@ -98,14 +101,11 @@ class PortfolioService:
                 drawdown=drawdown
             )
         )
-
-        print(
-            f"[PORTFOLIO] "
-            f"Equity={snapshot.equity} "
-            f"| Exposure={snapshot.exposure} "
-            f"| RealizedPnL={snapshot.realized_pnl} "
-            f"| UnrealizedPnL={snapshot.unrealized_pnl} "
-            f"| Drawdown={snapshot.drawdown}%"
+        
+        log(
+            "PORTFOLIO",
+            f"Equity={snapshot.equity} | Exposure={snapshot.exposure} | RealizedPnL={snapshot.realized_pnl}| UnrealizedPnL={snapshot.unrealized_pnl} | Drawdown={snapshot.drawdown}%",
+            Fore.CYAN
         )
 
         return snapshot

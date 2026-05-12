@@ -28,6 +28,10 @@ from data.storage.repositories.portfolio_repository import (
     PortfolioRepository
 )
 
+from core.utils.console_logger import (
+    log
+)
+
 init(autoreset=True)
 
 
@@ -243,13 +247,11 @@ class SignalQualityService:
                 False,
                 "ATR_NOT_READY"
             )
-
-        print(
-            Fore.MAGENTA +
-            "[ATR]" +
-            Style.RESET_ALL +
-            f" {payload.symbol} "
-            f"atr={round(atr_percent, 2)}%"
+        
+        log(
+            "ATR",
+            f"{payload.symbol} atr={round(atr_percent, 2)}%",
+            Fore.MAGENTA
         )
 
         if atr_percent < self.config[
