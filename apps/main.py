@@ -4,6 +4,7 @@ import sys
 import time
 import asyncio
 import multiprocessing
+from core.config.env_bootstrap import bootstrap_environment
 
 from colorama import (
     Fore,
@@ -143,6 +144,8 @@ if __name__ == "__main__":
         f"{Fore.GREEN}[BOOT]{Style.RESET_ALL} "
         f"Initializing API..."
     )
+    
+    bootstrap_environment()
 
     api_process = multiprocessing.Process(
         target=run_api
