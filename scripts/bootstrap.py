@@ -25,14 +25,7 @@ def ensure():
         stderr=subprocess.DEVNULL
     )
 
-    subprocess.run(
-        [
-            sys.executable,
-            "scripts/migrate.py"
-        ]
-    )
-
-    print("\033[92m[OK]\033[0m Environment ready")
+    print("[OK]  Environment ready")
 
 
 if __name__ == "__main__":

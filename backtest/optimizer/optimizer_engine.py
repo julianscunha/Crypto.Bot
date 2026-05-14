@@ -115,36 +115,107 @@ class OptimizerEngine:
                     replay.replay()
                 )
 
-            metrics = (
-                MetricsEngine()
-                .generate(
-                    self.USER_ID
+                metrics = (
+                    MetricsEngine()
+                    .generate(
+                        self.USER_ID
+                    )
                 )
-            )
-
-            print(
-                "[RESULT]",
-                metrics
-            )
-
-            if metrics["total_trades"] < 5:
-
-                restore_config(
-                    snapshot
+                
+                print(
+                    "[RESULT]",
+                    metrics
                 )
-
-                continue
-
-            score = (
-
-                metrics["pnl"]
-
-                *
-
-                metrics["winrate"]
-
-            ) + metrics["max_drawdown"]
-
+                
+                if metrics["total_trades"] < 5:
+                
+                    restore_config(
+                        snapshot
+                    )
+                
+                    continue
+                
+                # =====================================================
+                # QUANT SCORE
+                # =====================================================
+                
+                score = (
+                
+                    # =============================================
+                    # PROFITABILITY
+                    # =============================================
+                
+                    (
+                        metrics["pnl"] * 0.30
+                    )
+                
+                    +
+                
+                    # =============================================
+                    # TRADE QUALITY
+                    # =============================================
+                
+                    (
+                        metrics["profit_factor"]
+                        * 100
+                        * 0.25
+                    )
+                
+                    +
+                
+                    # =============================================
+                    # EXPECTANCY
+                    # =============================================
+                
+                    (
+                        metrics["expectancy"]
+                        * 10
+                        * 0.20
+                    )
+                
+                    +
+                
+                    # =============================================
+                    # RECOVERY CAPACITY
+                    # =============================================
+                
+                    (
+                        metrics["recovery_factor"]
+                        * 50
+                        * 0.15
+                    )
+                
+                    +
+                
+                    # =============================================
+                    # RISK / REWARD
+                    # =============================================
+                
+                    (
+                        metrics["risk_reward"]
+                        * 25
+                        * 0.10
+                    )
+                
+                )
+                
+                # =====================================================
+                # DRAWDOWN PENALTY
+                # =====================================================
+                
+                score -= (
+                
+                    abs(
+                        metrics["max_drawdown"]
+                    )
+                
+                    * 0.20
+                )
+                
+                print(
+                    "[SCORE]",
+                    round(score, 2)
+                )
             results.append({
 
                 "params": params,

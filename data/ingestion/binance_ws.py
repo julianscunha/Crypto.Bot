@@ -19,6 +19,10 @@ from core.utils.console_logger import (
     log
 )
 
+from core.config.settings import settings
+
+from core.state.market_state import market_state
+
 init(autoreset=True)
 
 
@@ -38,11 +42,10 @@ class BinanceWS:
         self.bus = bus
 
         self.user_id = user_id
-
+        
         self.symbols = [
-            "btcusdt",
-            "ethusdt",
-            "solusdt"
+            symbol.lower()
+            for symbol in settings.SYMBOLS
         ]
 
         self.interval = "1m"
@@ -76,12 +79,6 @@ class BinanceWS:
         stream_url = (
             self.build_stream_url()
         )
-       
-        log(
-            "BINANCE",
-            f"Connected {stream_url}",
-            Fore.LIGHTCYAN_EX
-        )
         
         print()
 
@@ -91,7 +88,20 @@ class BinanceWS:
 
                 async with websockets.connect(
                     stream_url
-                ) as websocket:
+                ) as websocket:              
+        
+                
+                    market_state.set_websocket_connected(
+                        True
+                    )
+                    
+                    log(
+                        "BINANCE",
+                        f"Connected {stream_url}",
+                        Fore.LIGHTCYAN_EX
+                    )
+                    
+                    print()
 
                     while True:
 
@@ -113,6 +123,10 @@ class BinanceWS:
                             continue
 
                         symbol = kline["s"]
+                        
+                        market_state.register_kline(
+                            symbol
+                        )
 
                         payload = (
                             MarketDataPayload(
@@ -145,6 +159,10 @@ class BinanceWS:
                         )
 
             except Exception as e: 
+            
+                market_state.set_websocket_connected(
+                    False
+                )
                 
                 log(
                     "BINANCE ERROR",

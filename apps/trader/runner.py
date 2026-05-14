@@ -47,13 +47,7 @@ from core.utils.console_logger import (
     log
 )
 
-DEFAULT_USER_ID = 0
-
-SYMBOLS = [
-    "BTCUSDT",
-    "ETHUSDT",
-    "SOLUSDT"
-]
+from core.config.settings import settings
 
 
 class MarketRegimeLogger:
@@ -120,7 +114,7 @@ async def main():
 
     ws = BinanceWS(
         bus=bus,
-        user_id=DEFAULT_USER_ID
+        user_id=0
     )
 
     await ws.start()

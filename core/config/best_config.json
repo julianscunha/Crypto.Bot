@@ -4,10 +4,18 @@
         "stop_loss_percent": 0.01
     },
     "metrics": {
-        "total_trades": 8,
+        "total_trades": 11,
         "winrate": 1.0,
-        "pnl": 7760.0,
-        "max_drawdown": 0
+        "pnl": 7220.0,
+        "max_drawdown": 0,
+        "profit_factor": 7220.0,
+        "expectancy": 656.36,
+        "avg_win": 656.36,
+        "avg_loss": 0,
+        "risk_reward": 656.36,
+        "recovery_factor": 7220.0,
+        "max_win_streak": 11,
+        "max_loss_streak": 0
     },
-    "score": 7760.0
+    "score": 239769.62
 }
