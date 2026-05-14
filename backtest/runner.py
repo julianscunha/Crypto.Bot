@@ -2,12 +2,6 @@
 
 import asyncio
 
-from colorama import (
-    Fore,
-    Style,
-    init
-)
-
 from data.storage.database import (
     init_db
 )
@@ -28,7 +22,13 @@ from backtest.engine.report_engine import (
     ReportEngine
 )
 
-init(autoreset=True)
+from backtest.reports.validation_interpreter import (
+    validation_interpreter
+)
+
+from core.utils.console_logger import (
+    log
+)
 
 
 DATASETS = [
@@ -49,11 +49,29 @@ async def main():
 
     print()
 
-    print(
-        Fore.LIGHTWHITE_EX +
-        "[BACKTEST]" +
-        Style.RESET_ALL +
-        " STARTING"
+    print("=" * 60)
+    print("                 BACKTEST ENGINE")
+    print("=" * 60)
+
+    print()
+
+    # =====================================================
+    # STARTUP
+    # =====================================================
+
+    log(
+        "SYSTEM",
+        "MODE           BACKTEST"
+    )
+
+    log(
+        "SYSTEM",
+        f"DATASETS       {len(DATASETS)}"
+    )
+
+    log(
+        "SYSTEM",
+        "DATABASE       CONNECTED"
     )
 
     # =====================================================
@@ -68,28 +86,32 @@ async def main():
 
     trades_repository.reset()
 
+    log(
+        "SYSTEM",
+        "TRADES         RESET"
+    )
+
     # =====================================================
     # REPLAY ENGINE
     # =====================================================
 
     for dataset in DATASETS:
-    
+
         print()
-    
+
         print(
-            Fore.YELLOW +
-            "[DATASET]" +
-            Style.RESET_ALL +
-            f" {dataset}"
+            "=" * 20
+            + f" {dataset.split('/')[-1]} "
+            + "=" * 20
         )
-    
+
         replay = (
             ReplayEngine(
                 csv_path=dataset,
                 user_id=USER_ID
             )
         )
-    
+
         await replay.replay()
 
     # =====================================================
@@ -101,28 +123,167 @@ async def main():
         .generate(USER_ID)
     )
 
+    # =====================================================
+    # INTERPRETATION
+    # =====================================================
+
+    report = (
+        validation_interpreter.analyze(
+            metrics
+        )
+    )
+
+    # =====================================================
+    # VALIDATION REPORT
+    # =====================================================
+
     print()
 
+    print("=" * 60)
+    print("                 VALIDATION REPORT")
+    print("=" * 60)
+
+    print()
+
+    # =====================================================
+    # PERFORMANCE
+    # =====================================================
+
+    performance = report["performance"]
+
+    print("[PERFORMANCE]")
+
     print(
-        Fore.GREEN +
-        "[BACKTEST]" +
-        Style.RESET_ALL +
-        f" Trades={metrics['total_trades']}"
+        f"Net Profit .............. "
+        f"{performance['net_profit']}"
     )
 
     print(
-        Fore.GREEN +
-        "[BACKTEST]" +
-        Style.RESET_ALL +
-        f" Winrate={metrics['winrate']}"
+        f"Profit Factor ........... "
+        f"{performance['profit_factor']} "
+        f"({performance['profit_factor_rating']})"
     )
 
     print(
-        Fore.GREEN +
-        "[BACKTEST]" +
-        Style.RESET_ALL +
-        f" PnL={metrics['pnl']}"
+        f"Expectancy .............. "
+        f"{performance['expectancy']}"
     )
+
+    print(
+        f"Recovery Factor ......... "
+        f"{performance['recovery_factor']}"
+    )
+
+    print()
+
+    # =====================================================
+    # TRADE QUALITY
+    # =====================================================
+
+    trade_quality = report["trade_quality"]
+
+    print("[TRADE QUALITY]")
+
+    print(
+        f"Winrate ................. "
+        f"{trade_quality['winrate']:.2%} "
+        f"({trade_quality['winrate_rating']})"
+    )
+
+    print(
+        f"Risk/Reward ............. "
+        f"{trade_quality['risk_reward']} "
+        f"({trade_quality['risk_reward_rating']})"
+    )
+
+    print(
+        f"Avg Win ................. "
+        f"{trade_quality['avg_win']}"
+    )
+
+    print(
+        f"Avg Loss ................ "
+        f"{trade_quality['avg_loss']}"
+    )
+
+    print()
+
+    # =====================================================
+    # RISK
+    # =====================================================
+
+    risk = report["risk"]
+
+    print("[RISK]")
+
+    print(
+        f"Max Drawdown ............ "
+        f"{risk['max_drawdown']} "
+        f"({risk['drawdown_rating']})"
+    )
+
+    print(
+        f"Max Win Streak .......... "
+        f"{risk['max_win_streak']}"
+    )
+
+    print(
+        f"Max Loss Streak ......... "
+        f"{risk['max_loss_streak']}"
+    )
+
+    print()
+
+    # =====================================================
+    # STATISTICAL ANALYSIS
+    # =====================================================
+
+    stats = report["statistical_analysis"]
+
+    print("[STATISTICAL ANALYSIS]")
+
+    print(
+        f"Trade Sample Size ....... "
+        f"{stats['trade_sample_size']} "
+        f"({stats['sample_rating']})"
+    )
+
+    print(
+        f"Overfit Risk ............ "
+        f"{stats['overfit_risk']}"
+    )
+
+    print(
+        f"Robustness .............. "
+        f"{stats['robustness']}"
+    )
+
+    print()
+
+    # =====================================================
+    # FINAL VERDICT
+    # =====================================================
+
+    verdict = report["final_verdict"]
+
+    print("[FINAL VERDICT]")
+
+    print(
+        f"Status .................. "
+        f"{verdict['status']}"
+    )
+
+    print()
+
+    print("Recommendation:")
+
+    print(
+        verdict["recommendation"]
+    )
+
+    print()
+
+    print("=" * 60)
 
     # =====================================================
     # REPORT
@@ -138,11 +299,12 @@ async def main():
 
     print()
 
-    print(
-        Fore.LIGHTWHITE_EX +
-        "[BACKTEST REPORT]" +
-        Style.RESET_ALL +
-        " backtest/reports/report.json"
+    log(
+        "SYSTEM",
+        (
+            "REPORT         "
+            "backtest/reports/report.json"
+        )
     )
 
     print()

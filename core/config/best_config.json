@@ -1,21 +1,21 @@
 {
     "params": {
-        "take_profit_percent": 0.005,
-        "stop_loss_percent": 0.01
+        "take_profit_percent": 0.003,
+        "stop_loss_percent": 0.015
     },
     "metrics": {
         "total_trades": 11,
-        "winrate": 1.0,
-        "pnl": 7220.0,
-        "max_drawdown": 0,
-        "profit_factor": 7220.0,
-        "expectancy": 656.36,
-        "avg_win": 656.36,
-        "avg_loss": 0,
-        "risk_reward": 656.36,
-        "recovery_factor": 7220.0,
-        "max_win_streak": 11,
-        "max_loss_streak": 0
+        "winrate": 0.73,
+        "pnl": -2300.0,
+        "max_drawdown": -5740.0,
+        "profit_factor": 0.75,
+        "expectancy": -198.4,
+        "avg_win": 860.0,
+        "avg_loss": 3060.0,
+        "risk_reward": 0.28,
+        "recovery_factor": -0.4,
+        "max_win_streak": 2,
+        "max_loss_streak": 1
     },
-    "score": 239769.62
+    "score": -2218.35
 }

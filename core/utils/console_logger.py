@@ -1,7 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import logging
+
 from pathlib import Path
 from datetime import datetime
+
+from logging.handlers import (
+    RotatingFileHandler
+)
 
 from colorama import (
     Fore,
@@ -50,12 +56,74 @@ LOG_COLORS = {
 
     "INFO": Fore.LIGHTWHITE_EX,
 
+    # ==============================================
+    # POSITIVE
+    # ==============================================
+
     "SUCCESS": Fore.GREEN,
+
+    # ==============================================
+    # NEGATIVE
+    # ==============================================
 
     "ERROR": Fore.RED,
 
+    # ==============================================
+    # WARNING
+    # ==============================================
+
     "WARNING": Fore.YELLOW
 }
+
+# =====================================================
+# PYTHON LOGGER
+# =====================================================
+
+runtime_logger = logging.getLogger(
+    "runtime_logger"
+)
+
+runtime_logger.setLevel(
+    logging.INFO
+)
+
+error_logger = logging.getLogger(
+    "error_logger"
+)
+
+error_logger.setLevel(
+    logging.ERROR
+)
+
+# Prevent duplicate handlers
+runtime_logger.handlers.clear()
+error_logger.handlers.clear()
+
+# =====================================================
+# ROTATING FILE HANDLERS
+# =====================================================
+
+runtime_handler = RotatingFileHandler(
+    RUNTIME_LOG_FILE,
+    maxBytes=1_000_000,
+    backupCount=3,
+    encoding="utf-8"
+)
+
+error_handler = RotatingFileHandler(
+    ERROR_LOG_FILE,
+    maxBytes=1_000_000,
+    backupCount=3,
+    encoding="utf-8"
+)
+
+runtime_logger.addHandler(
+    runtime_handler
+)
+
+error_logger.addHandler(
+    error_handler
+)
 
 # =====================================================
 # LOGGER
@@ -114,16 +182,12 @@ def log(
     )
 
     # =================================================
-    # FILE LOG
+    # RUNTIME LOG
     # =================================================
 
-    with open(
-        RUNTIME_LOG_FILE,
-        "a",
-        encoding="utf-8"
-    ) as file:
-
-        file.write(line + "\n")
+    runtime_logger.info(
+        line
+    )
 
     # =================================================
     # ERROR LOG
@@ -131,10 +195,6 @@ def log(
 
     if level == "ERROR":
 
-        with open(
-            ERROR_LOG_FILE,
-            "a",
-            encoding="utf-8"
-        ) as file:
-
-            file.write(line + "\n")
+        error_logger.error(
+            line
+        )
