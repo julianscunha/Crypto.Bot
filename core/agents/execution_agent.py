@@ -26,9 +26,6 @@ from core.utils.console_logger import (
     log
 )
 
-init(autoreset=True)
-
-
 class ExecutionAgent:
 
     def __init__(self, bus):

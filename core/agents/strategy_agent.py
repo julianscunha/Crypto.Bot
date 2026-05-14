@@ -24,8 +24,7 @@ from core.utils.console_logger import (
     log
 )
 
-init(autoreset=True)
-
+from data.features.indicators import atr
 
 class StrategyAgent:
 
@@ -83,14 +82,38 @@ class StrategyAgent:
             "confidence",
             0.50
         )
-
+        
+        prices = (
+            self.market_structure.get_prices(
+                payload.user_id,
+                payload.symbol
+            )
+        )
+        
+        atr_value = atr(prices)
+        
+        # =====================================================
+        # ATR VALIDATION
+        # =====================================================
+        
+        if atr_value is None:
+        
+            log(
+                "SIGNAL BLOCKED",
+                f"{payload.symbol} | ATR_NOT_READY",
+                Fore.LIGHTRED_EX
+            )
+        
+            return
+        
         signal_payload = (
             StrategySignalPayload(
                 user_id=payload.user_id,
                 symbol=payload.symbol,
                 signal=signal,
                 entry_price=payload.reference_price,
-                signal_strength=signal_strength
+                signal_strength=signal_strength,
+                atr=atr_value
             )
         )
 

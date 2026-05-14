@@ -28,9 +28,6 @@ from core.utils.console_logger import (
     log
 )
 
-init(autoreset=True)
-
-
 class AnalystAgent:
 
     def __init__(self, bus):
@@ -58,16 +55,6 @@ class AnalystAgent:
             return
 
         payload = message.payload
-
-        # =====================================================
-        # VISUAL SEPARATOR
-        # =====================================================
-
-        print(
-            Fore.GREEN +
-            "-" * 50 +
-            Style.RESET_ALL
-        )
 
         # =====================================================
         # UPDATE TREND ENGINE

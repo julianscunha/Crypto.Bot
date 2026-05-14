@@ -77,7 +77,8 @@ class StrategySignalPayload:
     entry_price: float
 
     signal_strength: float
-
+    
+    atr: float | None = None
 
 @dataclass
 class StrategySignalMessage(BaseMessage):

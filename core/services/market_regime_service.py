@@ -44,7 +44,7 @@ class MarketRegimeService:
             self.market_prices[symbol]
         )
 
-        if len(prices) < 50:
+        if len(prices) < 20:
 
             return "UNKNOWN"
 

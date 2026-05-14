@@ -24,9 +24,6 @@ from core.utils.console_logger import (
     log
 )
 
-init(autoreset=True)
-
-
 class RiskAgent:
 
     def __init__(self, bus):
@@ -46,6 +43,16 @@ class RiskAgent:
             return
 
         payload = message.payload
+        
+        if payload.atr is None:
+
+            log(
+                "RISK BLOCKED",
+                f"{payload.symbol} | ATR_MISSING",
+                Fore.RED
+            )
+        
+            return
         
         log(
             "RISK",
@@ -95,26 +102,28 @@ class RiskAgent:
         entry_price = payload.entry_price
         
         stop_loss = round(
-            entry_price * (
-                1 - TRADING_CONFIG["stop_loss_percent"]
+            entry_price - (
+                payload.atr * TRADING_CONFIG[
+                    "atr_stop_multiplier"
+                ]
             ),
             2
         )
         
         take_profit = round(
-            entry_price * (
-                1 + TRADING_CONFIG["take_profit_percent"]
+            entry_price + (
+                payload.atr * TRADING_CONFIG[
+                    "atr_take_profit_multiplier"
+                ]
             ),
             2
         )
         
         trailing_stop = round(
-            entry_price * (
-                TRADING_CONFIG[
-                    "trailing_stop_percent"
-                ]
-            ),
-            4
+            payload.atr * TRADING_CONFIG[
+                "atr_trailing_multiplier"
+            ],
+            2
         )
         
         quantity = (
@@ -127,6 +136,41 @@ class RiskAgent:
         # PAYLOAD
         # =====================================================
 
+        risk_distance = (
+            entry_price - stop_loss
+        )
+        
+        if risk_distance <= 0:
+
+            log(
+                "RISK BLOCKED",
+                f"{payload.symbol} | INVALID_RISK_DISTANCE",
+                Fore.RED
+            )
+        
+            return
+        
+        reward_distance = (
+            take_profit - entry_price
+        )
+        
+        risk_reward = round(
+            reward_distance / risk_distance,
+            2
+        )
+        
+        log(
+            "ATR RISK",
+            (
+                f"{payload.symbol} "
+                f"ATR={payload.atr:.4f}"
+                f"SL={stop_loss} "
+                f"TP={take_profit}"
+            ),
+            Fore.LIGHTCYAN_EX
+        )
+        
+        
         decision_payload = (
             RiskDecisionPayload(
                 user_id=payload.user_id,
@@ -137,7 +181,7 @@ class RiskAgent:
                 stop_loss=stop_loss,
                 take_profit=take_profit,
                 trailing_stop=trailing_stop,
-                risk_reward=2.0
+                risk_reward=risk_reward
             )
         )
 

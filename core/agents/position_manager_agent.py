@@ -18,16 +18,13 @@ from core.config.trading_config import (
     TRADING_CONFIG
 )
 
-from services.position_lifecycle_service import (
+from core.services.position_lifecycle_service import (
     PositionLifecycleService
 )
 
 from core.utils.console_logger import (
     log
 )
-
-init(autoreset=True)
-
 
 class PositionManagerAgent:
 

@@ -26,7 +26,7 @@ from core.config.config_loader import (
     load_best_config
 )
 
-from services.market_regime_service import (
+from core.services.market_regime_service import (
     market_regime_service
 )
 
@@ -84,7 +84,7 @@ class MarketRegimeLogger:
         log(
             "MARKET REGIME",
             f"{payload.symbol} {regime}",
-            Fore.LIGHTBLUE_EX
+            Fore.LIGHTYELLOW_EX
         )
         
         regime_config_loader.load_regime(

@@ -19,6 +19,16 @@ TRADING_CONFIG = {
     "trailing_stop_percent": 0.02,
 
     "risk_reward_ratio": 2.0,
+    
+    # =====================================================
+    # ATR RISK
+    # =====================================================
+    
+    "atr_stop_multiplier": 1.5,
+    
+    "atr_take_profit_multiplier": 3.0,
+    
+    "atr_trailing_multiplier": 1.0,
 
     # =====================================================
     # STRUCTURE

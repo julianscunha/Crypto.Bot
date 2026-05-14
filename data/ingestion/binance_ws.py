@@ -146,6 +146,15 @@ class BinanceWS:
                                 payload=payload
                             )
                         )
+                        
+                        print(
+                            "\n" +
+                            Fore.GREEN +
+                            f"{'-' * 25} "
+                            f"{symbol} "
+                            f"{'-' * 25}" +
+                            Style.RESET_ALL
+                        )
                        
                         log(
                             "KLINE",
