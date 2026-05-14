@@ -1,173 +1,109 @@
-# CRYPTO.BOT
+# CRYPTO.BOT — FULL DOCUMENTATION
 
-## Overview
-
-Crypto.Bot é uma plataforma modular de trading algorítmico orientada a eventos, baseada em arquitetura async/event-driven com isolamento multi-tenant via `user_id`.
+Última atualização: 2026-05-14 19:23
 
 ---
 
-# Architecture
+# OVERVIEW
 
-## Event Flow
+Crypto.Bot é uma plataforma modular de trading algorítmico baseada em:
+
+- arquitetura event-driven
+- processamento async
+- isolamento multi-tenant
+- agentes desacoplados
+- pipelines operacionais
+- engines independentes
+
+---
+
+# SYSTEM FLOW
 
 ```text
 BinanceWS
-↓
+    ↓
 EventBus
-↓
+    ↓
 AnalystAgent
-↓
+    ↓
 StrategyAgent
-↓
+    ↓
 RiskAgent
-↓
+    ↓
 ExecutionAgent
-↓
+    ↓
 PositionManagerAgent
-↓
+    ↓
 Portfolio Analytics
 ```
 
 ---
 
-### PAPER MODE (mock/random feed)
+# CORE MODULES
 
-signal_quality_config.py
+## AnalystAgent
 
-- cooldown_seconds = 5
-- ema_fast_period = 9
-- ema_slow_period = 21
-- min_atr_percent = 0.40
-
-market_structure_config.py
-
-- swing_window = 2
-- min_trend_strength = 1
-- consolidation_threshold = 0.001
+Responsável por:
+- ingestão analítica
+- atualização estrutural
+- atualização ATR
+- geração de análise inicial
 
 ---
 
-### REAL MARKET MODE (Binance Kline)
+## StrategyAgent
 
-signal_quality_config.py
-
-- cooldown_seconds = 15
-- ema_fast_period = 9
-- ema_slow_period = 21
-- min_atr_percent = 0.60
-
-market_structure_config.py
-
-- swing_window = 3
-- min_trend_strength = 2
-- consolidation_threshold = 0.003
+Responsável por:
+- geração de sinal BUY
+- validação ATR
+- validação EMA trend
+- SignalQualityService
+- market structure validation
 
 ---
 
-# Core Stack
+## RiskAgent
 
-- Python 3.11
-- AsyncIO
-- SQLAlchemy
-- Alembic
-- SQLite
-- Event-Driven Architecture
-- Multi-Agent Trading Engine
-
----
-
-# Current Features
-
-## Trading Engine
-
-- Multi-symbol
-- BUY signal flow
-- Risk management
-- Position lifecycle
-- Portfolio analytics
-- Async message bus
+Responsável por:
+- cálculo ATR risk
+- stop loss
+- take profit
+- trailing stop
+- risk/reward
+- bloqueios operacionais
 
 ---
 
-# Position Lifecycle Engine
+## ExecutionAgent
 
-## States
+Responsável por:
+- abertura de trades
+- persistência operacional
+- registro portfolio
+- métricas
 
-- OPEN
-- ACTIVE
-- TAKE_PROFIT
-- STOP_LOSS
-- CLOSED
+---
 
-## Features
+## PositionManagerAgent
 
+Responsável por:
 - trailing stop
 - stop loss
 - take profit
-- pnl realization
-- breakeven preparation
+- unrealized pnl
+- lifecycle da posição
 
 ---
 
-# Async Hardening
+# EVENT BUS RULES
 
-## Implementado
-
-- coroutine-safe event bus
-- exception isolation
-- subscriber protection
-- await validation
-
----
-
-# Contract Stabilization
-
-## Padrão Oficial
-
-MarketDataPayload:
-- open
-- high
-- low
-- close
-- volume
-
-StrategySignalPayload:
-- entry_price
-
-RiskDecisionPayload:
-- entry_price
-- risk_reward
-
-Nunca utilizar:
-- payload.price
-
----
-
-# Multi-Tenant
-
-`user_id` é obrigatório em:
-
-- payloads
-- repositories
-- positions
-- metrics
-- analytics
-
-Nunca realizar queries sem `user_id`.
-
----
-
-# Event Bus
-
-## Rules
-
-Todos os agentes devem usar:
+Todos os agentes devem implementar:
 
 ```python
 async def on_message(self, message)
 ```
 
-E:
+Toda publicação deve utilizar:
 
 ```python
 await bus.publish(message)
@@ -175,62 +111,215 @@ await bus.publish(message)
 
 ---
 
-# Database
+# PAYLOAD CONTRACTS
 
-## Stack
+## MarketDataPayload
 
-- SQLAlchemy ORM
-- Alembic migrations
-- SQLite
-
-## Migration
-
-```powershell
-alembic upgrade head
+```python
+open
+high
+low
+close
+volume
 ```
 
 ---
 
-# Project Structure
+## StrategySignalPayload
+
+```python
+entry_price
+signal_strength
+atr
+```
+
+---
+
+## RiskDecisionPayload
+
+```python
+entry_price
+stop_loss
+take_profit
+trailing_stop
+risk_reward
+```
+
+---
+
+# ATR ENGINE
+
+Features:
+- Wilder ATR
+- True Range
+- volatility filter
+- ATR percentage
+- real OHLC support
+
+Arquivo:
+```text
+core/services/atr_service.py
+```
+
+---
+
+# MARKET STRUCTURE ENGINE
+
+Features:
+- swing detection
+- structure validation
+- trend strength
+- consolidation filter
+- fake breakout protection
+
+Arquivos:
+```text
+core/services/market_structure_service.py
+core/config/market_structure_config.py
+```
+
+---
+
+# SIGNAL QUALITY ENGINE
+
+Valida:
+- cooldown
+- confidence threshold
+- EMA trend
+- drawdown protection
+- max positions
+- ATR volatility
+
+Arquivo:
+```text
+core/services/signal_quality_service.py
+```
+
+---
+
+# MULTI-TENANT
+
+`user_id` é obrigatório em:
+- payloads
+- repositories
+- metrics
+- positions
+- analytics
+
+Nunca realizar queries sem `user_id`.
+
+---
+
+# CONSOLE ENGINE
+
+Padronização visual:
+
+## Branco
+Eventos neutros:
+- MARKET
+- STRATEGY
+- SYSTEM
+
+## Verde
+Eventos positivos:
+- SIGNAL BUY
+- RISK APPROVED
+- EXECUTION OPEN
+- TAKE PROFIT
+
+## Vermelho
+Eventos negativos:
+- BLOCKED
+- ERROR
+- STOP LOSS
+
+## Amarelo
+Eventos intermediários:
+- TRAILING STOP
+- WARNING
+
+---
+
+# STARTUP PANEL
+
+```text
+[SYSTEM] MODE           PAPER
+[SYSTEM] SYMBOLS        BTCUSDT ETHUSDT SOLUSDT
+[SYSTEM] TIMEFRAME      1m
+[SYSTEM] DATABASE       CONNECTED
+[SYSTEM] EVENT BUS      READY
+[SYSTEM] AGENTS         READY
+[SYSTEM] BINANCE        CONNECTED
+```
+
+---
+
+# PROJECT STRUCTURE
 
 ```text
 apps/
 core/
 data/
-alembic/
+backtest/
 scripts/
+alembic/
+logs/
 ```
 
 ---
 
-# Main Modules
+# BACKTEST ENGINE
 
-## core/
+Fluxo:
 
-- agents/
-- bus/
-- contracts/
-- services/
+```text
+CSV
+ ↓
+ReplayEngine
+ ↓
+EventBus
+ ↓
+Agents
+ ↓
+Metrics
+```
 
-## data/
-
-- ingestion/
-- storage/
-
----
-
-# Portfolio Analytics
-
-## Current Metrics
-
-- total_trades
-- winrate
-- pnl
-- equity curve
+Arquivos:
+- backtest/engine/replay_engine.py
+- backtest/engine/metrics_engine.py
+- backtest/engine/report_engine.py
 
 ---
 
-# Current Operational Status
+# CURRENT ROADMAP
+
+## Próximos módulos
+
+- Binance execution real
+- PostgreSQL
+- Redis streams
+- distributed locking
+- retry engine
+- AI signal optimization
+- frontend operational dashboard
+- optimizer engine
+- live portfolio monitoring
+
+---
+
+# IMPORTANT RULES
+
+- Não quebrar state machine
+- Não remover validações
+- Não ignorar `user_id`
+- Não misturar payload contracts
+- Não criar session global
+- Não manter transaction aberta
+- Manter arquitetura async consistente
+
+---
+
+# CURRENT STATUS
 
 ```text
 Core Infrastructure .......... 96%
@@ -243,243 +332,3 @@ Production Hardening ......... 70%
 
 TOTAL: ~89%
 ```
-
----
-
-# Known Issues
-
-- BinanceWS ainda mockado
-- Sem orderbook real
-- Sem exchange execution real
-- Sem distributed lock
-- Sem retry engine robusto
-- Necessário hardening async completo
-
----
-
-# Next Priorities
-
-- Exchange Adapter real Binance
-- Websocket real
-- PostgreSQL
-- Redis event streaming
-- Distributed locking
-- Strategy engine avançado
-- Backtesting
-- AI-assisted signals
-
----
-
-# Important Rules
-
-- Não quebrar state machine
-- Não remover validações
-- Não ignorar user_id
-- Não misturar payload contracts
-- Manter arquitetura async consistente
-
----
-
-# Repository Layer
-
-## Current Architecture
-
-- Stateless repositories
-- Session-per-operation
-- Transaction isolation
-- Rollback safety
-- Lifecycle-safe persistence
-
-## Repository Rules
-
-Nunca manter:
-- session global
-- session persistente
-- transaction aberta entre eventos
-
-# =========================================================
-# PORTFOLIO CONSISTENCY ENGINE
-# =========================================================
-
-## COMPONENTS
-
-- PortfolioSnapshot
-- PortfolioRepository
-- PortfolioService
-- Equity Tracking
-- Exposure Tracking
-- Drawdown Engine
-- Unrealized PnL Tracking
-
-## FLOW
-
-OPEN TRADE
-    -> snapshot update
-
-PRICE UPDATE
-    -> unrealized pnl update
-
-CLOSE TRADE
-    -> realized pnl update
-
-## METRICS
-
-- equity
-- exposure
-- drawdown
-- realized pnl
-- unrealized pnl
-- total pnl
-- open positions
-- closed positions
-
-
-# =========================================================
-# SIGNAL QUALITY ENGINE
-# =========================================================
-
-## COMPONENTS
-
-- SignalQualityService
-- Confidence Threshold
-- Cooldown Engine
-- Drawdown Protection
-- Position Limiter
-- Frontend Config Ready
-
-## FLOW
-
-StrategySignal
-    -> SignalQualityService
-    -> RiskAgent
-    -> ExecutionAgent
-
-## VALIDATIONS
-
-- confidence threshold
-- cooldown validation
-- max open positions
-- drawdown guard
-
-## FRONTEND READY
-
-Arquivo:
-core/config/signal_quality_config.py
-
-Variáveis:
-- confidence_threshold
-- cooldown_seconds
-- max_open_positions
-- daily_drawdown_limit
-- ema_fast_period
-- ema_slow_period
-- min_atr_percent
-
-Todos os parâmetros podem ser:
-- editados manualmente
-- controlados pelo frontend
-- ajustados por IA
-- persistidos futuramente em banco
-
-
-# =========================================================
-# EMA TREND ENGINE
-# =========================================================
-
-## COMPONENTS
-
-- EmaTrendService
-- EMA Fast
-- EMA Slow
-- Bullish Trend Validation
-
-## FLOW
-
-MarketData
-    -> update_price()
-    -> EMA Calculation
-    -> Trend Validation
-    -> SignalQualityService
-
-## VALIDATION
-
-BUY permitido apenas quando:
-
-EMA_FAST > EMA_SLOW
-
-## CONFIG
-
-Arquivo:
-core/config/signal_quality_config.py
-
-Variáveis:
-- ema_fast_period
-- ema_slow_period
-- enable_trend_filter
-
-
-## REAL MARKET STRUCTURE ENGINE
-
-Engine responsável por validação estrutural de tendência.
-
-Features:
-- Swing High Detection
-- Swing Low Detection
-- Trend Strength
-- Break of Structure
-- Consolidation Filter
-- Fake Breakout Prevention
-
-Arquivos:
-- core/services/market_structure_service.py
-- core/config/market_structure_config.py
-
-## REAL BINANCE KLINE ENGINE
-
-Engine responsável por ingestão real de candles Binance.
-
-Features:
-- Websocket Binance
-- Real OHLC
-- Closed Candle Validation
-- Multi-symbol streaming
-- Real volume
-- Real EMA input
-- Real market structure input
-
-Arquivo:
-- data/ingestion/binance_ws.py
-
-
-## REAL ATR ENGINE
-
-Engine responsável por volatilidade real baseada em OHLC.
-
-Features:
-- True Range
-- Wilder ATR
-- ATR Percent
-- Volatility Filter
-- Multi-user safe
-- Binance Kline compatible
-
-Arquivos:
-- core/services/atr_service.py
-
-# BACKTEST ENGINE REAL
-
-Sistema de replay histórico utilizando:
-- EventBus real
-- Agents reais
-- Strategy real
-- Risk real
-- Position Manager real
-
-Fluxo:
-CSV → ReplayEngine → EventBus → Agents → Metrics
-
-Arquivos:
-- backtest/engine/replay_engine.py
-- backtest/engine/metrics_engine.py
-- backtest/engine/report_engine.py
-- backtest/runner.py
