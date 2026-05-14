@@ -32,13 +32,39 @@ ERROR_LOG_FILE = (
 )
 
 # =====================================================
+# LOG COLORS
+# =====================================================
+
+LOG_COLORS = {
+
+    # ==============================================
+    # NEUTRAL
+    # ==============================================
+
+    "MARKET": Fore.LIGHTWHITE_EX,
+    "STRATEGY": Fore.LIGHTWHITE_EX,
+    "RISK": Fore.LIGHTWHITE_EX,
+    "POSITION": Fore.LIGHTWHITE_EX,
+    "EXECUTION": Fore.LIGHTWHITE_EX,
+    "SYSTEM": Fore.LIGHTWHITE_EX,
+
+    "INFO": Fore.LIGHTWHITE_EX,
+
+    "SUCCESS": Fore.GREEN,
+
+    "ERROR": Fore.RED,
+
+    "WARNING": Fore.YELLOW
+}
+
+# =====================================================
 # LOGGER
 # =====================================================
 
 def log(
     category: str,
     message: str,
-    color=Fore.WHITE
+    level: str = "INFO"
 ) -> None:
 
     timestamp = (
@@ -48,7 +74,7 @@ def log(
 
     category_label = (
         f"[{category}]"
-        .ljust(24)
+        .ljust(16)
     )
 
     line = (
@@ -61,10 +87,30 @@ def log(
     # CONSOLE
     # =================================================
 
+    tag_color = LOG_COLORS.get(
+        level,
+        Fore.LIGHTWHITE_EX
+    )
+
+    console_line = (
+
+        Fore.LIGHTWHITE_EX +
+
+        f"{timestamp} " +
+
+        tag_color +
+
+        f"{category_label} " +
+
+        Fore.LIGHTWHITE_EX +
+
+        f"{message}" +
+
+        Style.RESET_ALL
+    )
+
     print(
-        color
-        + line
-        + Style.RESET_ALL
+        console_line
     )
 
     # =================================================
@@ -83,7 +129,7 @@ def log(
     # ERROR LOG
     # =================================================
 
-    if "ERROR" in category.upper():
+    if level == "ERROR":
 
         with open(
             ERROR_LOG_FILE,

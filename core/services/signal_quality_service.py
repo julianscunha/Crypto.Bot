@@ -250,9 +250,7 @@ class SignalQualityService:
         
         log(
             "ATR",
-            f"{payload.symbol} atr={round(atr_percent, 2)}%",
-            Fore.MAGENTA
-        )
+            f"{payload.symbol} atr={round(atr_percent, 2)}%", Fore.LIGHTWHITE_EX)
 
         if atr_percent < self.config[
             "min_atr_percent"

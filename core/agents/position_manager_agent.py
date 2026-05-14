@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from colorama import (
-    Fore,
-    Style,
-    init
-)
-
 from core.contracts.messages import (
     MarketDataMessage
 )
@@ -25,6 +19,7 @@ from core.services.position_lifecycle_service import (
 from core.utils.console_logger import (
     log
 )
+
 
 class PositionManagerAgent:
 
@@ -86,7 +81,7 @@ class PositionManagerAgent:
             # =====================================================
             # TRAILING STOP
             # =====================================================
-            
+
             trailing_price = (
                 PositionLifecycleService
                 .update_trailing_stop(
@@ -112,13 +107,16 @@ class PositionManagerAgent:
                     pnl=trade.unrealized_pnl,
                     reason="STOP_LOSS"
                 )
-                
+
                 log(
                     "POSITION",
-                    f"STOP LOSS {trade.symbol} PnL={round(trade.unrealized_pnl, 2)}",
-                    Fore.LIGHTRED_EX
-                )                
-                
+                    (
+                        f"STOP LOSS "
+                        f"{trade.symbol} "
+                        f"pnl={round(trade.unrealized_pnl, 2)}"
+                    ),
+                    "ERROR"
+                )
 
             # =====================================================
             # TAKE PROFIT
@@ -132,11 +130,15 @@ class PositionManagerAgent:
                     pnl=trade.unrealized_pnl,
                     reason="TAKE_PROFIT"
                 )
-                
+
                 log(
                     "POSITION",
-                    f"TAKE PROFIT {trade.symbol} PnL={round(trade.unrealized_pnl, 2)}",
-                    Fore.CYAN
+                    (
+                        f"TAKE PROFIT "
+                        f"{trade.symbol} "
+                        f"pnl={round(trade.unrealized_pnl, 2)}"
+                    ),
+                    "SUCCESS"
                 )
 
             # =====================================================
@@ -151,9 +153,13 @@ class PositionManagerAgent:
                     pnl=trade.unrealized_pnl,
                     reason="TRAILING_STOP"
                 )
-                
+
                 log(
                     "POSITION",
-                    f"TRAILING STOP {trade.symbol} PnL={round(trade.unrealized_pnl, 2)}",
-                    Fore.YELLOW
+                    (
+                        f"TRAILING STOP "
+                        f"{trade.symbol} "
+                        f"pnl={round(trade.unrealized_pnl, 2)}"
+                    ),
+                    "WARNING"
                 )

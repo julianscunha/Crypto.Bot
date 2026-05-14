@@ -14,15 +14,10 @@ from core.config.trading_config import (
     TRADING_CONFIG
 )
 
-from colorama import (
-    Fore,
-    Style,
-    init
-)
-
 from core.utils.console_logger import (
     log
 )
+
 
 class RiskAgent:
 
@@ -43,33 +38,44 @@ class RiskAgent:
             return
 
         payload = message.payload
-        
+
+        # =====================================================
+        # START VALIDATION
+        # =====================================================
+
+        log(
+            "RISK",
+            f"VALIDATING {payload.symbol}"
+        )
+
+        # =====================================================
+        # ATR VALIDATION
+        # =====================================================
+
         if payload.atr is None:
 
             log(
-                "RISK BLOCKED",
-                f"{payload.symbol} | ATR_MISSING",
-                Fore.RED
+                "RISK",
+                f"BLOCKED {payload.symbol} | ATR_MISSING",
+                "ERROR"
             )
-        
+
             return
-        
-        log(
-            "RISK",
-            f"{payload.symbol}",
-            Fore.LIGHTYELLOW_EX
-        )
 
         # =====================================================
         # SIGNAL FILTER
         # =====================================================
 
         if payload.signal != "BUY":
-           
+
             log(
-                "RISK BLOCKED",
-                f"{payload.symbol} | INVALID_SIGNAL",
-                Fore.LIGHTRED_EX
+                "RISK",
+                (
+                    f"BLOCKED "
+                    f"{payload.symbol} "
+                    f"| INVALID_SIGNAL"
+                ),
+                "ERROR"
             )
 
             return
@@ -86,11 +92,15 @@ class RiskAgent:
         )
 
         if existing_position:
-            
+
             log(
-                "RISK BLOCKED",
-                f"{payload.symbol} | POSITION_ALREADY_OPEN",
-                Fore.LIGHTRED_EX
+                "RISK",
+                (
+                    f"BLOCKED "
+                    f"{payload.symbol} "
+                    f"| POSITION_ALREADY_OPEN"
+                ),
+                "ERROR"
             )
 
             return
@@ -98,9 +108,9 @@ class RiskAgent:
         # =====================================================
         # RISK CALCULATION
         # =====================================================
-        
+
         entry_price = payload.entry_price
-        
+
         stop_loss = round(
             entry_price - (
                 payload.atr * TRADING_CONFIG[
@@ -109,7 +119,7 @@ class RiskAgent:
             ),
             2
         )
-        
+
         take_profit = round(
             entry_price + (
                 payload.atr * TRADING_CONFIG[
@@ -118,14 +128,14 @@ class RiskAgent:
             ),
             2
         )
-        
+
         trailing_stop = round(
             payload.atr * TRADING_CONFIG[
                 "atr_trailing_multiplier"
             ],
             2
         )
-        
+
         quantity = (
             TRADING_CONFIG[
                 "default_quantity"
@@ -133,44 +143,55 @@ class RiskAgent:
         )
 
         # =====================================================
-        # PAYLOAD
+        # RISK / REWARD
         # =====================================================
 
         risk_distance = (
             entry_price - stop_loss
         )
-        
+
         if risk_distance <= 0:
 
             log(
-                "RISK BLOCKED",
-                f"{payload.symbol} | INVALID_RISK_DISTANCE",
-                Fore.RED
+                "RISK",
+                (
+                    f"BLOCKED "
+                    f"{payload.symbol} "
+                    f"| INVALID_RISK_DISTANCE"
+                ),
+                "ERROR"
             )
-        
+
             return
-        
+
         reward_distance = (
             take_profit - entry_price
         )
-        
+
         risk_reward = round(
             reward_distance / risk_distance,
             2
         )
-        
+
+        # =====================================================
+        # ATR INFO
+        # =====================================================
+
         log(
-            "ATR RISK",
+            "RISK",
             (
+                f"ATR "
                 f"{payload.symbol} "
-                f"ATR={payload.atr:.4f}"
-                f"SL={stop_loss} "
-                f"TP={take_profit}"
-            ),
-            Fore.LIGHTCYAN_EX
+                f"atr={payload.atr:.4f} "
+                f"sl={stop_loss} "
+                f"tp={take_profit}"
+            )
         )
-        
-        
+
+        # =====================================================
+        # PAYLOAD
+        # =====================================================
+
         decision_payload = (
             RiskDecisionPayload(
                 user_id=payload.user_id,
@@ -193,14 +214,22 @@ class RiskAgent:
         )
 
         # =====================================================
+        # APPROVED
+        # =====================================================
+
+        log(
+            "RISK",
+            (
+                f"APPROVED "
+                f"{payload.symbol} "
+                f"rr={risk_reward}"
+            ),
+            "SUCCESS"
+        )
+
+        # =====================================================
         # PUBLISH
         # =====================================================
-        
-        log(
-                "RISK APPROVED",
-                f"{payload.symbol}",
-                Fore.LIGHTGREEN_EX
-            )
 
         await self.bus.publish(
             decision_message

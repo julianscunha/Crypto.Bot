@@ -50,7 +50,7 @@ async def main():
     print()
 
     print(
-        Fore.MAGENTA +
+        Fore.LIGHTWHITE_EX +
         "[BACKTEST]" +
         Style.RESET_ALL +
         " STARTING"
@@ -139,7 +139,7 @@ async def main():
     print()
 
     print(
-        Fore.CYAN +
+        Fore.LIGHTWHITE_EX +
         "[BACKTEST REPORT]" +
         Style.RESET_ALL +
         " backtest/reports/report.json"

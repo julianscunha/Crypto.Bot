@@ -16,15 +16,10 @@ from core.services.signal_quality_service import (
     signal_quality_service
 )
 
-from colorama import (
-    Fore,
-    Style,
-    init
-)
-
 from core.utils.console_logger import (
     log
 )
+
 
 class ExecutionAgent:
 
@@ -61,6 +56,17 @@ class ExecutionAgent:
         # =====================================================
 
         if payload.signal != "BUY":
+
+            log(
+                "EXECUTION",
+                (
+                    f"BLOCKED "
+                    f"{payload.symbol} "
+                    f"| INVALID_SIGNAL"
+                ),
+                "ERROR"
+            )
+
             return
 
         # =====================================================
@@ -71,11 +77,15 @@ class ExecutionAgent:
             payload.user_id,
             payload.symbol
         ):
-                    
+
             log(
-                "EXECUTION BLOCKED",
-                f"{payload.symbol} | POSITION_ALREADY_OPEN",
-                Fore.LIGHTRED_EX
+                "EXECUTION",
+                (
+                    f"BLOCKED "
+                    f"{payload.symbol} "
+                    f"| POSITION_ALREADY_OPEN"
+                ),
+                "ERROR"
             )
 
             return
@@ -98,12 +108,17 @@ class ExecutionAgent:
 
         # =====================================================
         # EXECUTION LOG
-        # =====================================================     
-        
+        # =====================================================
+
         log(
             "EXECUTION",
-            f"OPEN BUY {payload.symbol} @ {payload.entry_price} | qty={payload.quantity}",
-            Fore.LIGHTGREEN_EX
+            (
+                f"OPEN BUY "
+                f"{payload.symbol} "
+                f"@ {payload.entry_price} "
+                f"| qty={payload.quantity}"
+            ),
+            "SUCCESS"
         )
 
         # =====================================================
@@ -124,9 +139,13 @@ class ExecutionAgent:
                 user_id=payload.user_id
             )
         )
-        
+
         log(
-            "PORTFOLIO",
-            f"Trades={metrics['total_trades']} | Winrate={metrics['winrate']} | PnL={metrics['pnl']}",
-            Fore.LIGHTBLUE_EX
+            "POSITION",
+            (
+                f"PORTFOLIO "
+                f"trades={metrics['total_trades']} "
+                f"| winrate={metrics['winrate']} "
+                f"| pnl={metrics['pnl']}"
+            )
         )

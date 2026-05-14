@@ -111,12 +111,6 @@ class AnalystAgent:
             )
         )
 
-        log(
-            "MARKET",
-            f"{payload.symbol} close={payload.close}",
-            Fore.WHITE
-        )
-
         await self.bus.publish(
             analysis_message
         )

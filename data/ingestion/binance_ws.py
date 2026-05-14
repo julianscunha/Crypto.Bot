@@ -9,22 +9,17 @@ from core.contracts.messages import (
     MarketDataPayload
 )
 
-from colorama import (
-    Fore,
-    Style,
-    init
-)
-
 from core.utils.console_logger import (
     log
 )
 
-from core.config.settings import settings
+from core.config.settings import (
+    settings
+)
 
-from core.state.market_state import market_state
-
-init(autoreset=True)
-
+from core.state.market_state import (
+    market_state
+)
 
 BINANCE_WS_URL = (
     "wss://stream.binance.com:9443/ws"
@@ -42,7 +37,7 @@ class BinanceWS:
         self.bus = bus
 
         self.user_id = user_id
-        
+
         self.symbols = [
             symbol.lower()
             for symbol in settings.SYMBOLS
@@ -79,8 +74,6 @@ class BinanceWS:
         stream_url = (
             self.build_stream_url()
         )
-        
-        print()
 
         while True:
 
@@ -88,20 +81,16 @@ class BinanceWS:
 
                 async with websockets.connect(
                     stream_url
-                ) as websocket:              
-        
-                
+                ) as websocket:
+
                     market_state.set_websocket_connected(
                         True
                     )
-                    
+
                     log(
-                        "BINANCE",
-                        f"Connected {stream_url}",
-                        Fore.LIGHTCYAN_EX
+                        "SYSTEM",
+                        "BINANCE WEBSOCKET CONNECTED",
                     )
-                    
-                    print()
 
                     while True:
 
@@ -118,12 +107,15 @@ class BinanceWS:
 
                         kline = data["k"]
 
+                        # =================================================
                         # ONLY CLOSED CANDLES
+                        # =================================================
+
                         if not kline["x"]:
                             continue
 
                         symbol = kline["s"]
-                        
+
                         market_state.register_kline(
                             symbol
                         )
@@ -146,37 +138,52 @@ class BinanceWS:
                                 payload=payload
                             )
                         )
-                        
+
+                        # =================================================
+                        # SYMBOL SEPARATOR
+                        # =================================================
+
+                        print()
+
                         print(
-                            "\n" +
-                            Fore.GREEN +
-                            f"{'-' * 25} "
-                            f"{symbol} "
-                            f"{'-' * 25}" +
-                            Style.RESET_ALL
+                            (
+                                "=" * 26
+                                + f" {symbol} "
+                                + "=" * 26
+                            )
                         )
-                       
+
+                        # =================================================
+                        # MARKET LOG
+                        # =================================================
+
                         log(
-                            "KLINE",
-                            f"{symbol} close={payload.close}",
-                            Fore.LIGHTWHITE_EX
+                            "MARKET",
+                            (
+                                f"KLINE "
+                                f"{symbol} "
+                                f"close={payload.close}"
+                            )
                         )
-                        
+
+                        # =================================================
+                        # PUBLISH
+                        # =================================================
 
                         await self.bus.publish(
                             message
                         )
 
-            except Exception as e: 
-            
+            except Exception as e:
+
                 market_state.set_websocket_connected(
                     False
                 )
-                
+
                 log(
-                    "BINANCE ERROR",
-                    f"{e}",
-                    Fore.RED
+                    "SYSTEM",
+                    f"BINANCE ERROR {e}",
+                    "ERROR"
                 )
 
                 await asyncio.sleep(5)

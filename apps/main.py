@@ -126,17 +126,17 @@ if __name__ == "__main__":
     print()
 
     print(
-        Fore.CYAN +
+        Fore.LIGHTWHITE_EX +
         "=" * 60
     )
 
     print(
-        Fore.CYAN +
+        Fore.LIGHTWHITE_EX +
         "               CRYPTO.BOT - FULL SYSTEM"
     )
 
     print(
-        Fore.CYAN +
+        Fore.LIGHTWHITE_EX +
         "=" * 60
     )
 
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     print()
 
     print(
-        Fore.CYAN +
+        Fore.LIGHTWHITE_EX +
         "=" * 60
     )
 

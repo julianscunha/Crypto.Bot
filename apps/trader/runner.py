@@ -1,14 +1,26 @@
+# -*- coding: utf-8 -*-
+
 import asyncio
 
-from core.bus.event_bus import EventBus
+from core.bus.event_bus import (
+    EventBus
+)
 
-from core.agents.analyst_agent import AnalystAgent
+from core.agents.analyst_agent import (
+    AnalystAgent
+)
 
-from core.agents.strategy_agent import StrategyAgent
+from core.agents.strategy_agent import (
+    StrategyAgent
+)
 
-from core.agents.risk_agent import RiskAgent
+from core.agents.risk_agent import (
+    RiskAgent
+)
 
-from core.agents.execution_agent import ExecutionAgent
+from core.agents.execution_agent import (
+    ExecutionAgent
+)
 
 from core.agents.position_manager_agent import (
     PositionManagerAgent
@@ -38,16 +50,13 @@ from core.config.regime_config_loader import (
     regime_config_loader
 )
 
-from colorama import (
-    Fore,
-    Style
-)
-
 from core.utils.console_logger import (
     log
 )
 
-from core.config.settings import settings
+from core.config.settings import (
+    settings
+)
 
 
 class MarketRegimeLogger:
@@ -79,14 +88,17 @@ class MarketRegimeLogger:
             .detect_regime(
                 payload.symbol
             )
-        )     
-        
-        log(
-            "MARKET REGIME",
-            f"{payload.symbol} {regime}",
-            Fore.LIGHTYELLOW_EX
         )
-        
+
+        log(
+            "MARKET",
+            (
+                f"REGIME "
+                f"{payload.symbol} "
+                f"{regime}"
+            )
+        )
+
         regime_config_loader.load_regime(
             regime
         )
@@ -94,11 +106,62 @@ class MarketRegimeLogger:
 
 async def main():
 
+    # =====================================================
+    # DATABASE
+    # =====================================================
+
     init_db()
+
+    # =====================================================
+    # CONFIG
+    # =====================================================
 
     load_best_config()
 
+    # =====================================================
+    # SYSTEM PANEL
+    # =====================================================
+
+    log(
+        "SYSTEM",
+        (
+            f"MODE           "
+            f"{settings.MODE.upper()}"
+        ),
+    )
+
+    log(
+        "SYSTEM",
+        (
+            "SYMBOLS        "
+            f"{' '.join(settings.SYMBOLS)}"
+        )
+    )
+
+    log(
+        "SYSTEM",
+        "TIMEFRAME      1m"
+    )
+
+    log(
+        "SYSTEM",
+        "DATABASE       CONNECTED",
+    )
+
+    # =====================================================
+    # EVENT BUS
+    # =====================================================
+
     bus = EventBus()
+
+    log(
+        "SYSTEM",
+        "EVENT BUS      READY",
+    )
+
+    # =====================================================
+    # AGENTS
+    # =====================================================
 
     AnalystAgent(bus)
 
@@ -111,6 +174,15 @@ async def main():
     PositionManagerAgent(bus)
 
     MarketRegimeLogger(bus)
+
+    log(
+        "SYSTEM",
+        "AGENTS         READY",
+    )
+
+    # =====================================================
+    # WEBSOCKET
+    # =====================================================
 
     ws = BinanceWS(
         bus=bus,

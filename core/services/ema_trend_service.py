@@ -135,9 +135,7 @@ class EmaTrendService:
         
         log(
             "EMA",
-            f"{symbol} fast={round(ema_fast, 2)} slow={round(ema_slow, 2)}",
-            Fore.MAGENTA
-        )
+            f"{symbol} fast={round(ema_fast, 2)} slow={round(ema_slow, 2)}", Fore.LIGHTWHITE_EX)
 
         return (
             ema_fast >= ema_slow

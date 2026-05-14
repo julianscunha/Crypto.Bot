@@ -54,8 +54,7 @@ class StrategyAgent:
         
         log(
             "STRATEGY",
-            f"{payload.symbol}",
-            Fore.CYAN
+            f"ANALYZING {payload.symbol}"
         )
 
         candles_count = len(
@@ -66,9 +65,8 @@ class StrategyAgent:
         )
         
         log(
-            "STRUCTURE DATA",
-            f"{payload.symbol} candles={candles_count}",
-            Fore.LIGHTMAGENTA_EX
+            "STRATEGY",
+            f"STRUCTURE {payload.symbol} candles={candles_count}"
         )
 
         # =====================================================
@@ -99,9 +97,9 @@ class StrategyAgent:
         if atr_value is None:
         
             log(
-                "SIGNAL BLOCKED",
-                f"{payload.symbol} | ATR_NOT_READY",
-                Fore.LIGHTRED_EX
+                "STRATEGY",
+                f"SIGNAL BLOCKED {payload.symbol} | ATR_NOT_READY",
+                "ERROR"
             )
         
             return
@@ -146,9 +144,9 @@ class StrategyAgent:
         if not valid:
             
             log(
-                "SIGNAL BLOCKED",
-                f"{payload.symbol} | {reason}",
-                Fore.LIGHTRED_EX
+                "STRATEGY",
+                f"SIGNAL BLOCKED {payload.symbol} | {reason}",
+                "ERROR"
             )
 
             return
@@ -174,9 +172,13 @@ class StrategyAgent:
       #     return
         
         log(
-            "SIGNAL",
-            f"{payload.symbol} strength={signal_strength}",
-            Fore.LIGHTGREEN_EX
+            "STRATEGY",
+            (
+                f"SIGNAL BUY "
+                f"{payload.symbol} "
+                f"strength={signal_strength}"
+            ),
+            "SUCCESS"
         )
 
         # =====================================================

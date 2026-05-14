@@ -1,25 +1,23 @@
-$ErrorActionPreference = "Stop"
+Clear-Host
 
-$originalPath = Get-Location
+Write-Host ""
+Write-Host "============================================================" -ForegroundColor DarkGray
+Write-Host "                    CRYPTO.BOT ENGINE" -ForegroundColor White
+Write-Host "============================================================" -ForegroundColor DarkGray
+Write-Host ""
 
-try {
+Write-Host "[SYSTEM] " -NoNewline -ForegroundColor Green
+Write-Host "Starting trading engine..." -ForegroundColor Gray
 
-    Set-Location -Path (Split-Path -Parent $PSScriptRoot)
+Write-Host "[SYSTEM] " -NoNewline -ForegroundColor Green
+Write-Host "Initializing runtime environment..." -ForegroundColor Gray
 
-    $env:PYTHONPATH = Get-Location
+Write-Host ""
 
-    python scripts/bootstrap.py
+python apps/trader/runner.py
 
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[ERROR] Bootstrap failed" -ForegroundColor Red
-        exit $LASTEXITCODE
-    }
-
-    pip install -r requirements.txt | Out-Null
-
-    python apps/main.py
-
-}
-finally {
-    Set-Location $originalPath
-}
+Write-Host ""
+Write-Host "============================================================" -ForegroundColor DarkGray
+Write-Host "                    ENGINE STOPPED" -ForegroundColor Red
+Write-Host "============================================================" -ForegroundColor DarkGray
+Write-Host ""
