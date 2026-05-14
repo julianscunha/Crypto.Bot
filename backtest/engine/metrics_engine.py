@@ -129,18 +129,18 @@ class MetricsEngine:
         profit_factor = (
             gross_profit / gross_loss
             if gross_loss > 0
-            else gross_profit
+            else 0
         )
 
         avg_win = (
             gross_profit / len(wins)
-            if wins
-            else avg_win
+            if len(wins) > 0
+            else 0
         )
-
+        
         avg_loss = (
             gross_loss / len(losses)
-            if losses
+            if len(losses) > 0
             else 0
         )
 
@@ -163,7 +163,7 @@ class MetricsEngine:
         risk_reward = (
             avg_win / avg_loss
             if avg_loss > 0
-            else avg_win
+            else 0
         )
 
         pnl = (

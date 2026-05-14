@@ -20,6 +20,10 @@ from core.utils.console_logger import (
     log
 )
 
+from core.services.position_lifecycle_service import (
+    PositionLifecycleService
+)
+
 
 class ExecutionAgent:
 
@@ -94,11 +98,18 @@ class ExecutionAgent:
         # CREATE TRADE
         # =====================================================
 
+        entry_price = (
+            PositionLifecycleService
+            .apply_entry_slippage(
+                payload.entry_price
+            )
+        )        
+        
         self.positions.create_trade(
             user_id=payload.user_id,
             symbol=payload.symbol,
             action=payload.signal,
-            entry_price=payload.entry_price,
+            entry_price=entry_price,
             quantity=payload.quantity,
             stop_loss=payload.stop_loss,
             take_profit=payload.take_profit,
@@ -115,7 +126,7 @@ class ExecutionAgent:
             (
                 f"OPEN BUY "
                 f"{payload.symbol} "
-                f"@ {payload.entry_price} "
+                f"@ {entry_price} "
                 f"| qty={payload.quantity}"
             ),
             "SUCCESS"

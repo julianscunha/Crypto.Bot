@@ -26,6 +26,10 @@ from backtest.reports.validation_interpreter import (
     validation_interpreter
 )
 
+from backtest.reports.report_renderer import (
+    ReportRenderer
+)
+
 from core.utils.console_logger import (
     log
 )
@@ -134,157 +138,141 @@ async def main():
     )
 
     # =====================================================
-    # VALIDATION REPORT
+    # BACKTEST VALIDATION REPORT
     # =====================================================
 
-    print()
+    performance = report["performance"]
 
-    print("=" * 60)
-    print("                 VALIDATION REPORT")
-    print("=" * 60)
+    trade_quality = report["trade_quality"]
 
-    print()
+    risk = report["risk"]
+
+    stats = report["statistical_analysis"]
+
+    verdict = report["final_verdict"]
+
+    ReportRenderer.print_header(
+        "BACKTEST VALIDATION REPORT"
+    )
 
     # =====================================================
     # PERFORMANCE
     # =====================================================
 
-    performance = report["performance"]
-
-    print("[PERFORMANCE]")
-
-    print(
-        f"Net Profit .............. "
-        f"{performance['net_profit']}"
+    ReportRenderer.print_section(
+        "PERFORMANCE"
     )
 
-    print(
-        f"Profit Factor ........... "
-        f"{performance['profit_factor']} "
-        f"({performance['profit_factor_rating']})"
+    ReportRenderer.print_metric(
+        "Net Profit",
+        performance["net_profit"]
     )
 
-    print(
-        f"Expectancy .............. "
-        f"{performance['expectancy']}"
+    ReportRenderer.print_metric(
+        "Profit Factor",
+        performance["profit_factor"],
+        performance["profit_factor_rating"]
     )
 
-    print(
-        f"Recovery Factor ......... "
-        f"{performance['recovery_factor']}"
+    ReportRenderer.print_metric(
+        "Expectancy",
+        performance["expectancy"]
     )
 
-    print()
+    ReportRenderer.print_metric(
+        "Recovery Factor",
+        performance["recovery_factor"]
+    )
 
     # =====================================================
     # TRADE QUALITY
     # =====================================================
 
-    trade_quality = report["trade_quality"]
-
-    print("[TRADE QUALITY]")
-
-    print(
-        f"Winrate ................. "
-        f"{trade_quality['winrate']:.2%} "
-        f"({trade_quality['winrate_rating']})"
+    ReportRenderer.print_section(
+        "TRADE QUALITY"
     )
 
-    print(
-        f"Risk/Reward ............. "
-        f"{trade_quality['risk_reward']} "
-        f"({trade_quality['risk_reward_rating']})"
+    ReportRenderer.print_metric(
+        "Winrate",
+        f"{trade_quality['winrate']:.2%}",
+        trade_quality["winrate_rating"]
     )
 
-    print(
-        f"Avg Win ................. "
-        f"{trade_quality['avg_win']}"
+    ReportRenderer.print_metric(
+        "Risk/Reward",
+        trade_quality["risk_reward"],
+        trade_quality["risk_reward_rating"]
     )
 
-    print(
-        f"Avg Loss ................ "
-        f"{trade_quality['avg_loss']}"
+    ReportRenderer.print_metric(
+        "Avg Win",
+        trade_quality["avg_win"]
     )
 
-    print()
+    ReportRenderer.print_metric(
+        "Avg Loss",
+        trade_quality["avg_loss"]
+    )
 
     # =====================================================
     # RISK
     # =====================================================
 
-    risk = report["risk"]
-
-    print("[RISK]")
-
-    print(
-        f"Max Drawdown ............ "
-        f"{risk['max_drawdown']} "
-        f"({risk['drawdown_rating']})"
+    ReportRenderer.print_section(
+        "RISK"
     )
 
-    print(
-        f"Max Win Streak .......... "
-        f"{risk['max_win_streak']}"
+    ReportRenderer.print_metric(
+        "Max Drawdown",
+        risk["max_drawdown"],
+        risk["drawdown_rating"]
     )
 
-    print(
-        f"Max Loss Streak ......... "
-        f"{risk['max_loss_streak']}"
+    ReportRenderer.print_metric(
+        "Max Win Streak",
+        risk["max_win_streak"]
     )
 
-    print()
+    ReportRenderer.print_metric(
+        "Max Loss Streak",
+        risk["max_loss_streak"]
+    )
 
     # =====================================================
     # STATISTICAL ANALYSIS
     # =====================================================
 
-    stats = report["statistical_analysis"]
-
-    print("[STATISTICAL ANALYSIS]")
-
-    print(
-        f"Trade Sample Size ....... "
-        f"{stats['trade_sample_size']} "
-        f"({stats['sample_rating']})"
+    ReportRenderer.print_section(
+        "STATISTICAL ANALYSIS"
     )
 
-    print(
-        f"Overfit Risk ............ "
-        f"{stats['overfit_risk']}"
+    ReportRenderer.print_metric(
+        "Trade Sample Size",
+        stats["trade_sample_size"],
+        stats["sample_rating"]
     )
 
-    print(
-        f"Robustness .............. "
-        f"{stats['robustness']}"
+    ReportRenderer.print_metric(
+        "Overfit Risk",
+        stats["overfit_risk"]
     )
 
-    print()
+    ReportRenderer.print_metric(
+        "Robustness",
+        stats["robustness"]
+    )
 
     # =====================================================
     # FINAL VERDICT
     # =====================================================
 
-    verdict = report["final_verdict"]
-
-    print("[FINAL VERDICT]")
-
-    print(
-        f"Status .................. "
-        f"{verdict['status']}"
-    )
-
-    print()
-
-    print("Recommendation:")
-
-    print(
+    ReportRenderer.print_verdict(
+        verdict["status"],
         verdict["recommendation"]
     )
 
-    print()
-
-    print("=" * 60)
-
+    ReportRenderer.print_footer()
+    
     # =====================================================
     # REPORT
     # =====================================================
