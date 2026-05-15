@@ -194,4 +194,60 @@ async def main():
 
 if __name__ == "__main__":
 
-    asyncio.run(main())
+    try:
+
+        asyncio.run(main())
+    
+    except KeyboardInterrupt:
+    
+        print()
+    
+        print("=" * 60)
+        print("                LIVE SESSION REPORT")
+        print("=" * 60)
+    
+        from core.metrics.metrics_service import (
+            metrics_service
+        )
+    
+        metrics = (
+            metrics_service.calculate()
+        )
+    
+        print()
+        print(
+            f"Trades ...................... "
+            f"{metrics['total_trades']}"
+        )
+    
+        print(
+            f"Winrate .................... "
+            f"{metrics['winrate']:.2%}"
+        )
+    
+        print(
+            f"PnL ......................... "
+            f"{metrics['pnl']:.2f}"
+        )
+    
+        print(
+            f"Profit Factor .............. "
+            f"{metrics['profit_factor']:.2f}"
+        )
+    
+        print(
+            f"Max Drawdown ............... "
+            f"{metrics['max_drawdown']:.2f}"
+        )
+    
+        print()
+    
+        print("=" * 60)
+        print("                 ENGINE STOPPED")
+        print("=" * 60)
+    
+    except Exception as error:
+    
+        print(
+            f"[FATAL ERROR] {error}"
+        )

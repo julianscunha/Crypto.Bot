@@ -24,6 +24,10 @@ from core.services.position_lifecycle_service import (
     PositionLifecycleService
 )
 
+from core.config.trading_config import (
+    TRADING_CONFIG
+)
+
 
 class ExecutionAgent:
 
@@ -54,6 +58,16 @@ class ExecutionAgent:
             return
 
         payload = message.payload
+
+        # =====================================================
+        # EXECUTION MODE
+        # =====================================================
+
+        paper_execution = (
+            TRADING_CONFIG[
+                "paper_execution"
+            ]
+        )
 
         # =====================================================
         # SIGNAL FILTER
@@ -103,8 +117,8 @@ class ExecutionAgent:
             .apply_entry_slippage(
                 payload.entry_price
             )
-        )        
-        
+        )
+
         self.positions.create_trade(
             user_id=payload.user_id,
             symbol=payload.symbol,
@@ -121,10 +135,16 @@ class ExecutionAgent:
         # EXECUTION LOG
         # =====================================================
 
+        execution_mode = (
+            "PAPER"
+            if paper_execution
+            else "LIVE"
+        )
+
         log(
             "EXECUTION",
             (
-                f"OPEN BUY "
+                f"{execution_mode} OPEN BUY "
                 f"{payload.symbol} "
                 f"@ {entry_price} "
                 f"| qty={payload.quantity}"

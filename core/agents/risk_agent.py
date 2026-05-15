@@ -216,6 +216,55 @@ class RiskAgent:
         )
 
         # =====================================================
+        # POSITION VALIDATION
+        # =====================================================
+
+        if quantity <= 0:
+
+            log(
+                "RISK",
+                (
+                    f"BLOCKED "
+                    f"{payload.symbol} "
+                    f"| INVALID_POSITION_SIZE"
+                ),
+                "ERROR"
+            )
+
+            return
+
+        notional_value = (
+            quantity * entry_price
+        )
+
+        max_exposure_percent = (
+            TRADING_CONFIG[
+                "max_position_exposure_percent"
+            ]
+        )
+
+        max_exposure_value = (
+            account_balance *
+            (max_exposure_percent / 100)
+        )
+
+        if notional_value > max_exposure_value:
+        
+            log(
+                "RISK",
+                (
+                    f"BLOCKED "
+                    f"{payload.symbol} "
+                    f"| MAX_EXPOSURE_EXCEEDED "
+                    f"notional={notional_value:.2f} "
+                    f"limit={max_exposure_value:.2f}"
+                ),
+                "ERROR"
+            )
+        
+            return
+
+        # =====================================================
         # REWARD DISTANCE
         # =====================================================
 
@@ -227,6 +276,25 @@ class RiskAgent:
             reward_distance / risk_distance,
             2
         )
+
+        # =====================================================
+        # MIN RR FILTER
+        # =====================================================
+
+        if risk_reward < 1.2:
+        
+            log(
+                "RISK",
+                (
+                    f"BLOCKED "
+                    f"{payload.symbol} "
+                    f"| LOW_RR "
+                    f"rr={risk_reward}"
+                ),
+                "ERROR"
+            )
+        
+            return
 
         # =====================================================
         # ATR INFO
