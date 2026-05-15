@@ -83,16 +83,8 @@ class PositionManagerAgent:
             # =====================================================
 
             trailing_price = (
-                PositionLifecycleService
-                .update_trailing_stop(
-                    current_price=payload.close,
-                    highest_price=trade.highest_price,
-                    trailing_percent=(
-                        TRADING_CONFIG[
-                            "trailing_stop_percent"
-                        ]
-                    )
-                )
+                trade.highest_price
+                - trade.trailing_stop
             )
 
             # =====================================================

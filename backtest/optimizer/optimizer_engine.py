@@ -63,30 +63,39 @@ class OptimizerEngine:
 
     def generate_combinations(self):
 
-        take_profit_values = [
-            0.003,
-            0.005,
-            0.008
+        atr_take_profit_values = [
+            2.0,
+            3.0,
+            4.0
         ]
-
-        stop_loss_values = [
-            0.01,
-            0.015,
-            0.02
+        
+        atr_stop_values = [
+            1.0,
+            1.5,
+            2.0
+        ]
+        
+        atr_trailing_values = [
+            0.5,
+            1.0,
+            1.5
         ]
 
         combinations = []
 
-        for tp, sl in product(
-            take_profit_values,
-            stop_loss_values
+        for tp, sl, trailing in product(
+            atr_take_profit_values,
+            atr_stop_values,
+            atr_trailing_values
         ):
 
             combinations.append({
-
-                "take_profit_percent": tp,
-
-                "stop_loss_percent": sl
+            
+                "atr_take_profit_multiplier": tp,
+            
+                "atr_stop_multiplier": sl,
+            
+                "atr_trailing_multiplier": trailing
             })
 
         return combinations
@@ -564,7 +573,7 @@ class OptimizerEngine:
         # =====================================================
 
         ReportRenderer.print_header(
-            "OPTIMIZATION SUMMARY"
+            "TRAINING SUMMARY"
         )
 
         ReportRenderer.print_metric(
@@ -578,17 +587,17 @@ class OptimizerEngine:
         )
 
         ReportRenderer.print_metric(
-            "Best Score",
+            "Training Score",
             best_result["score"]
         )
 
         ReportRenderer.print_metric(
-            "Best Profit Factor",
+            "Training Profit Factor",
             best_result["metrics"]["profit_factor"]
         )
 
         ReportRenderer.print_metric(
-            "Best Winrate",
+            "Training Winrate",
             f"{best_result['metrics']['winrate']:.2%}"
         )
 
