@@ -37,6 +37,10 @@ from core.utils.console_logger import (
     log
 )
 
+from core.services.market_structure_service import (
+    market_structure_service
+)
+
 
 class OptimizerEngine:
 
@@ -68,13 +72,13 @@ class OptimizerEngine:
             3.0,
             4.0
         ]
-        
+
         atr_stop_values = [
             1.0,
             1.5,
             2.0
         ]
-        
+
         atr_trailing_values = [
             0.5,
             1.0,
@@ -90,11 +94,11 @@ class OptimizerEngine:
         ):
 
             combinations.append({
-            
+
                 "atr_take_profit_multiplier": tp,
-            
+
                 "atr_stop_multiplier": sl,
-            
+
                 "atr_trailing_multiplier": trailing
             })
 
@@ -159,6 +163,8 @@ class OptimizerEngine:
                     "DATASET",
                     dataset
                 )
+
+                market_structure_service.reset()
 
                 replay = (
                     ReplayEngine(
@@ -260,7 +266,7 @@ class OptimizerEngine:
             # =================================================
             # RESULT
             # =================================================
-
+            
             log(
                 "RESULT",
                 (
@@ -271,19 +277,100 @@ class OptimizerEngine:
                 ),
                 "SUCCESS"
             )
-
+            
+            # =================================================
+            # FILTER INVALID CONFIGS
+            # =================================================
+            
+            if metrics["profit_factor"] <= 1.0:
+                continue
+            
+            if metrics["pnl"] <= 0:
+                continue
+            
+            if metrics["expectancy"] <= 0:
+                continue
+            
             results.append({
-
-                "params": params,
-
-                "metrics": metrics,
-
+            
+                "params": dict(params),
+            
+                "metrics": dict(metrics),
+            
                 "score": score
             })
-
+            
             restore_config(
                 snapshot
             )
+
+        # =====================================================
+        # NO VALID RESULTS
+        # =====================================================
+        
+        if not results:
+        
+            ReportRenderer.print_header(
+                "OPTIMIZER VALIDATION REPORT"
+            )
+        
+            ReportRenderer.print_section(
+                "RESULT"
+            )
+        
+            ReportRenderer.print_metric(
+                "Configurations Tested",
+                len(combinations)
+            )
+        
+            ReportRenderer.print_metric(
+                "Valid Configurations",
+                0
+            )
+        
+            ReportRenderer.print_metric(
+                "Status",
+                "NO_EDGE_FOUND"
+            )
+        
+            print()
+        
+            print(
+                "No configuration passed the "
+                "minimum quantitative filters."
+            )
+        
+            print()
+        
+            print(
+                "Possible causes:"
+            )
+        
+            print(
+                "- Strategy lacks statistical edge"
+            )
+        
+            print(
+                "- Dataset too adverse"
+            )
+        
+            print(
+                "- Risk parameters too restrictive"
+            )
+        
+            print(
+                "- Insufficient trade sample"
+            )
+        
+            print()
+        
+            print("=" * 60)
+        
+            restore_config(
+                snapshot
+            )
+        
+            return
 
         # =====================================================
         # RANKING
@@ -380,7 +467,7 @@ class OptimizerEngine:
         ) as f:
 
             json.dump(
-                best_result,
+                best_result["params"],
                 f,
                 indent=4
             )
@@ -409,6 +496,8 @@ class OptimizerEngine:
         )
 
         trades_repository.reset()
+
+        market_structure_service.reset()
 
         validation_replay = (
             ReplayEngine(
@@ -569,11 +658,11 @@ class OptimizerEngine:
         )
 
         # =====================================================
-        # OPTIMIZATION SUMMARY
+        # BEST TRAINING CONFIG
         # =====================================================
 
         ReportRenderer.print_header(
-            "TRAINING SUMMARY"
+            "BEST TRAINING CONFIG"
         )
 
         ReportRenderer.print_metric(
@@ -587,17 +676,17 @@ class OptimizerEngine:
         )
 
         ReportRenderer.print_metric(
-            "Training Score",
+            "Best Training Score",
             best_result["score"]
         )
 
         ReportRenderer.print_metric(
-            "Training Profit Factor",
+            "Best Training PF",
             best_result["metrics"]["profit_factor"]
         )
 
         ReportRenderer.print_metric(
-            "Training Winrate",
+            "Best Training Winrate",
             f"{best_result['metrics']['winrate']:.2%}"
         )
 
@@ -624,6 +713,7 @@ class OptimizerEngine:
         restore_config(
             snapshot
         )
+
 
 if __name__ == "__main__":
 

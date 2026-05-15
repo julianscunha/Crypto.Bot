@@ -6,7 +6,9 @@ TRADING_CONFIG = {
     # POSITION
     # =====================================================
 
-    "default_quantity": 2.0,
+    "risk_per_trade_percent": 1.0,
+    
+    "account_balance": 10000.0,
   
     # =====================================================
     # ATR RISK

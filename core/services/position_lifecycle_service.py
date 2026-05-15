@@ -96,15 +96,3 @@ class PositionLifecycleService:
             ),
             2
         )
-
-    @staticmethod
-    def update_trailing_stop(
-        current_price: float,
-        highest_price: float,
-        trailing_percent: float
-    ):
-
-        return (
-            highest_price *
-            (1 - trailing_percent)
-        )

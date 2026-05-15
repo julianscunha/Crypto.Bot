@@ -77,6 +77,17 @@ class PositionManagerAgent:
 
             if not trade:
                 continue
+                
+            # =====================================================
+            # UPDATE HIGHEST PRICE
+            # =====================================================
+            
+            if payload.close > trade.highest_price:
+            
+                trade.highest_price = payload.close
+            
+                self.positions.session.commit()
+
 
             # =====================================================
             # TRAILING STOP

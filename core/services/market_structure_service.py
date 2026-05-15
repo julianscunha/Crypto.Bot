@@ -16,6 +16,14 @@ class MarketStructureService:
         self.market_data = defaultdict(list)
 
     # =====================================================
+    # RESET STATE
+    # =====================================================
+
+    def reset(self):
+
+        self.market_data.clear()
+
+    # =====================================================
     # UPDATE MARKET DATA
     # =====================================================
 
@@ -244,6 +252,7 @@ class MarketStructureService:
             "reason": "BULLISH_STRUCTURE",
             "trend_strength": trend_strength
         }
+
 
 market_structure_service = (
     MarketStructureService()

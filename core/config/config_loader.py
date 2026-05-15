@@ -74,8 +74,8 @@ def load_best_config():
         "SYSTEM",
         (
             "RISK CONFIG "
-            f"RR={TRADING_CONFIG['risk_reward_ratio']} "
-            f"QTY={TRADING_CONFIG['default_quantity']}"
+            f"RISK={TRADING_CONFIG['risk_per_trade_percent']}% "
+            f"BALANCE={TRADING_CONFIG['account_balance']}"
         )
     )
 

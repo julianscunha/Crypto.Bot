@@ -106,47 +106,72 @@ class RiskAgent:
             return
 
         # =====================================================
-        # RISK CALCULATION
+        # ENTRY PRICE
         # =====================================================
 
         entry_price = payload.entry_price
 
-        stop_loss = round(
-            entry_price - (
-                payload.atr * TRADING_CONFIG[
-                    "atr_stop_multiplier"
-                ]
-            ),
-            2
-        )
+        # =====================================================
+        # ATR MULTIPLIERS
+        # =====================================================
 
-        take_profit = round(
-            entry_price + (
-                payload.atr * TRADING_CONFIG[
-                    "atr_take_profit_multiplier"
-                ]
-            ),
-            2
-        )
-
-        trailing_stop = round(
-            payload.atr * TRADING_CONFIG[
-                "atr_trailing_multiplier"
-            ],
-            2
-        )
-
-        quantity = (
+        atr_stop_multiplier = (
             TRADING_CONFIG[
-                "default_quantity"
+                "atr_stop_multiplier"
+            ]
+        )
+
+        atr_take_profit_multiplier = (
+            TRADING_CONFIG[
+                "atr_take_profit_multiplier"
+            ]
+        )
+
+        atr_trailing_multiplier = (
+            TRADING_CONFIG[
+                "atr_trailing_multiplier"
             ]
         )
 
         # =====================================================
-        # RISK / REWARD
+        # STOP LOSS
         # =====================================================
 
-        risk_distance = (
+        stop_loss = round(
+            entry_price - (
+                payload.atr *
+                atr_stop_multiplier
+            ),
+            2
+        )
+
+        # =====================================================
+        # TAKE PROFIT
+        # =====================================================
+
+        take_profit = round(
+            entry_price + (
+                payload.atr *
+                atr_take_profit_multiplier
+            ),
+            2
+        )
+
+        # =====================================================
+        # TRAILING STOP
+        # =====================================================
+
+        trailing_stop = round(
+            payload.atr *
+            atr_trailing_multiplier,
+            2
+        )
+
+        # =====================================================
+        # RISK DISTANCE
+        # =====================================================
+
+        risk_distance = abs(
             entry_price - stop_loss
         )
 
@@ -163,6 +188,36 @@ class RiskAgent:
             )
 
             return
+
+        # =====================================================
+        # EQUITY RISK SIZING
+        # =====================================================
+
+        account_balance = (
+            TRADING_CONFIG[
+                "account_balance"
+            ]
+        )
+
+        risk_percent = (
+            TRADING_CONFIG[
+                "risk_per_trade_percent"
+            ]
+        )
+
+        risk_amount = (
+            account_balance *
+            (risk_percent / 100)
+        )
+
+        quantity = round(
+            risk_amount / risk_distance,
+            6
+        )
+
+        # =====================================================
+        # REWARD DISTANCE
+        # =====================================================
 
         reward_distance = (
             take_profit - entry_price
@@ -184,7 +239,8 @@ class RiskAgent:
                 f"{payload.symbol} "
                 f"atr={payload.atr:.4f} "
                 f"sl={stop_loss} "
-                f"tp={take_profit}"
+                f"tp={take_profit} "
+                f"qty={quantity}"
             )
         )
 

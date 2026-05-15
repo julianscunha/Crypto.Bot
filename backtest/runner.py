@@ -34,6 +34,10 @@ from core.utils.console_logger import (
     log
 )
 
+from core.services.market_structure_service import (
+    market_structure_service
+)
+
 
 DATASETS = [
 
@@ -108,6 +112,8 @@ async def main():
             + f" {dataset.split('/')[-1]} "
             + "=" * 20
         )
+
+        market_structure_service.reset()
 
         replay = (
             ReplayEngine(

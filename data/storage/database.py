@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = "sqlite:///data/storage/trades.db"
@@ -51,7 +51,8 @@ SessionLocal = sessionmaker(
 # BASE
 # =====================================================
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 # =====================================================
 # INIT DATABASE
