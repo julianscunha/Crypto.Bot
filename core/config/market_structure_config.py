@@ -14,7 +14,7 @@ MARKET_STRUCTURE_CONFIG = {
 
     "require_bos_confirmation": False,
 
-    "min_trend_strength": 1,#2
+    "min_trend_strength": 2,
 
     # =====================================================
     # CONSOLIDATION

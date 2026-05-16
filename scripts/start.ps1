@@ -1,23 +1,47 @@
+# ============================================================
+# CRYPTO.BOT STARTUP
+# ============================================================
+
+$Host.UI.RawUI.WindowTitle = "CRYPTO.BOT"
+
 Clear-Host
 
 Write-Host ""
-Write-Host "============================================================" -ForegroundColor DarkGray
-Write-Host "                    CRYPTO.BOT ENGINE" -ForegroundColor White
-Write-Host "============================================================" -ForegroundColor DarkGray
+Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host "                    CRYPTO.BOT ENGINE" -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 
-Write-Host "[SYSTEM] " -NoNewline -ForegroundColor Green
-Write-Host "Starting trading engine..." -ForegroundColor Gray
+# ============================================================
+# ROOT
+# ============================================================
 
-Write-Host "[SYSTEM] " -NoNewline -ForegroundColor Green
-Write-Host "Initializing runtime environment..." -ForegroundColor Gray
+$ROOT = Split-Path $PSScriptRoot -Parent
 
-Write-Host ""
+Set-Location $ROOT
 
-python apps/trader/runner.py
+# ============================================================
+# START
+# ============================================================
 
-Write-Host ""
-Write-Host "============================================================" -ForegroundColor DarkGray
-Write-Host "                    ENGINE STOPPED" -ForegroundColor Red
-Write-Host "============================================================" -ForegroundColor DarkGray
-Write-Host ""
+try {
+
+    python -m scripts.bootstrap.launcher
+
+}
+catch {
+
+    Write-Host ""
+    Write-Host $_ -ForegroundColor Red
+    Write-Host ""
+
+}
+finally {
+
+    Write-Host ""
+    Write-Host "============================================================" -ForegroundColor Cyan
+    Write-Host "                 ENGINE STOPPED" -ForegroundColor Cyan
+    Write-Host "============================================================" -ForegroundColor Cyan
+    Write-Host ""
+
+}

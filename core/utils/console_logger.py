@@ -72,7 +72,7 @@ LOG_COLORS = {
     # WARNING
     # ==============================================
 
-    "WARNING": Fore.YELLOW
+    "WARNING": Fore.LIGHTYELLOW_EX
 }
 
 # =====================================================
@@ -161,19 +161,19 @@ def log(
     )
 
     console_line = (
-
+    
         Fore.LIGHTWHITE_EX +
-
+    
         f"{timestamp} " +
-
+    
         tag_color +
-
+    
         f"{category_label} " +
-
+    
         Fore.LIGHTWHITE_EX +
-
+    
         f"{message}" +
-
+    
         Style.RESET_ALL
     )
 
@@ -198,3 +198,39 @@ def log(
         error_logger.error(
             line
         )
+        
+# =====================================================
+# SECTION
+# =====================================================
+
+def print_section(
+    title: str
+) -> None:
+
+    cyan = Fore.LIGHTCYAN_EX
+
+    line = (
+        "=" * 60
+    )
+
+    print("")
+
+    print(
+        cyan +
+        line +
+        Style.RESET_ALL
+    )
+
+    print(
+        cyan +
+        f"{title.center(60)}" +
+        Style.RESET_ALL
+    )
+
+    print(
+        cyan +
+        line +
+        Style.RESET_ALL
+    )
+
+    print("")

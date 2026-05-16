@@ -6,7 +6,7 @@ SIGNAL_QUALITY_CONFIG = {
     # CONFIDENCE
     # =====================================================
 
-    "confidence_threshold": 0.70,
+    "confidence_threshold": 0.55,
 
     # =====================================================
     # COOLDOWN
@@ -22,9 +22,9 @@ SIGNAL_QUALITY_CONFIG = {
 
     "enable_trend_filter": True,
 
-    "ema_fast_period": 3,#9
+    "ema_fast_period": 9,
 
-    "ema_slow_period": 5,#21
+    "ema_slow_period": 21,
 
     # =====================================================
     # VOLATILITY FILTER
@@ -32,9 +32,9 @@ SIGNAL_QUALITY_CONFIG = {
 
     "enable_volatility_filter": True,
 
-    "atr_period": 5,#14
+    "atr_period": 14,
 
-    "min_atr_percent": 0.10,#0.6
+    "min_atr_percent": 0.02,#0.6
 
     # =====================================================
     # RISK CONTROL
@@ -42,7 +42,7 @@ SIGNAL_QUALITY_CONFIG = {
 
     "max_open_positions": 3,
 
-    "daily_drawdown_limit": -5.0,
+    "daily_drawdown_limit": 5.0,
 
     "enable_drawdown_guard": True
 }

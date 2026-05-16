@@ -2,12 +2,6 @@
 
 from datetime import datetime
 
-from colorama import (
-    Fore,
-    Style,
-    init
-)
-
 from core.config.signal_quality_config import (
     SIGNAL_QUALITY_CONFIG
 )
@@ -31,9 +25,6 @@ from data.storage.repositories.portfolio_repository import (
 from core.utils.console_logger import (
     log
 )
-
-init(autoreset=True)
-
 
 class SignalQualityService:
 
@@ -198,10 +189,13 @@ class SignalQualityService:
             )
         )
 
-        trend_diff = (
-            ema_fast - ema_slow
-        )
-
+        trend_strength = (
+            (
+                ema_fast - ema_slow
+            ) / ema_slow
+        ) * 100
+        
+        
         # =====================================================
         # SOFT FILTER
         # =====================================================
@@ -241,25 +235,79 @@ class SignalQualityService:
             )
         )
 
+        # =====================================================
+        # ATR NOT READY
+        # =====================================================
+
         if atr_percent is None:
+
+            log(
+                "ATR",
+                (
+                    f"{payload.symbol} "
+                    f"ATR_NOT_READY"
+                ),
+                "WARNING"
+            )
 
             return (
                 False,
                 "ATR_NOT_READY"
             )
-        
+
+        min_atr = self.config[
+            "min_atr_percent"
+        ]
+
+        # =====================================================
+        # TELEMETRY
+        # =====================================================
+
         log(
             "ATR",
-            f"{payload.symbol} atr={round(atr_percent, 2)}%", Fore.LIGHTWHITE_EX)
+            (
+                f"{payload.symbol} "
+                f"atr={round(atr_percent, 4)}% "
+                f"min={min_atr}%"
+            ),
+            "INFO"
+        )
 
-        if atr_percent < self.config[
-            "min_atr_percent"
-        ]:
+        # =====================================================
+        # LOW VOLATILITY
+        # =====================================================
+
+        if atr_percent < min_atr:
+
+            log(
+                "ATR",
+                (
+                    f"BLOCKED "
+                    f"{payload.symbol} "
+                    f"LOW_VOLATILITY "
+                    f"atr={round(atr_percent, 4)}%"
+                ),
+                "WARNING"
+            )
 
             return (
                 False,
                 "LOW_VOLATILITY"
             )
+
+        # =====================================================
+        # APPROVED
+        # =====================================================
+
+        log(
+            "ATR",
+            (
+                f"APPROVED "
+                f"{payload.symbol} "
+                f"atr={round(atr_percent, 4)}%"
+            ),
+            "SUCCESS"
+        )
 
         return True, "OK"
 
@@ -384,7 +432,7 @@ class SignalQualityService:
         if not snapshot:
             return True, "NO_SNAPSHOT"
 
-        if snapshot.drawdown <= self.config[
+        if snapshot.drawdown >= self.config[
             "daily_drawdown_limit"
         ]:
 

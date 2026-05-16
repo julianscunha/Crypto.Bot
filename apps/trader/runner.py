@@ -156,7 +156,10 @@ async def main():
 
     log(
         "SYSTEM",
-        "TIMEFRAME      1m"
+        (
+            f"TIMEFRAME      "
+            f"{settings.KLINE_INTERVAL}"
+        )
     )
 
     log(
