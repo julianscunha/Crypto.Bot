@@ -54,6 +54,18 @@ from core.utils.console_logger import (
     log
 )
 
+from backtest.reports.report_renderer import (
+    ReportRenderer
+)
+
+from core.services.portfolio_service import (
+    PortfolioService
+)
+
+from core.config.trading_config import (
+    TRADING_CONFIG
+)
+
 from core.config.settings import (
     settings
 )
@@ -202,52 +214,77 @@ if __name__ == "__main__":
     
         print()
     
-        print("=" * 60)
-        print("                LIVE SESSION REPORT")
-        print("=" * 60)
-    
-        from core.metrics.metrics_service import (
-            metrics_service
+        portfolio_service = (
+            PortfolioService()
         )
     
-        metrics = (
-            metrics_service.calculate()
+        snapshot = (
+            portfolio_service.build_snapshot(
+                user_id=0,
+                initial_balance=
+                    TRADING_CONFIG[
+                        "account_balance"
+                    ]
+            )
         )
     
-        print()
-        print(
-            f"Trades ...................... "
-            f"{metrics['total_trades']}"
+        ReportRenderer.print_header(
+            "LIVE SESSION REPORT"
         )
     
-        print(
-            f"Winrate .................... "
-            f"{metrics['winrate']:.2%}"
+        ReportRenderer.print_section(
+            "SESSION"
         )
     
-        print(
-            f"PnL ......................... "
-            f"{metrics['pnl']:.2f}"
+        ReportRenderer.print_metric(
+            "Balance",
+            snapshot.balance
         )
     
-        print(
-            f"Profit Factor .............. "
-            f"{metrics['profit_factor']:.2f}"
+        ReportRenderer.print_metric(
+            "Equity",
+            snapshot.equity
         )
     
-        print(
-            f"Max Drawdown ............... "
-            f"{metrics['max_drawdown']:.2f}"
+        ReportRenderer.print_metric(
+            "Realized PnL",
+            snapshot.realized_pnl
         )
+    
+        ReportRenderer.print_metric(
+            "Unrealized PnL",
+            snapshot.unrealized_pnl
+        )
+    
+        ReportRenderer.print_metric(
+            "Total PnL",
+            snapshot.total_pnl
+        )
+    
+        ReportRenderer.print_metric(
+            "Open Positions",
+            snapshot.open_positions
+        )
+    
+        ReportRenderer.print_metric(
+            "Closed Positions",
+            snapshot.closed_positions
+        )
+    
+        ReportRenderer.print_metric(
+            "Exposure",
+            snapshot.exposure
+        )
+    
+        ReportRenderer.print_metric(
+            "Drawdown",
+            f"{snapshot.drawdown}%"
+        )
+    
+        ReportRenderer.print_footer()
     
         print()
     
         print("=" * 60)
         print("                 ENGINE STOPPED")
         print("=" * 60)
-    
-    except Exception as error:
-    
-        print(
-            f"[FATAL ERROR] {error}"
-        )
