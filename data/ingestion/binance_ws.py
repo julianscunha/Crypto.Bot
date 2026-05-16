@@ -2,6 +2,9 @@
 
 import json
 import asyncio
+import random
+import time
+
 import websockets
 
 from core.contracts.messages import (
@@ -45,6 +48,16 @@ class BinanceWS:
 
         self.interval = "1m"
 
+        # =====================================================
+        # RESILIENCE
+        # =====================================================
+
+        self.reconnect_attempts = 0
+
+        self.last_message_at = (
+            time.time()
+        )
+
     # =====================================================
     # STREAMS
     # =====================================================
@@ -79,9 +92,23 @@ class BinanceWS:
 
             try:
 
+                log(
+                    "WEBSOCKET",
+                    "CONNECTING BINANCE STREAM..."
+                )
+
                 async with websockets.connect(
-                    stream_url
+                    stream_url,
+                    ping_interval=20,
+                    ping_timeout=20,
+                    close_timeout=10
                 ) as websocket:
+
+                    # =========================================
+                    # RESET RECONNECT COUNTER
+                    # =========================================
+
+                    self.reconnect_attempts = 0
 
                     market_state.set_websocket_connected(
                         True
@@ -94,8 +121,17 @@ class BinanceWS:
 
                     while True:
 
-                        raw_data = (
-                            await websocket.recv()
+                        # =====================================
+                        # STALE STREAM PROTECTION
+                        # =====================================
+
+                        raw_data = await asyncio.wait_for(
+                            websocket.recv(),
+                            timeout=90
+                        )
+
+                        self.last_message_at = (
+                            time.time()
                         )
 
                         data = json.loads(
@@ -107,9 +143,9 @@ class BinanceWS:
 
                         kline = data["k"]
 
-                        # =================================================
+                        # =====================================
                         # ONLY CLOSED CANDLES
-                        # =================================================
+                        # =====================================
 
                         if not kline["x"]:
                             continue
@@ -139,9 +175,9 @@ class BinanceWS:
                             )
                         )
 
-                        # =================================================
+                        # =====================================
                         # SYMBOL SEPARATOR
-                        # =================================================
+                        # =====================================
 
                         print()
 
@@ -153,9 +189,9 @@ class BinanceWS:
                             )
                         )
 
-                        # =================================================
+                        # =====================================
                         # MARKET LOG
-                        # =================================================
+                        # =====================================
 
                         log(
                             "MARKET",
@@ -166,13 +202,28 @@ class BinanceWS:
                             )
                         )
 
-                        # =================================================
+                        # =====================================
                         # PUBLISH
-                        # =================================================
+                        # =====================================
 
                         await self.bus.publish(
                             message
                         )
+
+            except asyncio.TimeoutError:
+
+                market_state.set_websocket_connected(
+                    False
+                )
+
+                log(
+                    "WEBSOCKET",
+                    (
+                        "STALE STREAM DETECTED "
+                        "RECONNECTING..."
+                    ),
+                    "WARNING"
+                )
 
             except Exception as e:
 
@@ -180,10 +231,29 @@ class BinanceWS:
                     False
                 )
 
-                log(
-                    "SYSTEM",
-                    f"BINANCE ERROR {e}",
-                    "ERROR"
+                self.reconnect_attempts += 1
+
+                delay = min(
+                    2 ** self.reconnect_attempts,
+                    60
                 )
 
-                await asyncio.sleep(5)
+                delay += random.uniform(
+                    0,
+                    3
+                )
+
+                log(
+                    "WEBSOCKET",
+                    (
+                        f"RECONNECT "
+                        f"attempt={self.reconnect_attempts} "
+                        f"delay={delay:.1f}s "
+                        f"error={str(e)}"
+                    ),
+                    "WARNING"
+                )
+
+                await asyncio.sleep(
+                    delay
+                )

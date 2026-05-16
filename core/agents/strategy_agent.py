@@ -14,6 +14,10 @@ from core.services.market_structure_service import (
     market_structure_service
 )
 
+from core.state.market_state import (
+    market_state
+)
+
 from colorama import (
     Fore,
     Style,
@@ -25,6 +29,7 @@ from core.utils.console_logger import (
 )
 
 from data.features.indicators import atr
+
 
 class StrategyAgent:
 
@@ -51,7 +56,7 @@ class StrategyAgent:
             return
 
         payload = message.payload
-        
+
         log(
             "STRATEGY",
             f"ANALYZING {payload.symbol}"
@@ -63,7 +68,7 @@ class StrategyAgent:
                 payload.symbol
             )
         )
-        
+
         log(
             "STRATEGY",
             f"STRUCTURE {payload.symbol} candles={candles_count}"
@@ -80,30 +85,38 @@ class StrategyAgent:
             "confidence",
             0.50
         )
-        
+
         prices = (
             self.market_structure.get_prices(
                 payload.user_id,
                 payload.symbol
             )
         )
-        
+
         atr_value = atr(prices)
-        
+
         # =====================================================
         # ATR VALIDATION
         # =====================================================
-        
+
         if atr_value is None:
-        
+
             log(
                 "STRATEGY",
-                f"SIGNAL BLOCKED {payload.symbol} | ATR_NOT_READY",
+                (
+                    f"SIGNAL BLOCKED "
+                    f"{payload.symbol} "
+                    f"| ATR_NOT_READY"
+                ),
                 "ERROR"
             )
-        
+
+            market_state.increment_block_reason(
+                "ATR_NOT_READY"
+            )
+
             return
-        
+
         signal_payload = (
             StrategySignalPayload(
                 user_id=payload.user_id,
@@ -142,11 +155,19 @@ class StrategyAgent:
         )
 
         if not valid:
-            
+
             log(
                 "STRATEGY",
-                f"SIGNAL BLOCKED {payload.symbol} | {reason}",
+                (
+                    f"SIGNAL BLOCKED "
+                    f"{payload.symbol} "
+                    f"| {reason}"
+                ),
                 "ERROR"
+            )
+
+            market_state.increment_block_reason(
+                reason
             )
 
             return
@@ -154,23 +175,29 @@ class StrategyAgent:
         # =====================================================
         # FINAL STRUCTURE BLOCK
         # =====================================================
-        
+
         # TODO:
         # Reativar market structure validation
         # após dataset real e tuning estrutural
 
-      # if not structure_valid:
-      #
-      #     print(
-      #         Fore.LIGHTYELLOW_EX +
-      #         "[STRUCTURE BLOCKED]" +
-      #         Style.RESET_ALL +
-      #         f" {payload.symbol} "
-      #         f"| {structure['reason']}"
-      #     )
-      #
-      #     return
-        
+        # if not structure_valid:
+        #
+        #     log(
+        #         "STRATEGY",
+        #         (
+        #             f"STRUCTURE BLOCKED "
+        #             f"{payload.symbol} "
+        #             f"| {structure['reason']}"
+        #         ),
+        #         "WARNING"
+        #     )
+        #
+        #     market_state.increment_block_reason(
+        #         structure["reason"]
+        #     )
+        #
+        #     return
+
         log(
             "STRATEGY",
             (
@@ -180,6 +207,8 @@ class StrategyAgent:
             ),
             "SUCCESS"
         )
+        
+        market_state.increment_accepted_signal()
 
         # =====================================================
         # PUBLISH

@@ -70,6 +70,10 @@ from core.config.settings import (
     settings
 )
 
+from core.state.market_state import (
+    market_state
+)
+
 
 class MarketRegimeLogger:
 
@@ -209,15 +213,19 @@ if __name__ == "__main__":
     try:
 
         asyncio.run(main())
-    
+
     except KeyboardInterrupt:
-    
+
         print()
-    
+
+        # =================================================
+        # PORTFOLIO SNAPSHOT
+        # =================================================
+
         portfolio_service = (
             PortfolioService()
         )
-    
+
         snapshot = (
             portfolio_service.build_snapshot(
                 user_id=0,
@@ -227,64 +235,153 @@ if __name__ == "__main__":
                     ]
             )
         )
-    
+
+        # =================================================
+        # SESSION REPORT
+        # =================================================
+
         ReportRenderer.print_header(
             "LIVE SESSION REPORT"
         )
-    
+
         ReportRenderer.print_section(
             "SESSION"
         )
-    
+
         ReportRenderer.print_metric(
             "Balance",
             snapshot.balance
         )
-    
+
         ReportRenderer.print_metric(
             "Equity",
             snapshot.equity
         )
-    
+
         ReportRenderer.print_metric(
             "Realized PnL",
             snapshot.realized_pnl
         )
-    
+
         ReportRenderer.print_metric(
             "Unrealized PnL",
             snapshot.unrealized_pnl
         )
-    
+
         ReportRenderer.print_metric(
             "Total PnL",
             snapshot.total_pnl
         )
-    
+
         ReportRenderer.print_metric(
             "Open Positions",
             snapshot.open_positions
         )
-    
+
         ReportRenderer.print_metric(
             "Closed Positions",
             snapshot.closed_positions
         )
-    
+
         ReportRenderer.print_metric(
             "Exposure",
             snapshot.exposure
         )
-    
+
         ReportRenderer.print_metric(
             "Drawdown",
             f"{snapshot.drawdown}%"
         )
-    
+
+        # =================================================
+        # BLOCKED SIGNALS
+        # =================================================
+
+        blocked = (
+            market_state.get_blocked_signals()
+        )
+
+        if blocked:
+
+            ReportRenderer.print_section(
+                "BLOCKED SIGNALS"
+            )
+
+            for reason, count in blocked.items():
+
+                ReportRenderer.print_metric(
+                    reason,
+                    count
+                )
+
+        # =================================================
+        # MARKET SNAPSHOT
+        # =================================================
+
+        market_snapshot = (
+            market_state.snapshot()
+        )
+
+        ReportRenderer.print_section(
+            "MARKET"
+        )
+        
+        ReportRenderer.print_metric(
+            "Accepted Signals",
+            market_snapshot[
+                "accepted_signals"
+            ]
+        )
+        
+        ReportRenderer.print_metric(
+            "Acceptance Ratio",
+            (
+                f"{market_snapshot['acceptance_ratio']}%"
+            )
+        )
+
+        ReportRenderer.print_metric(
+            "Messages",
+            market_snapshot[
+                "total_messages"
+            ]
+        )
+
+        ReportRenderer.print_metric(
+            "Websocket",
+            (
+                "CONNECTED"
+                if market_snapshot[
+                    "websocket_connected"
+                ]
+                else "DISCONNECTED"
+            )
+        )
+
+        ReportRenderer.print_metric(
+            "Active Symbols",
+            len(
+                market_snapshot[
+                    "active_symbols"
+                ]
+            )
+        )
+
+        ReportRenderer.print_metric(
+            "Uptime (sec)",
+            market_snapshot[
+                "uptime_seconds"
+            ]
+        )
+
         ReportRenderer.print_footer()
-    
+
         print()
-    
+
         print("=" * 60)
-        print("                 ENGINE STOPPED")
+
+        print(
+            "                 ENGINE STOPPED"
+        )
+
         print("=" * 60)

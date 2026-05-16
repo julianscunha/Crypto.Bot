@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from collections import defaultdict
+
 
 class MarketState:
 
@@ -16,6 +18,16 @@ class MarketState:
         self.total_messages = 0
 
         self.last_kline_at = None
+
+        # =================================================
+        # TELEMETRY
+        # =================================================
+
+        self.blocked_signals = (
+            defaultdict(int)
+        )
+
+        self.accepted_signals = 0
 
         # =================================================
         # RUNTIME
@@ -60,6 +72,64 @@ class MarketState:
             )
 
     # =====================================================
+    # SIGNAL TELEMETRY
+    # =====================================================
+
+    def increment_block_reason(
+        self,
+        reason: str
+    ):
+
+        self.blocked_signals[
+            reason
+        ] += 1
+
+    def increment_accepted_signal(
+        self
+    ):
+
+        self.accepted_signals += 1
+
+    # =====================================================
+    # TELEMETRY SNAPSHOT
+    # =====================================================
+
+    def get_blocked_signals(self):
+
+        return dict(
+            self.blocked_signals
+        )
+
+    def get_total_blocked_signals(
+        self
+    ):
+
+        return sum(
+            self.blocked_signals.values()
+        )
+
+    def get_acceptance_ratio(
+        self
+    ):
+
+        total = (
+            self.accepted_signals
+            +
+            self.get_total_blocked_signals()
+        )
+
+        if total == 0:
+            return 0.0
+
+        return round(
+            (
+                self.accepted_signals
+                / total
+            ) * 100,
+            2
+        )
+
+    # =====================================================
     # SNAPSHOT
     # =====================================================
 
@@ -88,7 +158,16 @@ class MarketState:
                 self.last_kline_at,
 
             "active_symbols":
-                self.active_symbols
+                self.active_symbols,
+
+            "blocked_signals":
+                self.get_blocked_signals(),
+
+            "accepted_signals":
+                self.accepted_signals,
+
+            "acceptance_ratio":
+                self.get_acceptance_ratio()
         }
 
 
