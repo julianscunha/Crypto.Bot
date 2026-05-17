@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
 from core.contracts.messages import (
+
     MarketDataMessage,
+
     MarketAnalysisMessage,
+
     MarketAnalysisPayload
 )
 
@@ -29,7 +32,10 @@ from core.utils.console_logger import (
 
 class AnalystAgent:
 
-    def __init__(self, bus):
+    def __init__(
+        self,
+        bus
+    ):
 
         self.bus = bus
 
@@ -49,66 +55,90 @@ class AnalystAgent:
             atr_service
         )
 
-        self.bus.subscribe(self)
+        self.bus.subscribe(
+            self
+        )
 
-    async def on_message(self, message):
+    # =====================================================
+    # MESSAGE
+    # =====================================================
+
+    async def on_message(
+        self,
+        message
+    ):
 
         if not isinstance(
             message,
             MarketDataMessage
         ):
+
             return
 
-        payload = message.payload
+        payload = (
+            message.payload
+        )
 
-        # =====================================================
+        # =================================================
         # UPDATE TREND ENGINE
-        # =====================================================
+        # =================================================
 
         self.signal_quality.update_market_data(
             payload
         )
 
-        # =====================================================
-        # UPDATE MARKET STRUCTURE
-        # =====================================================
+        # =================================================
+        # UPDATE STRUCTURE ENGINE
+        # =================================================
 
         self.market_structure.update_market_data(
+
             user_id=payload.user_id,
+
             symbol=payload.symbol,
+
             price=payload.close
         )
 
-        # =====================================================
+        # =================================================
         # UPDATE ATR ENGINE
-        # =====================================================
+        # =================================================
 
         self.atr_service.update_candle(
+
             user_id=payload.user_id,
+
             symbol=payload.symbol,
+
             high=payload.high,
+
             low=payload.low,
+
             close=payload.close
         )
 
-        # =====================================================
+        # =================================================
         # UPDATE REGIME ENGINE
-        # =====================================================
+        # =================================================
 
         self.market_regime.update_price(
+
             symbol=payload.symbol,
+
             close=payload.close
         )
 
         regime = (
-            self.market_regime.detect_regime(
+
+            self.market_regime
+            .detect_regime(
                 payload.symbol
             )
         )
 
-        # =====================================================
+        # =================================================
         # REGIME CHANGED
-        # =====================================================
+        # =================================================
 
         if self.market_regime.has_changed(
             payload.symbol,
@@ -117,34 +147,134 @@ class AnalystAgent:
 
             log(
                 "MARKET",
-                f"REGIME {regime}",
-                "INFO"
+                f"REGIME {regime}"
             )
 
-        # =====================================================
-        # SIMPLE ANALYSIS
-        # =====================================================
+        # =================================================
+        # MARKET STRUCTURE
+        # =================================================
 
-        analysis = "BULLISH"
+        structure = (
 
-        confidence = 0.75
+            self.market_structure
+            .analyze_structure(
+
+                user_id=payload.user_id,
+
+                symbol=payload.symbol
+            )
+        )
+
+        # =================================================
+        # ATR
+        # =================================================
+
+        atr_percent = (
+
+            self.atr_service
+            .calculate_atr_percent(
+
+                user_id=payload.user_id,
+
+                symbol=payload.symbol
+            )
+        )
+
+        # =================================================
+        # CONFIDENCE MODEL
+        # =================================================
+
+        confidence = 0.50
+
+        # =================================================
+        # STRUCTURE BONUS
+        # =================================================
+
+        if structure["valid"]:
+
+            confidence += 0.20
+
+        # =================================================
+        # REGIME BONUS
+        # =================================================
+
+        if regime in [
+
+            "TRENDING",
+
+            "BULLISH"
+        ]:
+
+            confidence += 0.15
+
+        # =================================================
+        # VOLATILITY BONUS
+        # =================================================
+
+        if atr_percent is not None:
+
+            if atr_percent >= 0.30:
+
+                confidence += 0.10
+
+        confidence = round(
+            min(confidence, 1.0),
+            2
+        )
+
+        # =================================================
+        # ANALYSIS
+        # =================================================
+
+        analysis = (
+            "BULLISH"
+            if structure["valid"]
+            else "NEUTRAL"
+        )
+
+        # =================================================
+        # PAYLOAD
+        # =================================================
 
         analysis_payload = (
             MarketAnalysisPayload(
+
                 user_id=payload.user_id,
+
                 symbol=payload.symbol,
+
                 analysis=analysis,
+
                 reference_price=payload.close,
+
                 confidence=confidence
             )
         )
 
         analysis_message = (
             MarketAnalysisMessage(
+
                 sender="AnalystAgent",
+
                 payload=analysis_payload
             )
         )
+
+        # =================================================
+        # ANALYSIS LOG
+        # =================================================
+
+        log(
+            "ANALYST",
+            (
+                f"{analysis} "
+                f"confidence={confidence}"
+            )
+        )
+
+        # =================================================
+        # PUBLISH
+        # =================================================
 
         await self.bus.publish(
             analysis_message

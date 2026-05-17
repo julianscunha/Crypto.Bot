@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from collections import defaultdict
+from collections import (
+    defaultdict
+)
 
 
 class MarketRegimeService:
@@ -11,11 +13,13 @@ class MarketRegimeService:
             defaultdict(list)
         )
 
-        # =====================================================
-        # LAST REGIME CACHE
-        # =====================================================
-
         self.last_regime = {}
+
+        self.max_history = 200
+
+        self.minimum_warmup = 20
+
+        self.lookback_window = 50
 
     # =====================================================
     # UPDATE PRICE
@@ -27,6 +31,14 @@ class MarketRegimeService:
         close: float
     ):
 
+        # =================================================
+        # SAFETY
+        # =================================================
+
+        if close <= 0:
+
+            return
+
         prices = (
             self.market_prices[symbol]
         )
@@ -35,13 +47,26 @@ class MarketRegimeService:
             close
         )
 
-        # =====================================================
+        # =================================================
         # MEMORY LIMIT
-        # =====================================================
+        # =================================================
 
-        if len(prices) > 200:
+        if len(prices) > self.max_history:
 
             prices.pop(0)
+
+    # =====================================================
+    # GET PRICES
+    # =====================================================
+
+    def get_prices(
+        self,
+        symbol: str
+    ):
+
+        return self.market_prices[
+            symbol
+        ]
 
     # =====================================================
     # DETECT REGIME
@@ -52,27 +77,21 @@ class MarketRegimeService:
         symbol: str
     ):
 
-        prices = (
-            self.market_prices[symbol]
+        prices = self.get_prices(
+            symbol
         )
 
-        # =====================================================
+        # =================================================
         # WARMUP
-        # =====================================================
+        # =================================================
 
-        if len(prices) < 20:
+        if len(prices) < self.minimum_warmup:
 
             return "UNKNOWN"
 
-        # =====================================================
-        # LOOKBACK WINDOW
-        # =====================================================
-
-        recent = (
-            prices[-50:]
-            if len(prices) >= 50
-            else prices
-        )
+        recent = prices[
+            -self.lookback_window:
+        ]
 
         if len(recent) < 2:
 
@@ -82,43 +101,61 @@ class MarketRegimeService:
 
         last_price = recent[-1]
 
-        # =====================================================
+        # =================================================
         # SAFETY
-        # =====================================================
+        # =================================================
 
         if first_price <= 0:
 
             return "UNKNOWN"
 
-        variation = (
-            (last_price - first_price)
-            / first_price
+        variation_percent = round(
+
+            (
+                (
+                    last_price
+                    -
+                    first_price
+                )
+
+                / first_price
+            ) * 100,
+
+            4
         )
 
-        # =====================================================
-        # BULLISH
-        # =====================================================
+        # =================================================
+        # STRONG BULLISH
+        # =================================================
 
-        if variation > 0.02:
+        if variation_percent >= 3.0:
 
             return "BULLISH"
 
-        # =====================================================
-        # BEARISH
-        # =====================================================
+        # =================================================
+        # STRONG BEARISH
+        # =================================================
 
-        if variation < -0.02:
+        if variation_percent <= -3.0:
 
             return "BEARISH"
 
-        # =====================================================
+        # =================================================
+        # TRENDING
+        # =================================================
+
+        if abs(variation_percent) >= 1.0:
+
+            return "TRENDING"
+
+        # =================================================
         # SIDEWAYS
-        # =====================================================
+        # =================================================
 
         return "SIDEWAYS"
 
     # =====================================================
-    # REGIME CHANGED
+    # HAS CHANGED
     # =====================================================
 
     def has_changed(
@@ -135,7 +172,9 @@ class MarketRegimeService:
 
             return False
 
-        self.last_regime[symbol] = regime
+        self.last_regime[symbol] = (
+            regime
+        )
 
         return True
 
