@@ -46,7 +46,9 @@ class BinanceWS:
             for symbol in settings.SYMBOLS
         ]
 
-        self.interval = "1m"
+        self.interval = (
+            settings.KLINE_INTERVAL
+        )
 
         # =====================================================
         # RESILIENCE

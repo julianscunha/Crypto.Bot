@@ -330,9 +330,9 @@ if __name__ == "__main__":
         )
         
         ReportRenderer.print_metric(
-            "Accepted Signals",
+            "Generated Signals",
             market_snapshot[
-                "accepted_signals"
+                "generated_signals"
             ]
         )
         
@@ -376,15 +376,3 @@ if __name__ == "__main__":
                 "uptime_seconds"
             ]
         )
-
-        ReportRenderer.print_footer()
-
-        print()
-
-        print("=" * 60)
-
-        print(
-            "                 ENGINE STOPPED"
-        )
-
-        print("=" * 60)

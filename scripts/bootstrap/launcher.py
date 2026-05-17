@@ -62,12 +62,30 @@ def show_menu():
 
 def run_process(command, cwd=None):
 
+    process = None
+
     try:
 
-        subprocess.run(
+        process = subprocess.Popen(
             command,
             cwd=cwd
         )
+
+        process.wait()
+
+    except KeyboardInterrupt:
+
+        if process:
+
+            process.terminate()
+
+            try:
+
+                process.wait(timeout=5)
+
+            except Exception:
+
+                process.kill()
 
     except Exception as error:
 
@@ -114,7 +132,7 @@ def start_optimizer():
         [
             sys.executable,
             "-m",
-            "apps.optimizer.optimizer"
+            "backtest.optimizer.optimizer_engine"
         ]
     )
 
@@ -128,7 +146,7 @@ def start_backtest():
         [
             sys.executable,
             "-m",
-            "apps.backtest.backtest"
+            "backtest.runner"
         ]
     )
 

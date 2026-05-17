@@ -200,7 +200,7 @@ class SignalQualityService:
         # SOFT FILTER
         # =====================================================
 
-        if trend_diff < -0.50:
+        if trend_strength < -0.50:
 
             return (
                 False,

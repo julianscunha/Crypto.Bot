@@ -27,7 +27,7 @@ class MarketState:
             defaultdict(int)
         )
 
-        self.accepted_signals = 0
+        self.generated_signals = 0
 
         # =================================================
         # RUNTIME
@@ -88,7 +88,7 @@ class MarketState:
         self
     ):
 
-        self.accepted_signals += 1
+        self.generated_signals += 1
 
     # =====================================================
     # TELEMETRY SNAPSHOT
@@ -113,7 +113,7 @@ class MarketState:
     ):
 
         total = (
-            self.accepted_signals
+            self.generated_signals
             +
             self.get_total_blocked_signals()
         )
@@ -123,7 +123,7 @@ class MarketState:
 
         return round(
             (
-                self.accepted_signals
+                self.generated_signals
                 / total
             ) * 100,
             2
@@ -163,8 +163,8 @@ class MarketState:
             "blocked_signals":
                 self.get_blocked_signals(),
 
-            "accepted_signals":
-                self.accepted_signals,
+            "generated_signals":
+                self.generated_signals,
 
             "acceptance_ratio":
                 self.get_acceptance_ratio()

@@ -218,9 +218,9 @@ class RiskAgent:
         # =====================================================
         # POSITION VALIDATION
         # =====================================================
-
+        
         if quantity <= 0:
-
+        
             log(
                 "RISK",
                 (
@@ -230,39 +230,38 @@ class RiskAgent:
                 ),
                 "ERROR"
             )
-
+        
             return
-
+        
         notional_value = (
             quantity * entry_price
         )
-
+        
         max_exposure_percent = (
             TRADING_CONFIG[
                 "max_position_exposure_percent"
             ]
         )
-
+        
         max_exposure_value = (
             account_balance *
             (max_exposure_percent / 100)
         )
-
+        
+        # =====================================================
+        # MICRO ACCOUNT ADAPTATION
+        # =====================================================
+        
         if notional_value > max_exposure_value:
         
-            log(
-                "RISK",
-                (
-                    f"BLOCKED "
-                    f"{payload.symbol} "
-                    f"| MAX_EXPOSURE_EXCEEDED "
-                    f"notional={notional_value:.2f} "
-                    f"limit={max_exposure_value:.2f}"
-                ),
-                "ERROR"
+            quantity = round(
+                max_exposure_value / entry_price,
+                6
             )
         
-            return
+            notional_value = (
+                quantity * entry_price
+            )
 
         # =====================================================
         # REWARD DISTANCE
