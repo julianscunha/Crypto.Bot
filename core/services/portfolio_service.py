@@ -12,13 +12,22 @@ from core.utils.console_logger import (
     log
 )
 
+
 class PortfolioService:
 
     def __init__(self):
 
-        self.trades = TradesRepository()
+        self.trades = (
+            TradesRepository()
+        )
 
-        self.portfolio = PortfolioRepository()
+        self.portfolio = (
+            PortfolioRepository()
+        )
+
+    # =====================================================
+    # BUILD SNAPSHOT
+    # =====================================================
 
     def build_snapshot(
         self,
@@ -38,78 +47,168 @@ class PortfolioService:
             )
         )
 
-        realized_pnl = sum(
-            trade.realized_pnl or 0.0
-            for trade in closed_trades
-        )
+        # =================================================
+        # REALIZED PNL
+        # =================================================
 
-        unrealized_pnl = sum(
-            trade.unrealized_pnl or 0.0
-            for trade in open_trades
-        )
+        realized_pnl = round(
 
-        total_pnl = (
-            realized_pnl +
-            unrealized_pnl
-        )
+            sum(
 
-        balance = (
-            initial_balance +
-            realized_pnl
-        )
+                trade.realized_pnl or 0.0
 
-        equity = (
-            balance +
-            unrealized_pnl
-        )
+                for trade in closed_trades
+            ),
 
-        exposure = sum(
-            (
-                trade.current_price or 0.0
-            ) * (
-                trade.quantity or 0.0
-            )
-            for trade in open_trades
-        )
-
-        peak_equity = max(
-            equity,
-            initial_balance
-        )
-
-        drawdown = round(
-            (
-                (
-                    peak_equity -
-                    equity
-                ) / peak_equity
-            ) * 100,
             2
         )
 
+        # =================================================
+        # UNREALIZED PNL
+        # =================================================
+
+        unrealized_pnl = round(
+
+            sum(
+
+                trade.unrealized_pnl or 0.0
+
+                for trade in open_trades
+            ),
+
+            2
+        )
+
+        # =================================================
+        # TOTAL PNL
+        # =================================================
+
+        total_pnl = round(
+            realized_pnl
+            +
+            unrealized_pnl,
+            2
+        )
+
+        # =================================================
+        # BALANCE
+        # =================================================
+
+        balance = round(
+            initial_balance
+            +
+            realized_pnl,
+            2
+        )
+
+        # =================================================
+        # EQUITY
+        # =================================================
+
+        equity = round(
+            balance
+            +
+            unrealized_pnl,
+            2
+        )
+
+        # =================================================
+        # EXPOSURE
+        # =================================================
+
+        exposure = round(
+
+            sum(
+
+                (
+                    trade.current_price or 0.0
+                )
+
+                *
+
+                (
+                    trade.quantity or 0.0
+                )
+
+                for trade in open_trades
+            ),
+
+            2
+        )
+
+        # =================================================
+        # DRAWDOWN
+        # =================================================
+
+        peak_reference = max(
+            initial_balance,
+            balance
+        )
+
+        if peak_reference <= 0:
+
+            drawdown = 0.0
+
+        else:
+
+            drawdown = round(
+
+                (
+                    (
+                        peak_reference
+                        -
+                        equity
+                    )
+
+                    / peak_reference
+                ) * 100,
+
+                2
+            )
+
+        # =================================================
+        # SNAPSHOT
+        # =================================================
+
         snapshot = (
             self.portfolio.create_snapshot(
+
                 user_id=user_id,
-                balance=round(balance, 2),
-                equity=round(equity, 2),
-                realized_pnl=round(realized_pnl, 2),
-                unrealized_pnl=round(unrealized_pnl, 2),
-                total_pnl=round(total_pnl, 2),
-                open_positions=len(open_trades),
-                closed_positions=len(closed_trades),
-                exposure=round(exposure, 2),
+
+                balance=balance,
+
+                equity=equity,
+
+                realized_pnl=realized_pnl,
+
+                unrealized_pnl=unrealized_pnl,
+
+                total_pnl=total_pnl,
+
+                open_positions=len(
+                    open_trades
+                ),
+
+                closed_positions=len(
+                    closed_trades
+                ),
+
+                exposure=exposure,
+
                 drawdown=drawdown
             )
         )
-        
+
+        # =================================================
+        # PORTFOLIO LOG
+        # =================================================
+
         log(
             "PORTFOLIO",
             (
-                f"Equity={snapshot.equity} | "
-                f"Exposure={snapshot.exposure} | "
-                f"RealizedPnL={snapshot.realized_pnl} | "
-                f"UnrealizedPnL={snapshot.unrealized_pnl} | "
-                f"Drawdown={snapshot.drawdown}%"
+                f"EQUITY={snapshot.equity} "
+                f"PNL={snapshot.total_pnl} "
+                f"DD={snapshot.drawdown}%"
             )
         )
 

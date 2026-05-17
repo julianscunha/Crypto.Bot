@@ -8,10 +8,6 @@ from data.storage.repositories.trades_repository import (
     trades_repository
 )
 
-from core.config.trading_config import (
-    TRADING_CONFIG
-)
-
 from core.services.position_lifecycle_service import (
     PositionLifecycleService
 )
@@ -27,7 +23,9 @@ class PositionManagerAgent:
 
         self.bus = bus
 
-        self.positions = trades_repository
+        self.positions = (
+            trades_repository
+        )
 
         self.bus.subscribe(self)
 
@@ -41,13 +39,16 @@ class PositionManagerAgent:
 
         payload = message.payload
 
-        positions = self.positions.get_open_trades(
-            user_id=payload.user_id
+        positions = (
+            self.positions.get_open_trades(
+                user_id=payload.user_id
+            )
         )
 
         for trade in positions:
 
             if trade.symbol != payload.symbol:
+
                 continue
 
             # =====================================================
@@ -76,26 +77,33 @@ class PositionManagerAgent:
             )
 
             if not trade:
+
                 continue
-                
+
             # =====================================================
             # UPDATE HIGHEST PRICE
             # =====================================================
-            
+
             if payload.close > trade.highest_price:
-            
-                trade.highest_price = payload.close
-            
+
+                trade.highest_price = (
+                    payload.close
+                )
+
                 self.positions.session.commit()
 
-
             # =====================================================
-            # TRAILING STOP
+            # TRAILING PRICE
             # =====================================================
 
             trailing_price = (
                 trade.highest_price
                 - trade.trailing_stop
+            )
+
+            pnl = round(
+                trade.unrealized_pnl,
+                2
             )
 
             # =====================================================
@@ -113,11 +121,7 @@ class PositionManagerAgent:
 
                 log(
                     "POSITION",
-                    (
-                        f"STOP LOSS "
-                        f"{trade.symbol} "
-                        f"pnl={round(trade.unrealized_pnl, 2)}"
-                    ),
+                    f"STOP LOSS pnl={pnl}",
                     "ERROR"
                 )
 
@@ -136,11 +140,7 @@ class PositionManagerAgent:
 
                 log(
                     "POSITION",
-                    (
-                        f"TAKE PROFIT "
-                        f"{trade.symbol} "
-                        f"pnl={round(trade.unrealized_pnl, 2)}"
-                    ),
+                    f"TAKE PROFIT pnl={pnl}",
                     "SUCCESS"
                 )
 
@@ -159,10 +159,6 @@ class PositionManagerAgent:
 
                 log(
                     "POSITION",
-                    (
-                        f"TRAILING STOP "
-                        f"{trade.symbol} "
-                        f"pnl={round(trade.unrealized_pnl, 2)}"
-                    ),
+                    f"TRAILING STOP pnl={pnl}",
                     "WARNING"
                 )

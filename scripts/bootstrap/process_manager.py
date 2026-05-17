@@ -17,38 +17,74 @@ from core.utils.console_logger import (
 PROCESSES = []
 
 # =====================================================
-# STATUS LINE
+# STATUS
 # =====================================================
 
-def status_line(label, value):
+def status_line(
+    label,
+    value
+):
 
-    return f"{label:.<30} {value}"
+    return (
+        f"{label:.<30} {value}"
+    )
 
 # =====================================================
-# CLEAN OLD PROCESSES
+# SAFE TASKKILL
+# =====================================================
+
+def safe_taskkill(
+    target: str
+):
+
+    try:
+
+        subprocess.run(
+            [
+                "taskkill",
+                "/F",
+                "/IM",
+                target
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+    except Exception:
+
+        pass
+
+# =====================================================
+# CLEANUP
 # =====================================================
 
 def cleanup_old_processes():
 
     try:
 
+        # =================================================
+        # WINDOWS
+        # =================================================
+
         if os.name == "nt":
 
             targets = [
+
+                # =========================================
+                # FRONTEND
+                # =========================================
+
                 "node.exe"
+
+                # =========================================
+                # Add more controlled targets if needed
+                # =========================================
             ]
 
             for target in targets:
 
-                subprocess.run(
-                    [
-                        "taskkill",
-                        "/F",
-                        "/IM",
-                        target
-                    ],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
+                safe_taskkill(
+                    target
                 )
 
         log(
@@ -81,17 +117,22 @@ def start_process(
     cwd=None
 ):
 
+    creation_flags = 0
+
+    if os.name == "nt":
+
+        creation_flags = (
+            subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+
     process = subprocess.Popen(
         command,
         cwd=cwd,
-        creationflags=(
-            subprocess.CREATE_NEW_PROCESS_GROUP
-            if os.name == "nt"
-            else 0
-        )
+        creationflags=creation_flags
     )
 
     PROCESSES.append(
+
         {
             "name": name,
             "process": process
@@ -101,6 +142,53 @@ def start_process(
     return process
 
 # =====================================================
+# TERMINATE PROCESS
+# =====================================================
+
+def terminate_process(
+    process
+):
+
+    if not process:
+
+        return
+
+    try:
+
+        # =================================================
+        # WINDOWS
+        # =================================================
+
+        if os.name == "nt":
+
+            subprocess.run(
+                [
+                    "taskkill",
+                    "/F",
+                    "/T",
+                    "/PID",
+                    str(process.pid)
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+        # =================================================
+        # UNIX
+        # =================================================
+
+        else:
+
+            os.killpg(
+                os.getpgid(process.pid),
+                signal.SIGTERM
+            )
+
+    except Exception:
+
+        pass
+
+# =====================================================
 # STOP ALL
 # =====================================================
 
@@ -108,37 +196,12 @@ def stop_all_processes():
 
     for item in PROCESSES:
 
-        process = item["process"]
-
-        try:
-
-            if os.name == "nt":
-
-                subprocess.run(
-                    [
-                        "taskkill",
-                        "/F",
-                        "/T",
-                        "/PID",
-                        str(process.pid)
-                    ],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-
-            else:
-
-                os.killpg(
-                    os.getpgid(process.pid),
-                    signal.SIGTERM
-                )
-
-        except Exception:
-
-            pass
+        terminate_process(
+            item["process"]
+        )
 
 # =====================================================
-# WAIT
+# WAIT LOOP
 # =====================================================
 
 def wait_forever():
@@ -152,5 +215,16 @@ def wait_forever():
     except KeyboardInterrupt:
 
         stop_all_processes()
+
+        print()
+
+        log(
+            "SYSTEM",
+            status_line(
+                "Shutdown",
+                "OK"
+            ),
+            "SUCCESS"
+        )
 
         sys.exit(0)

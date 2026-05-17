@@ -38,20 +38,9 @@ from core.config.config_loader import (
     load_best_config
 )
 
-from core.services.market_regime_service import (
-    market_regime_service
-)
-
-from core.contracts.messages import (
-    MarketDataMessage
-)
-
-from core.config.regime_config_loader import (
-    regime_config_loader
-)
-
 from core.utils.console_logger import (
-    log
+    log,
+    print_section
 )
 
 from backtest.reports.report_renderer import (
@@ -75,51 +64,6 @@ from core.state.market_state import (
 )
 
 
-class MarketRegimeLogger:
-
-    def __init__(self, bus):
-
-        bus.subscribe(self)
-
-    async def on_message(
-        self,
-        message
-    ):
-
-        if not isinstance(
-            message,
-            MarketDataMessage
-        ):
-            return
-
-        payload = message.payload
-
-        market_regime_service.update_price(
-            symbol=payload.symbol,
-            close=payload.close
-        )
-
-        regime = (
-            market_regime_service
-            .detect_regime(
-                payload.symbol
-            )
-        )
-
-        log(
-            "MARKET",
-            (
-                f"REGIME "
-                f"{payload.symbol} "
-                f"{regime}"
-            )
-        )
-
-        regime_config_loader.load_regime(
-            regime
-        )
-
-
 async def main():
 
     # =====================================================
@@ -138,12 +82,16 @@ async def main():
     # SYSTEM PANEL
     # =====================================================
 
+    print_section(
+        "CRYPTO.BOT ENGINE"
+    )
+
     log(
         "SYSTEM",
         (
             f"MODE           "
             f"{settings.MODE.upper()}"
-        ),
+        )
     )
 
     log(
@@ -165,6 +113,7 @@ async def main():
     log(
         "SYSTEM",
         "DATABASE       CONNECTED",
+        "SUCCESS"
     )
 
     # =====================================================
@@ -176,6 +125,7 @@ async def main():
     log(
         "SYSTEM",
         "EVENT BUS      READY",
+        "SUCCESS"
     )
 
     # =====================================================
@@ -192,11 +142,10 @@ async def main():
 
     PositionManagerAgent(bus)
 
-    MarketRegimeLogger(bus)
-
     log(
         "SYSTEM",
         "AGENTS         READY",
+        "SUCCESS"
     )
 
     # =====================================================
@@ -211,168 +160,180 @@ async def main():
     await ws.start()
 
 
+# =========================================================
+# SESSION REPORT
+# =========================================================
+
+def print_session_report():
+
+    portfolio_service = (
+        PortfolioService()
+    )
+
+    snapshot = (
+        portfolio_service.build_snapshot(
+            user_id=0,
+            initial_balance=(
+                TRADING_CONFIG[
+                    "account_balance"
+                ]
+            )
+        )
+    )
+
+    ReportRenderer.print_header(
+        "LIVE SESSION REPORT"
+    )
+
+    # =====================================================
+    # SESSION
+    # =====================================================
+
+    ReportRenderer.print_section(
+        "SESSION"
+    )
+
+    ReportRenderer.print_metric(
+        "Balance",
+        snapshot.balance
+    )
+
+    ReportRenderer.print_metric(
+        "Equity",
+        snapshot.equity
+    )
+
+    ReportRenderer.print_metric(
+        "Realized PnL",
+        snapshot.realized_pnl
+    )
+
+    ReportRenderer.print_metric(
+        "Unrealized PnL",
+        snapshot.unrealized_pnl
+    )
+
+    ReportRenderer.print_metric(
+        "Total PnL",
+        snapshot.total_pnl
+    )
+
+    ReportRenderer.print_metric(
+        "Open Positions",
+        snapshot.open_positions
+    )
+
+    ReportRenderer.print_metric(
+        "Closed Positions",
+        snapshot.closed_positions
+    )
+
+    ReportRenderer.print_metric(
+        "Exposure",
+        snapshot.exposure
+    )
+
+    ReportRenderer.print_metric(
+        "Drawdown",
+        f"{snapshot.drawdown}%"
+    )
+
+    # =====================================================
+    # BLOCKED SIGNALS
+    # =====================================================
+
+    blocked = (
+        market_state.get_blocked_signals()
+    )
+
+    if blocked:
+
+        ReportRenderer.print_section(
+            "BLOCKED SIGNALS"
+        )
+
+        for reason, count in blocked.items():
+
+            ReportRenderer.print_metric(
+                reason,
+                count
+            )
+
+    # =====================================================
+    # MARKET
+    # =====================================================
+
+    market_snapshot = (
+        market_state.snapshot()
+    )
+
+    ReportRenderer.print_section(
+        "MARKET"
+    )
+
+    ReportRenderer.print_metric(
+        "Generated Signals",
+        market_snapshot[
+            "generated_signals"
+        ]
+    )
+
+    ReportRenderer.print_metric(
+        "Acceptance Ratio",
+        (
+            f"{market_snapshot['acceptance_ratio']}%"
+        )
+    )
+
+    ReportRenderer.print_metric(
+        "Messages",
+        market_snapshot[
+            "total_messages"
+        ]
+    )
+
+    ReportRenderer.print_metric(
+        "Websocket",
+        (
+            "CONNECTED"
+            if market_snapshot[
+                "websocket_connected"
+            ]
+            else "DISCONNECTED"
+        )
+    )
+
+    ReportRenderer.print_metric(
+        "Active Symbols",
+        len(
+            market_snapshot[
+                "active_symbols"
+            ]
+        )
+    )
+
+    ReportRenderer.print_metric(
+        "Uptime (sec)",
+        market_snapshot[
+            "uptime_seconds"
+        ]
+    )
+
+    print()
+
+
+# =========================================================
+# ENTRYPOINT
+# =========================================================
+
 if __name__ == "__main__":
 
     try:
 
-        asyncio.run(main())
+        asyncio.run(
+            main()
+        )
 
     except KeyboardInterrupt:
 
-        print()
-
-        # =================================================
-        # PORTFOLIO SNAPSHOT
-        # =================================================
-
-        portfolio_service = (
-            PortfolioService()
-        )
-
-        snapshot = (
-            portfolio_service.build_snapshot(
-                user_id=0,
-                initial_balance=
-                    TRADING_CONFIG[
-                        "account_balance"
-                    ]
-            )
-        )
-
-        # =================================================
-        # SESSION REPORT
-        # =================================================
-
-        ReportRenderer.print_header(
-            "LIVE SESSION REPORT"
-        )
-
-        ReportRenderer.print_section(
-            "SESSION"
-        )
-
-        ReportRenderer.print_metric(
-            "Balance",
-            snapshot.balance
-        )
-
-        ReportRenderer.print_metric(
-            "Equity",
-            snapshot.equity
-        )
-
-        ReportRenderer.print_metric(
-            "Realized PnL",
-            snapshot.realized_pnl
-        )
-
-        ReportRenderer.print_metric(
-            "Unrealized PnL",
-            snapshot.unrealized_pnl
-        )
-
-        ReportRenderer.print_metric(
-            "Total PnL",
-            snapshot.total_pnl
-        )
-
-        ReportRenderer.print_metric(
-            "Open Positions",
-            snapshot.open_positions
-        )
-
-        ReportRenderer.print_metric(
-            "Closed Positions",
-            snapshot.closed_positions
-        )
-
-        ReportRenderer.print_metric(
-            "Exposure",
-            snapshot.exposure
-        )
-
-        ReportRenderer.print_metric(
-            "Drawdown",
-            f"{snapshot.drawdown}%"
-        )
-
-        # =================================================
-        # BLOCKED SIGNALS
-        # =================================================
-
-        blocked = (
-            market_state.get_blocked_signals()
-        )
-
-        if blocked:
-
-            ReportRenderer.print_section(
-                "BLOCKED SIGNALS"
-            )
-
-            for reason, count in blocked.items():
-
-                ReportRenderer.print_metric(
-                    reason,
-                    count
-                )
-
-        # =================================================
-        # MARKET SNAPSHOT
-        # =================================================
-
-        market_snapshot = (
-            market_state.snapshot()
-        )
-
-        ReportRenderer.print_section(
-            "MARKET"
-        )
-        
-        ReportRenderer.print_metric(
-            "Generated Signals",
-            market_snapshot[
-                "generated_signals"
-            ]
-        )
-        
-        ReportRenderer.print_metric(
-            "Acceptance Ratio",
-            (
-                f"{market_snapshot['acceptance_ratio']}%"
-            )
-        )
-
-        ReportRenderer.print_metric(
-            "Messages",
-            market_snapshot[
-                "total_messages"
-            ]
-        )
-
-        ReportRenderer.print_metric(
-            "Websocket",
-            (
-                "CONNECTED"
-                if market_snapshot[
-                    "websocket_connected"
-                ]
-                else "DISCONNECTED"
-            )
-        )
-
-        ReportRenderer.print_metric(
-            "Active Symbols",
-            len(
-                market_snapshot[
-                    "active_symbols"
-                ]
-            )
-        )
-
-        ReportRenderer.print_metric(
-            "Uptime (sec)",
-            market_snapshot[
-                "uptime_seconds"
-            ]
-        )
+        print_session_report()

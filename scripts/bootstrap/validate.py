@@ -12,38 +12,56 @@ from core.utils.console_logger import (
 # ROOT
 # =====================================================
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+ROOT = (
+    Path(__file__)
+    .resolve()
+    .parent
+    .parent
+    .parent
+)
 
 # =====================================================
 # FILES
 # =====================================================
 
 FILE_PATHS = {
-    ".env": ROOT / ".env",
-    "requirements.txt": (
-        ROOT
-        / "scripts"
-        / "bootstrap"
-        / "requirements.txt"
-    )
+
+    ".env":
+        ROOT / ".env",
+
+    "requirements.txt":
+        (
+            ROOT
+            / "scripts"
+            / "bootstrap"
+            / "requirements.txt"
+        )
 }
 
 # =====================================================
-# PYTHON VERSION
+# PYTHON
 # =====================================================
 
-MIN_PYTHON = (3, 11)
+MIN_PYTHON = (
+    3,
+    11
+)
 
 # =====================================================
-# STATUS LINE
+# STATUS
 # =====================================================
 
-def status_line(label, value):
+def status_line(
+    label,
+    value
+):
 
-    return f"{label:.<30} {value}"
+    return (
+        f"{label:.<30} {value}"
+    )
 
 # =====================================================
-# VALIDATE PYTHON
+# PYTHON VALIDATION
 # =====================================================
 
 def validate_python():
@@ -77,21 +95,27 @@ def validate_python():
     return False
 
 # =====================================================
-# VALIDATE STRUCTURE
+# STRUCTURE VALIDATION
 # =====================================================
 
 def validate_structure():
 
-    required = [
+    required_paths = [
+
         ROOT / "apps",
+
         ROOT / "core",
+
         ROOT / "data",
+
         ROOT / "scripts"
     ]
 
     success = all(
+
         path.exists()
-        for path in required
+
+        for path in required_paths
     )
 
     if success:
@@ -119,20 +143,22 @@ def validate_structure():
     return False
 
 # =====================================================
-# VALIDATE FILES
+# FILE VALIDATION
 # =====================================================
 
 def validate_files():
 
-    success = True
+    missing_files = []
 
-    for _, full_path in FILE_PATHS.items():
+    for name, path in FILE_PATHS.items():
 
-        if not full_path.exists():
+        if not path.exists():
 
-            success = False
+            missing_files.append(
+                name
+            )
 
-    if success:
+    if not missing_files:
 
         log(
             "SYSTEM",
@@ -157,50 +183,61 @@ def validate_files():
     return False
 
 # =====================================================
-# VALIDATE VENV
+# VENV VALIDATION
 # =====================================================
 
 def validate_venv():
 
-    venv_path = ROOT / ".venv"
+    venv_path = (
+        ROOT / ".venv"
+    )
 
-    if not venv_path.exists():
+    if venv_path.exists():
 
         log(
             "SYSTEM",
             status_line(
                 "VirtualEnv",
-                "WARNING"
+                "OK"
             ),
-            "WARNING"
+            "SUCCESS"
         )
 
-        return
+        return True
 
     log(
         "SYSTEM",
         status_line(
             "VirtualEnv",
-            "OK"
+            "WARNING"
         ),
-        "SUCCESS"
+        "WARNING"
     )
 
+    return False
+
 # =====================================================
-# MAIN VALIDATION
+# ENVIRONMENT VALIDATION
 # =====================================================
 
 def validate_environment():
 
     validations = [
+
         validate_python(),
+
         validate_structure(),
+
         validate_files()
     ]
 
     validate_venv()
 
-    if all(validations):
+    success = all(
+        validations
+    )
+
+    if success:
 
         log(
             "SYSTEM",
@@ -225,7 +262,7 @@ def validate_environment():
     return False
 
 # =====================================================
-# MAIN
+# ENTRYPOINT
 # =====================================================
 
 if __name__ == "__main__":

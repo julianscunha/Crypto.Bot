@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from collections import defaultdict
+from collections import (
+    defaultdict
+)
 
 from core.config.market_structure_config import (
     MARKET_STRUCTURE_CONFIG
@@ -11,15 +13,23 @@ class MarketStructureService:
 
     def __init__(self):
 
-        self.config = MARKET_STRUCTURE_CONFIG
+        self.config = (
+            MARKET_STRUCTURE_CONFIG
+        )
 
-        self.market_data = defaultdict(list)
+        self.market_data = (
+            defaultdict(list)
+        )
+
+        self.max_history = 300
 
     # =====================================================
-    # RESET STATE
+    # RESET
     # =====================================================
 
-    def reset(self):
+    def reset(
+        self
+    ):
 
         self.market_data.clear()
 
@@ -39,15 +49,24 @@ class MarketStructureService:
             symbol
         )
 
-        history = self.market_data[key]
+        history = (
+            self.market_data[key]
+        )
 
-        history.append(price)
+        history.append(
+            price
+        )
 
-        if len(history) > 300:
+        # =================================================
+        # MEMORY LIMIT
+        # =================================================
+
+        if len(history) > self.max_history:
+
             history.pop(0)
 
     # =====================================================
-    # GET HISTORY
+    # GET PRICES
     # =====================================================
 
     def get_prices(
@@ -74,20 +93,47 @@ class MarketStructureService:
         window
     ):
 
-        current = prices[index]
+        # =================================================
+        # SAFETY
+        # =================================================
 
-        left = prices[
-            index - window:index
-        ]
+        if (
+            index - window < 0
+            or
+            index + window >= len(prices)
+        ):
 
-        right = prices[
-            index + 1:index + window + 1
-        ]
+            return False
+
+        current = (
+            prices[index]
+        )
+
+        left = (
+            prices[
+                index - window:index
+            ]
+        )
+
+        right = (
+            prices[
+                index + 1:index + window + 1
+            ]
+        )
 
         return (
-            all(current > x for x in left)
+
+            all(
+                current > value
+                for value in left
+            )
+
             and
-            all(current > x for x in right)
+
+            all(
+                current > value
+                for value in right
+            )
         )
 
     # =====================================================
@@ -101,20 +147,47 @@ class MarketStructureService:
         window
     ):
 
-        current = prices[index]
+        # =================================================
+        # SAFETY
+        # =================================================
 
-        left = prices[
-            index - window:index
-        ]
+        if (
+            index - window < 0
+            or
+            index + window >= len(prices)
+        ):
 
-        right = prices[
-            index + 1:index + window + 1
-        ]
+            return False
+
+        current = (
+            prices[index]
+        )
+
+        left = (
+            prices[
+                index - window:index
+            ]
+        )
+
+        right = (
+            prices[
+                index + 1:index + window + 1
+            ]
+        )
 
         return (
-            all(current < x for x in left)
+
+            all(
+                current < value
+                for value in left
+            )
+
             and
-            all(current < x for x in right)
+
+            all(
+                current < value
+                for value in right
+            )
         )
 
     # =====================================================
@@ -136,10 +209,21 @@ class MarketStructureService:
             "swing_window"
         ]
 
-        if len(prices) < 10:
+        minimum_required = max(
+            10,
+            window * 2 + 1
+        )
+
+        # =================================================
+        # WARMUP
+        # =================================================
+
+        if len(prices) < minimum_required:
 
             return {
+
                 "valid": False,
+
                 "reason": "INSUFFICIENT_DATA"
             }
 
@@ -147,50 +231,62 @@ class MarketStructureService:
 
         swing_lows = []
 
-        for i in range(
+        for index in range(
             window,
             len(prices) - window
         ):
 
             if self.is_swing_high(
                 prices,
-                i,
+                index,
                 window
             ):
 
                 swing_highs.append(
-                    prices[i]
+                    prices[index]
                 )
 
             if self.is_swing_low(
                 prices,
-                i,
+                index,
                 window
             ):
 
                 swing_lows.append(
-                    prices[i]
+                    prices[index]
                 )
 
+        # =================================================
+        # STRUCTURE VALIDATION
+        # =================================================
+
         if len(swing_highs) < 2:
+
             return {
+
                 "valid": False,
+
                 "reason": "NO_STRUCTURE"
             }
 
         if len(swing_lows) < 2:
+
             return {
+
                 "valid": False,
+
                 "reason": "NO_STRUCTURE"
             }
 
         bullish_highs = (
+
             swing_highs[-1]
             >
             swing_highs[-2]
         )
 
         bullish_lows = (
+
             swing_lows[-1]
             >
             swing_lows[-2]
@@ -199,20 +295,32 @@ class MarketStructureService:
         trend_strength = 0
 
         if bullish_highs:
+
             trend_strength += 1
 
         if bullish_lows:
+
             trend_strength += 1
 
+        # =================================================
+        # TREND STRENGTH
+        # =================================================
+
         if (
-            trend_strength <
+
+            trend_strength
+
+            <
+
             self.config[
                 "min_trend_strength"
             ]
         ):
 
             return {
+
                 "valid": False,
+
                 "reason": "WEAK_STRUCTURE"
             }
 
@@ -226,30 +334,64 @@ class MarketStructureService:
 
             recent = prices[-10:]
 
-            max_price = max(recent)
+            max_price = max(
+                recent
+            )
 
-            min_price = min(recent)
+            min_price = min(
+                recent
+            )
+
+            # =============================================
+            # SAFETY
+            # =============================================
+
+            if min_price <= 0:
+
+                return {
+
+                    "valid": False,
+
+                    "reason": "INVALID_PRICE"
+                }
 
             range_percent = (
-                (max_price - min_price)
+
+                (
+                    max_price - min_price
+                )
+
                 / min_price
             )
 
             if (
-                range_percent <
+
+                range_percent
+
+                <
+
                 self.config[
                     "consolidation_threshold"
                 ]
             ):
 
                 return {
+
                     "valid": False,
+
                     "reason": "CONSOLIDATION"
                 }
 
+        # =================================================
+        # VALID STRUCTURE
+        # =================================================
+
         return {
+
             "valid": True,
+
             "reason": "BULLISH_STRUCTURE",
+
             "trend_strength": trend_strength
         }
 

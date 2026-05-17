@@ -81,6 +81,33 @@ class BinanceWS:
         )
 
     # =====================================================
+    # SYMBOL DIVIDER
+    # =====================================================
+
+    def print_symbol_divider(
+        self,
+        symbol: str
+    ):
+
+        title = f" {symbol} "
+
+        total_width = 60
+
+        side = (
+            total_width - len(title)
+        ) // 2
+
+        print()
+
+        print(
+            (
+                "=" * side
+                + title
+                + "=" * side
+            )
+        )
+
+    # =====================================================
     # START
     # =====================================================
 
@@ -96,7 +123,8 @@ class BinanceWS:
 
                 log(
                     "WEBSOCKET",
-                    "CONNECTING BINANCE STREAM..."
+                    "CONNECTING",
+                    "INFO"
                 )
 
                 async with websockets.connect(
@@ -118,7 +146,8 @@ class BinanceWS:
 
                     log(
                         "SYSTEM",
-                        "BINANCE WEBSOCKET CONNECTED",
+                        "WEBSOCKET CONNECTED",
+                        "SUCCESS"
                     )
 
                     while True:
@@ -141,6 +170,7 @@ class BinanceWS:
                         )
 
                         if "k" not in data:
+
                             continue
 
                         kline = data["k"]
@@ -150,6 +180,7 @@ class BinanceWS:
                         # =====================================
 
                         if not kline["x"]:
+
                             continue
 
                         symbol = kline["s"]
@@ -178,17 +209,11 @@ class BinanceWS:
                         )
 
                         # =====================================
-                        # SYMBOL SEPARATOR
+                        # SYMBOL DIVIDER
                         # =====================================
 
-                        print()
-
-                        print(
-                            (
-                                "=" * 26
-                                + f" {symbol} "
-                                + "=" * 26
-                            )
+                        self.print_symbol_divider(
+                            symbol
                         )
 
                         # =====================================
@@ -199,7 +224,6 @@ class BinanceWS:
                             "MARKET",
                             (
                                 f"KLINE "
-                                f"{symbol} "
                                 f"close={payload.close}"
                             )
                         )
@@ -220,14 +244,11 @@ class BinanceWS:
 
                 log(
                     "WEBSOCKET",
-                    (
-                        "STALE STREAM DETECTED "
-                        "RECONNECTING..."
-                    ),
+                    "STALE STREAM",
                     "WARNING"
                 )
 
-            except Exception as e:
+            except Exception as error:
 
                 market_state.set_websocket_connected(
                     False
@@ -249,9 +270,7 @@ class BinanceWS:
                     "WEBSOCKET",
                     (
                         f"RECONNECT "
-                        f"attempt={self.reconnect_attempts} "
-                        f"delay={delay:.1f}s "
-                        f"error={str(e)}"
+                        f"attempt={self.reconnect_attempts}"
                     ),
                     "WARNING"
                 )

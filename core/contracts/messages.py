@@ -1,24 +1,39 @@
 # -*- coding: utf-8 -*-
 
-from dataclasses import dataclass
+from dataclasses import (
+    dataclass,
+    field
+)
 
+from datetime import (
+    datetime
+)
+
+from typing import (
+    Any,
+    Optional
+)
 
 # =========================================================
 # BASE MESSAGE
 # =========================================================
 
-@dataclass
+@dataclass(slots=True)
 class BaseMessage:
 
     sender: str
-    payload: object
 
+    payload: Any
+
+    created_at: datetime = field(
+        default_factory=datetime.utcnow
+    )
 
 # =========================================================
 # MARKET DATA
 # =========================================================
 
-@dataclass
+@dataclass(slots=True)
 class MarketDataPayload:
 
     user_id: int
@@ -26,23 +41,28 @@ class MarketDataPayload:
     symbol: str
 
     open: float
+
     high: float
+
     low: float
+
     close: float
 
     volume: float
 
 
-@dataclass
-class MarketDataMessage(BaseMessage):
-    pass
+@dataclass(slots=True)
+class MarketDataMessage(
+    BaseMessage
+):
 
+    pass
 
 # =========================================================
 # MARKET ANALYSIS
 # =========================================================
 
-@dataclass
+@dataclass(slots=True)
 class MarketAnalysisPayload:
 
     user_id: int
@@ -53,19 +73,21 @@ class MarketAnalysisPayload:
 
     reference_price: float
 
-    confidence: float
+    confidence: float = 0.0
 
 
-@dataclass
-class MarketAnalysisMessage(BaseMessage):
+@dataclass(slots=True)
+class MarketAnalysisMessage(
+    BaseMessage
+):
+
     pass
-
 
 # =========================================================
 # STRATEGY SIGNAL
 # =========================================================
 
-@dataclass
+@dataclass(slots=True)
 class StrategySignalPayload:
 
     user_id: int
@@ -76,20 +98,23 @@ class StrategySignalPayload:
 
     entry_price: float
 
-    signal_strength: float
-    
-    atr: float | None = None
+    signal_strength: float = 0.0
 
-@dataclass
-class StrategySignalMessage(BaseMessage):
+    atr: Optional[float] = None
+
+
+@dataclass(slots=True)
+class StrategySignalMessage(
+    BaseMessage
+):
+
     pass
-
 
 # =========================================================
 # RISK DECISION
 # =========================================================
 
-@dataclass
+@dataclass(slots=True)
 class RiskDecisionPayload:
 
     user_id: int
@@ -103,16 +128,17 @@ class RiskDecisionPayload:
     quantity: float
 
     stop_loss: float
+
     take_profit: float
 
     trailing_stop: float
 
-    risk_reward: float
+    risk_reward: float = 0.0
 
 
-@dataclass
-class RiskDecisionMessage(BaseMessage):
+@dataclass(slots=True)
+class RiskDecisionMessage(
+    BaseMessage
+):
+
     pass
-    
-
-

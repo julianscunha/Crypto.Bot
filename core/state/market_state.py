@@ -13,8 +13,6 @@ class MarketState:
         # MARKET DATA
         # =================================================
 
-        self.candles = {}
-
         self.total_messages = 0
 
         self.last_kline_at = None
@@ -33,11 +31,17 @@ class MarketState:
         # RUNTIME
         # =================================================
 
-        self.started_at = datetime.utcnow()
+        self.started_at = (
+            datetime.utcnow()
+        )
 
-        self.websocket_connected = False
+        self.websocket_connected = (
+            False
+        )
 
-        self.active_symbols = []
+        self.active_symbols = (
+            set()
+        )
 
     # =====================================================
     # WEBSOCKET
@@ -48,7 +52,9 @@ class MarketState:
         connected: bool
     ):
 
-        self.websocket_connected = connected
+        self.websocket_connected = (
+            connected
+        )
 
     # =====================================================
     # MARKET DATA
@@ -65,11 +71,9 @@ class MarketState:
             datetime.utcnow()
         )
 
-        if symbol not in self.active_symbols:
-
-            self.active_symbols.append(
-                symbol
-            )
+        self.active_symbols.add(
+            symbol
+        )
 
     # =====================================================
     # SIGNAL TELEMETRY
@@ -84,17 +88,19 @@ class MarketState:
             reason
         ] += 1
 
-    def increment_accepted_signal(
+    def increment_generated_signal(
         self
     ):
 
         self.generated_signals += 1
 
     # =====================================================
-    # TELEMETRY SNAPSHOT
+    # TELEMETRY
     # =====================================================
 
-    def get_blocked_signals(self):
+    def get_blocked_signals(
+        self
+    ):
 
         return dict(
             self.blocked_signals
@@ -118,7 +124,8 @@ class MarketState:
             self.get_total_blocked_signals()
         )
 
-        if total == 0:
+        if total <= 0:
+
             return 0.0
 
         return round(
@@ -133,7 +140,9 @@ class MarketState:
     # SNAPSHOT
     # =====================================================
 
-    def snapshot(self):
+    def snapshot(
+        self
+    ):
 
         uptime = (
             datetime.utcnow()
@@ -158,7 +167,9 @@ class MarketState:
                 self.last_kline_at,
 
             "active_symbols":
-                self.active_symbols,
+                sorted(
+                    list(self.active_symbols)
+                ),
 
             "blocked_signals":
                 self.get_blocked_signals(),
@@ -171,4 +182,6 @@ class MarketState:
         }
 
 
-market_state = MarketState()
+market_state = (
+    MarketState()
+)

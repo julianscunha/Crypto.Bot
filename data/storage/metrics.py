@@ -1,73 +1,216 @@
 # -*- coding: utf-8 -*-
 
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy.orm import (
+    Session
+)
 
-from data.storage.database import SessionLocal
-from data.storage.models import Trade
+from sqlalchemy import (
+    func
+)
+
+from data.storage.database import (
+    SessionLocal
+)
+
+from data.storage.models import (
+    Trade
+)
 
 
 class MetricsStorage:
 
-    def __init__(self):
+    # =====================================================
+    # SESSION
+    # =====================================================
 
-        self.db: Session = SessionLocal()
+    def _session(
+        self
+    ) -> Session:
+
+        return SessionLocal()
+
+    # =====================================================
+    # METRICS
+    # =====================================================
 
     def get_metrics(
         self,
         user_id: int
     ):
 
-        trades = (
-            self.db.query(Trade)
-            .filter(
-                Trade.user_id == user_id,
-                Trade.status == "CLOSED"
+        session = self._session()
+
+        try:
+
+            trades = (
+
+                session.query(Trade)
+
+                .filter(
+
+                    Trade.user_id == user_id,
+
+                    Trade.status == "CLOSED"
+                )
+
+                .all()
             )
-            .all()
-        )
 
-        total_trades = len(trades)
+            total_trades = len(
+                trades
+            )
 
-        if total_trades == 0:
+            # =================================================
+            # EMPTY
+            # =================================================
+
+            if total_trades == 0:
+
+                return {
+
+                    "total_trades": 0,
+
+                    "winning_trades": 0,
+
+                    "losing_trades": 0,
+
+                    "winrate": 0.0,
+
+                    "pnl": 0.0
+                }
+
+            # =================================================
+            # WINNERS
+            # =================================================
+
+            winning_trades = len(
+
+                [
+
+                    trade
+
+                    for trade in trades
+
+                    if (
+                        trade.pnl or 0.0
+                    ) > 0
+                ]
+            )
+
+            # =================================================
+            # LOSERS
+            # =================================================
+
+            losing_trades = len(
+
+                [
+
+                    trade
+
+                    for trade in trades
+
+                    if (
+                        trade.pnl or 0.0
+                    ) < 0
+                ]
+            )
+
+            # =================================================
+            # TOTAL PNL
+            # =================================================
+
+            total_pnl = round(
+
+                sum(
+
+                    trade.pnl or 0.0
+
+                    for trade in trades
+                ),
+
+                2
+            )
+
+            # =================================================
+            # WINRATE
+            # =================================================
+
+            winrate = round(
+
+                (
+                    winning_trades
+                    / total_trades
+                ) * 100,
+
+                2
+            )
 
             return {
-                "total_trades": 0,
-                "winrate": 0,
-                "pnl": 0
+
+                "total_trades":
+                    total_trades,
+
+                "winning_trades":
+                    winning_trades,
+
+                "losing_trades":
+                    losing_trades,
+
+                "winrate":
+                    winrate,
+
+                "pnl":
+                    total_pnl
             }
 
-        wins = len([
-            t for t in trades
-            if t.pnl > 0
-        ])
+        finally:
 
-        total_pnl = sum([
-            t.pnl for t in trades
-        ])
+            session.close()
 
-        return {
-            "total_trades": total_trades,
-            "winrate": round(wins / total_trades, 2),
-            "pnl": round(total_pnl, 2)
-        }
+    # =====================================================
+    # OPEN EXPOSURE
+    # =====================================================
 
     def total_open_exposure(
         self,
         user_id: int
     ):
 
-        result = (
-            self.db.query(
-                func.sum(
-                    Trade.current_price * Trade.quantity
-                )
-            )
-            .filter(
-                Trade.user_id == user_id,
-                Trade.status == "OPEN"
-            )
-            .scalar()
-        )
+        session = self._session()
 
-        return result or 0
+        try:
+
+            result = (
+
+                session.query(
+
+                    func.sum(
+
+                        Trade.current_price
+                        *
+                        Trade.quantity
+                    )
+                )
+
+                .filter(
+
+                    Trade.user_id == user_id,
+
+                    Trade.status == "OPEN"
+                )
+
+                .scalar()
+            )
+
+            if result is None:
+
+                return 0.0
+
+            return round(
+                result,
+                2
+            )
+
+        finally:
+
+            session.close()

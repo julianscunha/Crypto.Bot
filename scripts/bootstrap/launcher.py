@@ -26,15 +26,26 @@ from scripts.bootstrap.process_manager import (
 # ROOT
 # =====================================================
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+ROOT = (
+    Path(__file__)
+    .resolve()
+    .parent
+    .parent
+    .parent
+)
 
 # =====================================================
 # STATUS LINE
 # =====================================================
 
-def status_line(label, value):
+def status_line(
+    label,
+    value
+):
 
-    return f"{label:.<30} {value}"
+    return (
+        f"{label:.<30} {value}"
+    )
 
 # =====================================================
 # MENU
@@ -52,15 +63,50 @@ def show_menu():
     print("[4] Frontend")
     print("[5] Full Stack")
 
-    print("")
+    print()
+
     print("[0] Exit")
-    print("")
+
+    print()
+
+# =====================================================
+# SAFE TERMINATION
+# =====================================================
+
+def terminate_process(
+    process
+):
+
+    if not process:
+
+        return
+
+    try:
+
+        process.terminate()
+
+        process.wait(
+            timeout=5
+        )
+
+    except Exception:
+
+        try:
+
+            process.kill()
+
+        except Exception:
+
+            pass
 
 # =====================================================
 # RUN PROCESS
 # =====================================================
 
-def run_process(command, cwd=None):
+def run_process(
+    command,
+    cwd=None
+):
 
     process = None
 
@@ -75,19 +121,26 @@ def run_process(command, cwd=None):
 
     except KeyboardInterrupt:
 
-        if process:
+        print()
 
-            process.terminate()
+        log(
+            "SYSTEM",
+            status_line(
+                "Shutdown",
+                "OK"
+            ),
+            "SUCCESS"
+        )
 
-            try:
-
-                process.wait(timeout=5)
-
-            except Exception:
-
-                process.kill()
+        terminate_process(
+            process
+        )
 
     except Exception as error:
+
+        terminate_process(
+            process
+        )
 
         with open(
             ROOT / "logs" / "errors.log",
@@ -109,7 +162,7 @@ def run_process(command, cwd=None):
         )
 
 # =====================================================
-# START RUNNER
+# RUNNER
 # =====================================================
 
 def start_runner():
@@ -123,7 +176,7 @@ def start_runner():
     )
 
 # =====================================================
-# START OPTIMIZER
+# OPTIMIZER
 # =====================================================
 
 def start_optimizer():
@@ -137,7 +190,7 @@ def start_optimizer():
     )
 
 # =====================================================
-# START BACKTEST
+# BACKTEST
 # =====================================================
 
 def start_backtest():
@@ -151,7 +204,7 @@ def start_backtest():
     )
 
 # =====================================================
-# START FRONTEND
+# FRONTEND
 # =====================================================
 
 def start_frontend():
@@ -162,31 +215,70 @@ def start_frontend():
             "run",
             "dev"
         ],
-        cwd=str(ROOT / "frontend")
+        cwd=str(
+            ROOT / "frontend"
+        )
     )
 
 # =====================================================
-# START FULL STACK
+# FULL STACK
 # =====================================================
 
 def start_fullstack():
 
-    subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "apps.trader.runner"
-        ]
-    )
+    runner_process = None
 
-    subprocess.run(
-        [
-            "npm",
-            "run",
-            "dev"
-        ],
-        cwd=str(ROOT / "frontend")
-    )
+    frontend_process = None
+
+    try:
+
+        runner_process = (
+            subprocess.Popen(
+                [
+                    sys.executable,
+                    "-m",
+                    "apps.trader.runner"
+                ]
+            )
+        )
+
+        frontend_process = (
+            subprocess.Popen(
+                [
+                    "npm",
+                    "run",
+                    "dev"
+                ],
+                cwd=str(
+                    ROOT / "frontend"
+                )
+            )
+        )
+
+        frontend_process.wait()
+
+    except KeyboardInterrupt:
+
+        print()
+
+        log(
+            "SYSTEM",
+            status_line(
+                "Shutdown",
+                "OK"
+            ),
+            "SUCCESS"
+        )
+
+    finally:
+
+        terminate_process(
+            runner_process
+        )
+
+        terminate_process(
+            frontend_process
+        )
 
 # =====================================================
 # MAIN
@@ -210,11 +302,13 @@ def main():
 
         try:
 
-            option = input("Select mode: ")
+            option = input(
+                "Select mode: "
+            )
 
         except KeyboardInterrupt:
 
-            print("")
+            print()
 
             log(
                 "SYSTEM",
@@ -227,30 +321,59 @@ def main():
 
             return
 
+        # =================================================
+        # RUNNER
+        # =================================================
+
         if option == "1":
 
             start_runner()
+
             break
+
+        # =================================================
+        # OPTIMIZER
+        # =================================================
 
         elif option == "2":
 
             start_optimizer()
+
             break
+
+        # =================================================
+        # BACKTEST
+        # =================================================
 
         elif option == "3":
 
             start_backtest()
+
             break
+
+        # =================================================
+        # FRONTEND
+        # =================================================
 
         elif option == "4":
 
             start_frontend()
+
             break
+
+        # =================================================
+        # FULL STACK
+        # =================================================
 
         elif option == "5":
 
             start_fullstack()
+
             break
+
+        # =================================================
+        # EXIT
+        # =================================================
 
         elif option == "0":
 
@@ -264,6 +387,10 @@ def main():
             )
 
             return
+
+        # =================================================
+        # INVALID OPTION
+        # =================================================
 
         else:
 

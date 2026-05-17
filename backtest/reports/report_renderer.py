@@ -11,6 +11,10 @@ init(autoreset=True)
 
 class ReportRenderer:
 
+    WIDTH = 60
+
+    METRIC_WIDTH = 30
+
     # =====================================================
     # HEADER
     # =====================================================
@@ -20,21 +24,29 @@ class ReportRenderer:
         title: str
     ):
 
+        line = (
+            "=" * ReportRenderer.WIDTH
+        )
+
         print()
 
         print(
-            Fore.LIGHTWHITE_EX
-            + "=" * 60
+            Fore.LIGHTCYAN_EX
+            + line
+            + Style.RESET_ALL
         )
 
         print(
-            Fore.CYAN
-            + title.center(60)
+            Fore.LIGHTCYAN_EX
+            + title.center(
+                ReportRenderer.WIDTH
+            )
+            + Style.RESET_ALL
         )
 
         print(
-            Fore.LIGHTWHITE_EX
-            + "=" * 60
+            Fore.LIGHTCYAN_EX
+            + line
             + Style.RESET_ALL
         )
 
@@ -50,7 +62,7 @@ class ReportRenderer:
         print()
 
         print(
-            Fore.YELLOW
+            Fore.LIGHTYELLOW_EX
             + f"[{title}]"
             + Style.RESET_ALL
         )
@@ -68,17 +80,26 @@ class ReportRenderer:
 
         line = (
             f"{label} "
-            .ljust(30, ".")
+            .ljust(
+                ReportRenderer.METRIC_WIDTH,
+                "."
+            )
             + f" {value}"
         )
 
+        # =================================================
+        # RATING
+        # =================================================
+
         if rating:
 
-            # =============================================
-            # RATING COLOR
-            # =============================================
+            rating_upper = (
+                rating.upper()
+            )
 
-            rating_upper = rating.upper()
+            # =============================================
+            # POSITIVE
+            # =============================================
 
             if rating_upper in [
                 "ROBUST",
@@ -90,6 +111,10 @@ class ReportRenderer:
                 rating_color = (
                     Fore.GREEN
                 )
+
+            # =============================================
+            # NEGATIVE
+            # =============================================
 
             elif rating_upper in [
                 "POOR",
@@ -105,10 +130,14 @@ class ReportRenderer:
                     Fore.RED
                 )
 
+            # =============================================
+            # NEUTRAL
+            # =============================================
+
             else:
 
                 rating_color = (
-                    Fore.YELLOW
+                    Fore.LIGHTYELLOW_EX
                 )
 
             line += (
@@ -137,13 +166,13 @@ class ReportRenderer:
 
         print()
 
-        # =============================================
-        # STATUS COLOR
-        # =============================================
-
         status_upper = (
             status.upper()
         )
+
+        # =================================================
+        # STATUS COLORS
+        # =================================================
 
         if status_upper in [
             "ROBUST",
@@ -160,7 +189,7 @@ class ReportRenderer:
         ]:
 
             status_color = (
-                Fore.YELLOW
+                Fore.LIGHTYELLOW_EX
             )
 
         else:
@@ -170,7 +199,7 @@ class ReportRenderer:
             )
 
         print(
-            Fore.CYAN
+            Fore.LIGHTCYAN_EX
             + "[FINAL VERDICT]"
             + Style.RESET_ALL
         )
@@ -180,7 +209,10 @@ class ReportRenderer:
         print(
             Fore.LIGHTWHITE_EX
             + "Status "
-            .ljust(30, ".")
+            .ljust(
+                ReportRenderer.METRIC_WIDTH,
+                "."
+            )
             + status_color
             + f" {status}"
             + Style.RESET_ALL
@@ -189,7 +221,7 @@ class ReportRenderer:
         print()
 
         print(
-            Fore.CYAN
+            Fore.LIGHTCYAN_EX
             + "Recommendation:"
             + Style.RESET_ALL
         )
@@ -210,7 +242,7 @@ class ReportRenderer:
         print()
 
         print(
-            Fore.LIGHTWHITE_EX
-            + "=" * 60
+            Fore.LIGHTCYAN_EX
+            + "=" * ReportRenderer.WIDTH
             + Style.RESET_ALL
         )

@@ -13,7 +13,13 @@ from core.utils.console_logger import (
 # ROOT
 # =====================================================
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+ROOT = (
+    Path(__file__)
+    .resolve()
+    .parent
+    .parent
+    .parent
+)
 
 REQUIREMENTS_FILE = (
     ROOT
@@ -22,13 +28,42 @@ REQUIREMENTS_FILE = (
     / "requirements.txt"
 )
 
+BOOTSTRAP_LOG = (
+    ROOT
+    / "logs"
+    / "bootstrap.log"
+)
+
 # =====================================================
-# STATUS LINE
+# STATUS
 # =====================================================
 
-def status_line(label, value):
+def status_line(
+    label,
+    value
+):
 
-    return f"{label:.<30} {value}"
+    return (
+        f"{label:.<30} {value}"
+    )
+
+# =====================================================
+# WRITE LOG
+# =====================================================
+
+def write_bootstrap_log(
+    content: str
+):
+
+    with open(
+        BOOTSTRAP_LOG,
+        "a",
+        encoding="utf-8"
+    ) as file:
+
+        file.write(
+            f"{content}\n"
+        )
 
 # =====================================================
 # INSTALL REQUIREMENTS
@@ -39,30 +74,39 @@ def install_requirements():
     try:
 
         result = subprocess.run(
+
             [
                 sys.executable,
+
                 "-m",
+
                 "pip",
+
                 "install",
+
                 "-r",
-                str(REQUIREMENTS_FILE),
+
+                str(
+                    REQUIREMENTS_FILE
+                ),
+
                 "--disable-pip-version-check"
             ],
+
             capture_output=True,
+
             text=True
         )
 
+        # =================================================
+        # FAILURE
+        # =================================================
+
         if result.returncode != 0:
 
-            with open(
-                ROOT / "logs" / "bootstrap.log",
-                "a",
-                encoding="utf-8"
-            ) as file:
-
-                file.write(
-                    result.stderr
-                )
+            write_bootstrap_log(
+                result.stderr
+            )
 
             log(
                 "SYSTEM",
@@ -75,6 +119,10 @@ def install_requirements():
 
             return False
 
+        # =================================================
+        # SUCCESS
+        # =================================================
+
         log(
             "SYSTEM",
             status_line(
@@ -86,17 +134,15 @@ def install_requirements():
 
         return True
 
+    # =====================================================
+    # EXCEPTION
+    # =====================================================
+
     except Exception as error:
 
-        with open(
-            ROOT / "logs" / "bootstrap.log",
-            "a",
-            encoding="utf-8"
-        ) as file:
-
-            file.write(
-                f"{str(error)}\n"
-            )
+        write_bootstrap_log(
+            str(error)
+        )
 
         log(
             "SYSTEM",
@@ -110,7 +156,7 @@ def install_requirements():
         return False
 
 # =====================================================
-# MAIN
+# ENTRYPOINT
 # =====================================================
 
 if __name__ == "__main__":

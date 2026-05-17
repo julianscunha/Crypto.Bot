@@ -2,6 +2,10 @@
 
 import inspect
 
+from core.utils.console_logger import (
+    log
+)
+
 
 class EventBus:
 
@@ -9,27 +13,82 @@ class EventBus:
 
         self.subscribers = []
 
-    def subscribe(self, subscriber):
+    # =====================================================
+    # SUBSCRIBE
+    # =====================================================
 
-        self.subscribers.append(subscriber)
+    def subscribe(
+        self,
+        subscriber
+    ):
 
-    async def publish(self, message):
+        # =================================================
+        # SAFETY
+        # =================================================
 
-        for subscriber in self.subscribers:
+        if subscriber in self.subscribers:
 
-            if not hasattr(subscriber, "on_message"):
-                continue
+            return
+
+        if not hasattr(
+            subscriber,
+            "on_message"
+        ):
+
+            return
+
+        self.subscribers.append(
+            subscriber
+        )
+
+    # =====================================================
+    # PUBLISH
+    # =====================================================
+
+    async def publish(
+        self,
+        message
+    ):
+
+        for subscriber in list(
+            self.subscribers
+        ):
 
             try:
 
-                result = subscriber.on_message(message)
+                result = (
+                    subscriber.on_message(
+                        message
+                    )
+                )
 
-                if inspect.isawaitable(result):
+                # =============================================
+                # ASYNC SUPPORT
+                # =============================================
+
+                if inspect.isawaitable(
+                    result
+                ):
+
                     await result
 
-            except Exception as e:
+            # =================================================
+            # ISOLATED FAILURE
+            # =================================================
 
-                print(
-                    f"[BUS ERROR] "
-                    f"{subscriber.__class__.__name__}: {e}"
+            except Exception as error:
+
+                log(
+                    "EVENTBUS",
+                    (
+                        f"FAILED "
+                        f"{subscriber.__class__.__name__}"
+                    ),
+                    "ERROR"
+                )
+
+                log(
+                    "EVENTBUS",
+                    str(error),
+                    "ERROR"
                 )

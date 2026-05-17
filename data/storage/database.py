@@ -1,45 +1,100 @@
 # -*- coding: utf-8 -*-
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import (
+    create_engine,
+    event
+)
 
-DATABASE_URL = "sqlite:///data/storage/trades.db"
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    sessionmaker
+)
+
+# =====================================================
+# DATABASE
+# =====================================================
+
+DATABASE_URL = (
+    "sqlite:///data/storage/trades.db"
+)
 
 # =====================================================
 # ENGINE
 # =====================================================
 
 engine = create_engine(
+
     DATABASE_URL,
 
     connect_args={
+
         "check_same_thread": False
     },
 
+    future=True
+)
+
+# =====================================================
+# SQLITE PRAGMA
+# =====================================================
+
+@event.listens_for(
+    engine,
+    "connect"
+)
+def set_sqlite_pragma(
+    dbapi_connection,
+    connection_record
+):
+
+    cursor = dbapi_connection.cursor()
+
     # =================================================
-    # POOL CONTROL
+    # WAL MODE
     # =================================================
 
-    pool_size=20,
-    max_overflow=40,
-    pool_timeout=30,
-    pool_recycle=1800
-)
+    cursor.execute(
+        "PRAGMA journal_mode=WAL;"
+    )
+
+    # =================================================
+    # NORMAL SYNC
+    # =================================================
+
+    cursor.execute(
+        "PRAGMA synchronous=NORMAL;"
+    )
+
+    # =================================================
+    # MEMORY TEMP STORE
+    # =================================================
+
+    cursor.execute(
+        "PRAGMA temp_store=MEMORY;"
+    )
+
+    # =================================================
+    # FOREIGN KEYS
+    # =================================================
+
+    cursor.execute(
+        "PRAGMA foreign_keys=ON;"
+    )
+
+    cursor.close()
 
 # =====================================================
 # SESSION FACTORY
 # =====================================================
 
 SessionLocal = sessionmaker(
+
     autocommit=False,
+
     autoflush=False,
 
     # =================================================
-    # IMPORTANT:
-    # Prevent ORM object expiration after commit.
-    # Avoids implicit lazy reloads reopening
-    # connections in async/event-driven flows.
+    # IMPORTANT
     # =================================================
 
     expire_on_commit=False,
@@ -51,7 +106,10 @@ SessionLocal = sessionmaker(
 # BASE
 # =====================================================
 
-class Base(DeclarativeBase):
+class Base(
+    DeclarativeBase
+):
+
     pass
 
 # =====================================================
@@ -61,8 +119,12 @@ class Base(DeclarativeBase):
 def init_db():
 
     from data.storage.models import (
+
         Trade,
-        EquityCurve
+
+        EquityCurve,
+
+        PortfolioSnapshot
     )
 
     Base.metadata.create_all(

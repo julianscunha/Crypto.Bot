@@ -1,25 +1,19 @@
 # -*- coding: utf-8 -*-
 
-from collections import defaultdict
-
-from colorama import (
-    Fore,
-    Style,
-    init
+from collections import (
+    defaultdict
 )
-
-from core.utils.console_logger import (
-    log
-)
-
-init(autoreset=True)
 
 
 class EmaTrendService:
 
     def __init__(self):
 
-        self.market_history = defaultdict(list)
+        self.market_history = (
+            defaultdict(list)
+        )
+
+        self.max_history = 200
 
     # =====================================================
     # UPDATE PRICE
@@ -37,14 +31,21 @@ class EmaTrendService:
             symbol
         )
 
-        history = self.market_history[key]
-
-        history.append(price)
-
-        # LIMIT HISTORY
-        self.market_history[key] = (
-            history[-200:]
+        history = (
+            self.market_history[key]
         )
+
+        history.append(
+            price
+        )
+
+        # =================================================
+        # MEMORY LIMIT
+        # =================================================
+
+        if len(history) > self.max_history:
+
+            history.pop(0)
 
     # =====================================================
     # GET PRICES
@@ -76,10 +77,16 @@ class EmaTrendService:
         period: int
     ):
 
+        # =================================================
+        # SAFETY
+        # =================================================
+
         if not prices:
-            return 0.0
+
+            return None
 
         if len(prices) < period:
+
             return None
 
         multiplier = (
@@ -87,20 +94,29 @@ class EmaTrendService:
         )
 
         ema = (
-            sum(prices[:period]) / period
+            sum(prices[:period])
+            / period
         )
 
         for price in prices[period:]:
 
             ema = (
-                (price - ema)
+
+                (
+                    price - ema
+                )
+
                 * multiplier
+
             ) + ema
 
-        return ema
+        return round(
+            ema,
+            8
+        )
 
     # =====================================================
-    # TREND VALIDATION
+    # BULLISH VALIDATION
     # =====================================================
 
     def is_bullish(
@@ -126,19 +142,27 @@ class EmaTrendService:
             period=slow_period
         )
 
-        # NOT ENOUGH DATA
+        # =================================================
+        # WARMUP
+        # =================================================
+
         if ema_fast is None:
+
             return False
 
         if ema_slow is None:
+
             return False
-        
-        log(
-            "EMA",
-            f"{symbol} fast={round(ema_fast, 2)} slow={round(ema_slow, 2)}", Fore.LIGHTWHITE_EX)
+
+        # =================================================
+        # TREND
+        # =================================================
 
         return (
             ema_fast >= ema_slow
         )
 
-ema_trend_service = EmaTrendService()
+
+ema_trend_service = (
+    EmaTrendService()
+)

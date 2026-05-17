@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from datetime import datetime
+from datetime import (
+    datetime
+)
 
 from core.config.signal_quality_config import (
     SIGNAL_QUALITY_CONFIG
@@ -22,9 +24,6 @@ from data.storage.repositories.portfolio_repository import (
     PortfolioRepository
 )
 
-from core.utils.console_logger import (
-    log
-)
 
 class SignalQualityService:
 
@@ -95,49 +94,38 @@ class SignalQualityService:
         payload
     ) -> tuple[bool, str]:
 
-        valid, reason = self._validate_trend(
-            payload
+        validators = [
+
+            self._validate_trend,
+
+            self._validate_atr,
+
+            self._validate_confidence,
+
+            self._validate_cooldown,
+
+            self._validate_max_positions,
+
+            self._validate_drawdown
+        ]
+
+        for validator in validators:
+
+            valid, reason = (
+                validator(payload)
+            )
+
+            if not valid:
+
+                return (
+                    False,
+                    reason
+                )
+
+        return (
+            True,
+            "VALID"
         )
-
-        if not valid:
-            return valid, reason
-
-        valid, reason = self._validate_atr(
-            payload
-        )
-
-        if not valid:
-            return valid, reason
-
-        valid, reason = self._validate_confidence(
-            payload
-        )
-
-        if not valid:
-            return valid, reason
-
-        valid, reason = self._validate_cooldown(
-            payload
-        )
-
-        if not valid:
-            return valid, reason
-
-        valid, reason = self._validate_max_positions(
-            payload
-        )
-
-        if not valid:
-            return valid, reason
-
-        valid, reason = self._validate_drawdown(
-            payload
-        )
-
-        if not valid:
-            return valid, reason
-
-        return True, "VALID"
 
     # =====================================================
     # TREND
@@ -152,29 +140,42 @@ class SignalQualityService:
             "enable_trend_filter"
         ]:
 
-            return True, "DISABLED"
+            return (
+                True,
+                "DISABLED"
+            )
 
-        prices = self.trend_service.get_prices(
-            user_id=payload.user_id,
-            symbol=payload.symbol
+        prices = (
+            self.trend_service.get_prices(
+                user_id=payload.user_id,
+                symbol=payload.symbol
+            )
         )
 
-        slow_period = self.config[
-            "ema_slow_period"
-        ]
+        slow_period = (
+            self.config[
+                "ema_slow_period"
+            ]
+        )
 
-        # =====================================================
-        # NOT ENOUGH DATA
-        # =====================================================
+        # =================================================
+        # WARMUP
+        # =================================================
 
         if len(prices) < slow_period:
 
-            return True, "WARMUP"
+            return (
+                True,
+                "WARMUP"
+            )
 
         ema_fast = (
+
             self.trend_service
             .calculate_ema(
+
                 prices=prices,
+
                 period=self.config[
                     "ema_fast_period"
                 ]
@@ -182,32 +183,74 @@ class SignalQualityService:
         )
 
         ema_slow = (
+
             self.trend_service
             .calculate_ema(
+
                 prices=prices,
+
                 period=slow_period
             )
         )
 
-        trend_strength = (
-            (
-                ema_fast - ema_slow
-            ) / ema_slow
-        ) * 100
-        
-        
-        # =====================================================
-        # SOFT FILTER
-        # =====================================================
+        # =================================================
+        # SAFETY
+        # =================================================
 
-        if trend_strength < -0.50:
+        if ema_fast is None:
+
+            return (
+                False,
+                "EMA_FAST_INVALID"
+            )
+
+        if ema_slow is None:
+
+            return (
+                False,
+                "EMA_SLOW_INVALID"
+            )
+
+        if ema_slow <= 0:
+
+            return (
+                False,
+                "EMA_DIVISION_INVALID"
+            )
+
+        trend_strength = round(
+
+            (
+                (
+                    ema_fast
+                    -
+                    ema_slow
+                )
+
+                / ema_slow
+            ) * 100,
+
+            4
+        )
+
+        bearish_threshold = (
+            self.config.get(
+                "bearish_threshold",
+                -0.50
+            )
+        )
+
+        if trend_strength < bearish_threshold:
 
             return (
                 False,
                 "BEARISH_TREND"
             )
 
-        return True, "OK"
+        return (
+            True,
+            "OK"
+        )
 
     # =====================================================
     # ATR
@@ -222,94 +265,50 @@ class SignalQualityService:
             "enable_volatility_filter"
         ]:
 
-            return True, "DISABLED"
+            return (
+                True,
+                "DISABLED"
+            )
 
         atr_percent = (
+
             self.atr_service
             .calculate_atr_percent(
+
                 user_id=payload.user_id,
+
                 symbol=payload.symbol,
+
                 period=self.config[
                     "atr_period"
                 ]
             )
         )
 
-        # =====================================================
-        # ATR NOT READY
-        # =====================================================
-
         if atr_percent is None:
-
-            log(
-                "ATR",
-                (
-                    f"{payload.symbol} "
-                    f"ATR_NOT_READY"
-                ),
-                "WARNING"
-            )
 
             return (
                 False,
                 "ATR_NOT_READY"
             )
 
-        min_atr = self.config[
-            "min_atr_percent"
-        ]
-
-        # =====================================================
-        # TELEMETRY
-        # =====================================================
-
-        log(
-            "ATR",
-            (
-                f"{payload.symbol} "
-                f"atr={round(atr_percent, 4)}% "
-                f"min={min_atr}%"
-            ),
-            "INFO"
+        min_atr = (
+            self.config[
+                "min_atr_percent"
+            ]
         )
 
-        # =====================================================
-        # LOW VOLATILITY
-        # =====================================================
-
         if atr_percent < min_atr:
-
-            log(
-                "ATR",
-                (
-                    f"BLOCKED "
-                    f"{payload.symbol} "
-                    f"LOW_VOLATILITY "
-                    f"atr={round(atr_percent, 4)}%"
-                ),
-                "WARNING"
-            )
 
             return (
                 False,
                 "LOW_VOLATILITY"
             )
 
-        # =====================================================
-        # APPROVED
-        # =====================================================
-
-        log(
-            "ATR",
-            (
-                f"APPROVED "
-                f"{payload.symbol} "
-                f"atr={round(atr_percent, 4)}%"
-            ),
-            "SUCCESS"
+        return (
+            True,
+            "OK"
         )
-
-        return True, "OK"
 
     # =====================================================
     # CONFIDENCE
@@ -320,24 +319,34 @@ class SignalQualityService:
         payload
     ):
 
-        threshold = self.config[
-            "confidence_threshold"
-        ]
+        threshold = (
+            self.config[
+                "confidence_threshold"
+            ]
+        )
 
-        confidence = getattr(
-            payload,
-            "signal_strength",
-            0.0
+        confidence = round(
+
+            getattr(
+                payload,
+                "signal_strength",
+                0.0
+            ),
+
+            2
         )
 
         if confidence < threshold:
 
             return (
                 False,
-                f"LOW_CONFIDENCE_{confidence}"
+                "LOW_CONFIDENCE"
             )
 
-        return True, "OK"
+        return (
+            True,
+            "OK"
+        )
 
     # =====================================================
     # COOLDOWN
@@ -352,35 +361,52 @@ class SignalQualityService:
             "enable_cooldown"
         ]:
 
-            return True, "DISABLED"
+            return (
+                True,
+                "DISABLED"
+            )
 
         key = (
             payload.user_id,
             payload.symbol
         )
 
-        now = datetime.utcnow()
-
-        last_trade = self.cooldowns.get(
-            key
+        last_trade = (
+            self.cooldowns.get(key)
         )
 
-        if last_trade:
+        if not last_trade:
 
-            seconds = (
-                now - last_trade
-            ).total_seconds()
+            return (
+                True,
+                "OK"
+            )
 
-            if seconds < self.config[
+        elapsed_seconds = (
+
+            datetime.utcnow()
+            -
+            last_trade
+
+        ).total_seconds()
+
+        cooldown_seconds = (
+            self.config[
                 "cooldown_seconds"
-            ]:
+            ]
+        )
 
-                return (
-                    False,
-                    "COOLDOWN_ACTIVE"
-                )
+        if elapsed_seconds < cooldown_seconds:
 
-        return True, "OK"
+            return (
+                False,
+                "COOLDOWN_ACTIVE"
+            )
+
+        return (
+            True,
+            "OK"
+        )
 
     # =====================================================
     # MAX POSITIONS
@@ -392,21 +418,30 @@ class SignalQualityService:
     ):
 
         open_positions = (
-            self.trades.get_open_trades(
+
+            self.trades
+            .get_open_trades(
                 user_id=payload.user_id
             )
         )
 
-        if len(open_positions) >= self.config[
-            "max_open_positions"
-        ]:
+        max_positions = (
+            self.config[
+                "max_open_positions"
+            ]
+        )
+
+        if len(open_positions) >= max_positions:
 
             return (
                 False,
                 "MAX_OPEN_POSITIONS"
             )
 
-        return True, "OK"
+        return (
+            True,
+            "OK"
+        )
 
     # =====================================================
     # DRAWDOWN
@@ -421,27 +456,43 @@ class SignalQualityService:
             "enable_drawdown_guard"
         ]:
 
-            return True, "DISABLED"
+            return (
+                True,
+                "DISABLED"
+            )
 
         snapshot = (
-            self.portfolio.get_latest_snapshot(
+
+            self.portfolio
+            .get_latest_snapshot(
                 user_id=payload.user_id
             )
         )
 
         if not snapshot:
-            return True, "NO_SNAPSHOT"
 
-        if snapshot.drawdown >= self.config[
-            "daily_drawdown_limit"
-        ]:
+            return (
+                True,
+                "NO_SNAPSHOT"
+            )
+
+        drawdown_limit = (
+            self.config[
+                "daily_drawdown_limit"
+            ]
+        )
+
+        if snapshot.drawdown >= drawdown_limit:
 
             return (
                 False,
                 "DAILY_DRAWDOWN_LIMIT"
             )
 
-        return True, "OK"
+        return (
+            True,
+            "OK"
+        )
 
 
 signal_quality_service = (

@@ -21,9 +21,15 @@ init(autoreset=True)
 # LOG DIRECTORY
 # =====================================================
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
+ROOT_DIR = (
+    Path(__file__)
+    .resolve()
+    .parents[2]
+)
 
-LOGS_DIR = ROOT_DIR / "logs"
+LOGS_DIR = (
+    ROOT_DIR / "logs"
+)
 
 LOGS_DIR.mkdir(
     exist_ok=True
@@ -38,41 +44,42 @@ ERROR_LOG_FILE = (
 )
 
 # =====================================================
+# VISUAL SETTINGS
+# =====================================================
+
+CATEGORY_WIDTH = 16
+
+SECTION_WIDTH = 60
+
+# =====================================================
 # LOG COLORS
 # =====================================================
 
 LOG_COLORS = {
 
     # ==============================================
-    # NEUTRAL
+    # DEFAULT
     # ==============================================
-
-    "MARKET": Fore.LIGHTWHITE_EX,
-    "STRATEGY": Fore.LIGHTWHITE_EX,
-    "RISK": Fore.LIGHTWHITE_EX,
-    "POSITION": Fore.LIGHTWHITE_EX,
-    "EXECUTION": Fore.LIGHTWHITE_EX,
-    "SYSTEM": Fore.LIGHTWHITE_EX,
 
     "INFO": Fore.LIGHTWHITE_EX,
 
     # ==============================================
-    # POSITIVE
+    # SUCCESS
     # ==============================================
 
     "SUCCESS": Fore.GREEN,
 
     # ==============================================
-    # NEGATIVE
-    # ==============================================
-
-    "ERROR": Fore.RED,
-
-    # ==============================================
     # WARNING
     # ==============================================
 
-    "WARNING": Fore.LIGHTYELLOW_EX
+    "WARNING": Fore.LIGHTYELLOW_EX,
+
+    # ==============================================
+    # ERROR
+    # ==============================================
+
+    "ERROR": Fore.RED
 }
 
 # =====================================================
@@ -95,12 +102,16 @@ error_logger.setLevel(
     logging.ERROR
 )
 
-# Prevent duplicate handlers
+# =====================================================
+# PREVENT DUPLICATE HANDLERS
+# =====================================================
+
 runtime_logger.handlers.clear()
+
 error_logger.handlers.clear()
 
 # =====================================================
-# ROTATING FILE HANDLERS
+# FILE HANDLERS
 # =====================================================
 
 runtime_handler = RotatingFileHandler(
@@ -142,39 +153,32 @@ def log(
 
     category_label = (
         f"[{category}]"
-        .ljust(16)
+        .ljust(CATEGORY_WIDTH)
     )
 
-    line = (
+    log_line = (
         f"{timestamp} "
         f"{category_label} "
         f"{message}"
     )
 
     # =================================================
-    # CONSOLE
+    # CONSOLE COLORS
     # =================================================
 
-    tag_color = LOG_COLORS.get(
+    level_color = LOG_COLORS.get(
         level,
         Fore.LIGHTWHITE_EX
     )
 
     console_line = (
-    
-        Fore.LIGHTWHITE_EX +
-    
-        f"{timestamp} " +
-    
-        tag_color +
-    
-        f"{category_label} " +
-    
-        Fore.LIGHTWHITE_EX +
-    
-        f"{message}" +
-    
-        Style.RESET_ALL
+        Fore.LIGHTWHITE_EX
+        + f"{timestamp} "
+        + level_color
+        + f"{category_label}"
+        + Fore.LIGHTWHITE_EX
+        + f" {message}"
+        + Style.RESET_ALL
     )
 
     print(
@@ -186,7 +190,7 @@ def log(
     # =================================================
 
     runtime_logger.info(
-        line
+        log_line
     )
 
     # =================================================
@@ -196,9 +200,9 @@ def log(
     if level == "ERROR":
 
         error_logger.error(
-            line
+            log_line
         )
-        
+
 # =====================================================
 # SECTION
 # =====================================================
@@ -207,30 +211,32 @@ def print_section(
     title: str
 ) -> None:
 
-    cyan = Fore.LIGHTCYAN_EX
+    cyan = (
+        Fore.LIGHTCYAN_EX
+    )
 
     line = (
-        "=" * 60
+        "=" * SECTION_WIDTH
     )
 
-    print("")
+    print()
 
     print(
-        cyan +
-        line +
-        Style.RESET_ALL
-    )
-
-    print(
-        cyan +
-        f"{title.center(60)}" +
-        Style.RESET_ALL
+        cyan
+        + line
+        + Style.RESET_ALL
     )
 
     print(
-        cyan +
-        line +
-        Style.RESET_ALL
+        cyan
+        + f"{title.center(SECTION_WIDTH)}"
+        + Style.RESET_ALL
     )
 
-    print("")
+    print(
+        cyan
+        + line
+        + Style.RESET_ALL
+    )
+
+    print()

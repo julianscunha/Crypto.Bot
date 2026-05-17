@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
 from core.contracts.messages import (
+
     StrategySignalMessage,
+
     RiskDecisionMessage,
+
     RiskDecisionPayload
 )
 
@@ -21,72 +24,89 @@ from core.utils.console_logger import (
 
 class RiskAgent:
 
-    def __init__(self, bus):
+    def __init__(
+        self,
+        bus
+    ):
 
         self.bus = bus
 
-        self.positions = trades_repository
+        self.positions = (
+            trades_repository
+        )
 
-        self.bus.subscribe(self)
+        self.bus.subscribe(
+            self
+        )
 
-    async def on_message(self, message):
+    # =====================================================
+    # MESSAGE
+    # =====================================================
+
+    async def on_message(
+        self,
+        message
+    ):
 
         if not isinstance(
             message,
             StrategySignalMessage
         ):
+
             return
 
-        payload = message.payload
-
-        # =====================================================
-        # START VALIDATION
-        # =====================================================
-
-        log(
-            "RISK",
-            f"VALIDATING {payload.symbol}"
+        payload = (
+            message.payload
         )
 
-        # =====================================================
+        # =================================================
         # ATR VALIDATION
-        # =====================================================
+        # =================================================
 
         if payload.atr is None:
 
             log(
                 "RISK",
-                f"BLOCKED {payload.symbol} | ATR_MISSING",
+                "BLOCKED ATR_NOT_READY",
+                "WARNING"
+            )
+
+            return
+
+        if payload.atr <= 0:
+
+            log(
+                "RISK",
+                "BLOCKED INVALID_ATR",
                 "ERROR"
             )
 
             return
 
-        # =====================================================
+        # =================================================
         # SIGNAL FILTER
-        # =====================================================
+        # =================================================
 
         if payload.signal != "BUY":
 
             log(
                 "RISK",
-                (
-                    f"BLOCKED "
-                    f"{payload.symbol} "
-                    f"| INVALID_SIGNAL"
-                ),
-                "ERROR"
+                "BLOCKED INVALID_SIGNAL",
+                "WARNING"
             )
 
             return
 
-        # =====================================================
+        # =================================================
         # EXISTING POSITION
-        # =====================================================
+        # =================================================
 
         existing_position = (
+
             self.positions.get_open_trade(
+
                 user_id=payload.user_id,
+
                 symbol=payload.symbol
             )
         )
@@ -95,264 +115,361 @@ class RiskAgent:
 
             log(
                 "RISK",
-                (
-                    f"BLOCKED "
-                    f"{payload.symbol} "
-                    f"| POSITION_ALREADY_OPEN"
-                ),
+                "BLOCKED POSITION_ALREADY_OPEN",
+                "WARNING"
+            )
+
+            return
+
+        # =================================================
+        # ENTRY
+        # =================================================
+
+        entry_price = round(
+            payload.entry_price,
+            2
+        )
+
+        if entry_price <= 0:
+
+            log(
+                "RISK",
+                "BLOCKED INVALID_ENTRY",
                 "ERROR"
             )
 
             return
 
-        # =====================================================
-        # ENTRY PRICE
-        # =====================================================
-
-        entry_price = payload.entry_price
-
-        # =====================================================
-        # ATR MULTIPLIERS
-        # =====================================================
+        # =================================================
+        # ATR CONFIG
+        # =================================================
 
         atr_stop_multiplier = (
+
             TRADING_CONFIG[
                 "atr_stop_multiplier"
             ]
         )
 
         atr_take_profit_multiplier = (
+
             TRADING_CONFIG[
                 "atr_take_profit_multiplier"
             ]
         )
 
         atr_trailing_multiplier = (
+
             TRADING_CONFIG[
                 "atr_trailing_multiplier"
             ]
         )
 
-        # =====================================================
-        # STOP LOSS
-        # =====================================================
+        # =================================================
+        # LEVELS
+        # =================================================
 
         stop_loss = round(
-            entry_price - (
-                payload.atr *
+
+            entry_price
+            -
+            (
+                payload.atr
+                *
                 atr_stop_multiplier
             ),
+
             2
         )
-
-        # =====================================================
-        # TAKE PROFIT
-        # =====================================================
 
         take_profit = round(
-            entry_price + (
-                payload.atr *
+
+            entry_price
+            +
+            (
+                payload.atr
+                *
                 atr_take_profit_multiplier
             ),
+
             2
         )
-
-        # =====================================================
-        # TRAILING STOP
-        # =====================================================
 
         trailing_stop = round(
-            payload.atr *
+
+            payload.atr
+            *
             atr_trailing_multiplier,
+
             2
         )
 
-        # =====================================================
-        # RISK DISTANCE
-        # =====================================================
+        # =================================================
+        # STOP VALIDATION
+        # =================================================
 
-        risk_distance = abs(
-            entry_price - stop_loss
+        if stop_loss <= 0:
+
+            log(
+                "RISK",
+                "BLOCKED INVALID_STOP",
+                "ERROR"
+            )
+
+            return
+
+        if stop_loss >= entry_price:
+
+            log(
+                "RISK",
+                "BLOCKED INVALID_STOP",
+                "ERROR"
+            )
+
+            return
+
+        if take_profit <= entry_price:
+
+            log(
+                "RISK",
+                "BLOCKED INVALID_TARGET",
+                "ERROR"
+            )
+
+            return
+
+        # =================================================
+        # RISK DISTANCE
+        # =================================================
+
+        risk_distance = round(
+
+            abs(
+                entry_price - stop_loss
+            ),
+
+            8
         )
 
         if risk_distance <= 0:
 
             log(
                 "RISK",
-                (
-                    f"BLOCKED "
-                    f"{payload.symbol} "
-                    f"| INVALID_RISK_DISTANCE"
-                ),
+                "BLOCKED INVALID_RISK_DISTANCE",
                 "ERROR"
             )
 
             return
 
-        # =====================================================
-        # EQUITY RISK SIZING
-        # =====================================================
+        # =================================================
+        # ACCOUNT
+        # =================================================
 
         account_balance = (
+
             TRADING_CONFIG[
                 "account_balance"
             ]
         )
 
         risk_percent = (
+
             TRADING_CONFIG[
                 "risk_per_trade_percent"
             ]
         )
 
-        risk_amount = (
-            account_balance *
-            (risk_percent / 100)
+        risk_amount = round(
+
+            account_balance
+            *
+            (
+                risk_percent / 100
+            ),
+
+            2
         )
 
+        # =================================================
+        # POSITION SIZE
+        # =================================================
+
         quantity = round(
-            risk_amount / risk_distance,
+
+            risk_amount
+            / risk_distance,
+
             6
         )
 
-        # =====================================================
-        # POSITION VALIDATION
-        # =====================================================
-        
         if quantity <= 0:
-        
+
             log(
                 "RISK",
-                (
-                    f"BLOCKED "
-                    f"{payload.symbol} "
-                    f"| INVALID_POSITION_SIZE"
-                ),
+                "BLOCKED INVALID_POSITION_SIZE",
                 "ERROR"
             )
-        
+
             return
-        
-        notional_value = (
-            quantity * entry_price
+
+        # =================================================
+        # EXPOSURE
+        # =================================================
+
+        notional_value = round(
+
+            quantity
+            *
+            entry_price,
+
+            2
         )
-        
+
         max_exposure_percent = (
+
             TRADING_CONFIG[
                 "max_position_exposure_percent"
             ]
         )
-        
-        max_exposure_value = (
-            account_balance *
-            (max_exposure_percent / 100)
-        )
-        
-        # =====================================================
-        # MICRO ACCOUNT ADAPTATION
-        # =====================================================
-        
-        if notional_value > max_exposure_value:
-        
-            quantity = round(
-                max_exposure_value / entry_price,
-                6
-            )
-        
-            notional_value = (
-                quantity * entry_price
-            )
 
-        # =====================================================
-        # REWARD DISTANCE
-        # =====================================================
+        max_exposure_value = round(
 
-        reward_distance = (
-            take_profit - entry_price
-        )
+            account_balance
+            *
+            (
+                max_exposure_percent / 100
+            ),
 
-        risk_reward = round(
-            reward_distance / risk_distance,
             2
         )
 
-        # =====================================================
-        # MIN RR FILTER
-        # =====================================================
+        # =================================================
+        # MICRO ACCOUNT ADAPTATION
+        # =================================================
+
+        if notional_value > max_exposure_value:
+
+            quantity = round(
+
+                max_exposure_value
+                / entry_price,
+
+                6
+            )
+
+            notional_value = round(
+
+                quantity
+                *
+                entry_price,
+
+                2
+            )
+
+        # =================================================
+        # FINAL VALIDATION
+        # =================================================
+
+        if quantity <= 0:
+
+            log(
+                "RISK",
+                "BLOCKED EXPOSURE_LIMIT",
+                "WARNING"
+            )
+
+            return
+
+        # =================================================
+        # REWARD
+        # =================================================
+
+        reward_distance = round(
+
+            take_profit
+            - entry_price,
+
+            8
+        )
+
+        risk_reward = round(
+
+            reward_distance
+            / risk_distance,
+
+            2
+        )
+
+        # =================================================
+        # RR FILTER
+        # =================================================
 
         if risk_reward < 1.2:
-        
+
             log(
                 "RISK",
                 (
-                    f"BLOCKED "
-                    f"{payload.symbol} "
-                    f"| LOW_RR "
+                    f"BLOCKED LOW_RR "
                     f"rr={risk_reward}"
                 ),
-                "ERROR"
+                "WARNING"
             )
-        
+
             return
 
-        # =====================================================
-        # ATR INFO
-        # =====================================================
-
-        log(
-            "RISK",
-            (
-                f"ATR "
-                f"{payload.symbol} "
-                f"atr={payload.atr:.4f} "
-                f"sl={stop_loss} "
-                f"tp={take_profit} "
-                f"qty={quantity}"
-            )
-        )
-
-        # =====================================================
+        # =================================================
         # PAYLOAD
-        # =====================================================
+        # =================================================
 
         decision_payload = (
             RiskDecisionPayload(
+
                 user_id=payload.user_id,
+
                 symbol=payload.symbol,
+
                 signal=payload.signal,
+
                 entry_price=entry_price,
+
                 quantity=quantity,
+
                 stop_loss=stop_loss,
+
                 take_profit=take_profit,
+
                 trailing_stop=trailing_stop,
+
                 risk_reward=risk_reward
             )
         )
 
         decision_message = (
             RiskDecisionMessage(
+
                 sender="RiskAgent",
+
                 payload=decision_payload
             )
         )
 
-        # =====================================================
+        # =================================================
         # APPROVED
-        # =====================================================
+        # =================================================
 
         log(
             "RISK",
             (
                 f"APPROVED "
-                f"{payload.symbol} "
-                f"rr={risk_reward}"
+                f"rr={risk_reward} "
+                f"qty={quantity}"
             ),
             "SUCCESS"
         )
 
-        # =====================================================
+        # =================================================
         # PUBLISH
-        # =====================================================
+        # =================================================
 
         await self.bus.publish(
             decision_message

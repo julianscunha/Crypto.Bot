@@ -77,11 +77,7 @@ class ExecutionAgent:
 
             log(
                 "EXECUTION",
-                (
-                    f"BLOCKED "
-                    f"{payload.symbol} "
-                    f"| INVALID_SIGNAL"
-                ),
+                "BLOCKED INVALID_SIGNAL",
                 "ERROR"
             )
 
@@ -98,12 +94,8 @@ class ExecutionAgent:
 
             log(
                 "EXECUTION",
-                (
-                    f"BLOCKED "
-                    f"{payload.symbol} "
-                    f"| POSITION_ALREADY_OPEN"
-                ),
-                "ERROR"
+                "BLOCKED POSITION_ALREADY_OPEN",
+                "WARNING"
             )
 
             return
@@ -144,10 +136,9 @@ class ExecutionAgent:
         log(
             "EXECUTION",
             (
-                f"{execution_mode} OPEN BUY "
-                f"{payload.symbol} "
+                f"{execution_mode} BUY "
                 f"@ {entry_price} "
-                f"| qty={payload.quantity}"
+                f"qty={payload.quantity}"
             ),
             "SUCCESS"
         )
@@ -162,7 +153,7 @@ class ExecutionAgent:
         )
 
         # =====================================================
-        # PORTFOLIO
+        # PORTFOLIO METRICS
         # =====================================================
 
         metrics = (
@@ -174,9 +165,7 @@ class ExecutionAgent:
         log(
             "POSITION",
             (
-                f"PORTFOLIO "
-                f"trades={metrics['total_trades']} "
-                f"| winrate={metrics['winrate']} "
-                f"| pnl={metrics['pnl']}"
+                f"OPEN={metrics['open_positions']} "
+                f"PNL={metrics['pnl']}"
             )
         )

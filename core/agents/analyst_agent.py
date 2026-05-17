@@ -14,19 +14,18 @@ from core.services.market_structure_service import (
     market_structure_service
 )
 
-from core.services.atr_service import (
-    atr_service
+from core.services.market_regime_service import (
+    market_regime_service
 )
 
-from colorama import (
-    Fore,
-    Style,
-    init
+from core.services.atr_service import (
+    atr_service
 )
 
 from core.utils.console_logger import (
     log
 )
+
 
 class AnalystAgent:
 
@@ -42,7 +41,13 @@ class AnalystAgent:
             market_structure_service
         )
 
-        self.atr_service = atr_service
+        self.market_regime = (
+            market_regime_service
+        )
+
+        self.atr_service = (
+            atr_service
+        )
 
         self.bus.subscribe(self)
 
@@ -85,6 +90,36 @@ class AnalystAgent:
             low=payload.low,
             close=payload.close
         )
+
+        # =====================================================
+        # UPDATE REGIME ENGINE
+        # =====================================================
+
+        self.market_regime.update_price(
+            symbol=payload.symbol,
+            close=payload.close
+        )
+
+        regime = (
+            self.market_regime.detect_regime(
+                payload.symbol
+            )
+        )
+
+        # =====================================================
+        # REGIME CHANGED
+        # =====================================================
+
+        if self.market_regime.has_changed(
+            payload.symbol,
+            regime
+        ):
+
+            log(
+                "MARKET",
+                f"REGIME {regime}",
+                "INFO"
+            )
 
         # =====================================================
         # SIMPLE ANALYSIS
