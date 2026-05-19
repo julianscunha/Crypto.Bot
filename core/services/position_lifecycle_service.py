@@ -8,31 +8,99 @@ from core.config.exchange_config import (
 class PositionLifecycleService:
 
     # =====================================================
-    # UNREALIZED PNL
+    # HELPERS
     # =====================================================
 
     @staticmethod
+    def _is_valid_price(
+        price: float
+    ) -> bool:
+
+        return (
+            price is not None
+            and
+            price > 0
+        )
+
+    @staticmethod
+    def _is_valid_quantity(
+        quantity: float
+    ) -> bool:
+
+        return (
+            quantity is not None
+            and
+            quantity > 0
+        )
+
+    @staticmethod
+    def _round_price(
+        value: float
+    ) -> float:
+
+        precision = (
+            EXCHANGE_CONFIG[
+                "price_precision"
+            ]
+        )
+
+        return round(
+            value,
+            precision
+        )
+
+    @staticmethod
+    def _calculate_fee(
+        price: float,
+        quantity: float,
+        fee_percent: float
+    ) -> float:
+
+        return (
+            price
+            *
+            quantity
+            *
+            fee_percent
+        )
+
+    # =====================================================
+    # UNREALIZED PNL
+    # =====================================================
+
+    @classmethod
     def calculate_unrealized_pnl(
+        cls,
         entry_price: float,
         current_price: float,
         quantity: float
-    ):
+    ) -> float:
 
         # =================================================
         # SAFETY
         # =================================================
 
-        if entry_price <= 0:
+        if not cls._is_valid_price(
+            entry_price
+        ):
 
             return 0.0
 
-        if current_price <= 0:
+        if not cls._is_valid_price(
+            current_price
+        ):
 
             return 0.0
 
-        if quantity <= 0:
+        if not cls._is_valid_quantity(
+            quantity
+        ):
 
             return 0.0
+
+        # =================================================
+        # GROSS PNL
+        # =================================================
 
         gross_pnl = (
 
@@ -50,28 +118,32 @@ class PositionLifecycleService:
             "use_fees"
         ]:
 
-            fee_percent = (
+            taker_fee_percent = (
                 EXCHANGE_CONFIG[
                     "taker_fee"
                 ]
             )
 
             entry_fee = (
+                cls._calculate_fee(
 
-                entry_price
-                *
-                quantity
-                *
-                fee_percent
+                    entry_price,
+
+                    quantity,
+
+                    taker_fee_percent
+                )
             )
 
             exit_fee = (
+                cls._calculate_fee(
 
-                current_price
-                *
-                quantity
-                *
-                fee_percent
+                    current_price,
+
+                    quantity,
+
+                    taker_fee_percent
+                )
             )
 
             gross_pnl -= (
@@ -89,16 +161,15 @@ class PositionLifecycleService:
     # ENTRY SLIPPAGE
     # =====================================================
 
-    @staticmethod
+    @classmethod
     def apply_entry_slippage(
+        cls,
         entry_price: float
     ) -> float:
 
-        # =================================================
-        # SAFETY
-        # =================================================
-
-        if entry_price <= 0:
+        if not cls._is_valid_price(
+            entry_price
+        ):
 
             return 0.0
 
@@ -106,12 +177,11 @@ class PositionLifecycleService:
             "use_slippage"
         ]:
 
-            return round(
-                entry_price,
-                2
+            return cls._round_price(
+                entry_price
             )
 
-        slippage = (
+        slippage_percent = (
             EXCHANGE_CONFIG[
                 "slippage"
             ]
@@ -123,29 +193,27 @@ class PositionLifecycleService:
 
             * (
 
-                1 + slippage
+                1 + slippage_percent
             )
         )
 
-        return round(
-            adjusted_price,
-            2
+        return cls._round_price(
+            adjusted_price
         )
 
     # =====================================================
     # EXIT SLIPPAGE
     # =====================================================
 
-    @staticmethod
+    @classmethod
     def apply_exit_slippage(
+        cls,
         exit_price: float
     ) -> float:
 
-        # =================================================
-        # SAFETY
-        # =================================================
-
-        if exit_price <= 0:
+        if not cls._is_valid_price(
+            exit_price
+        ):
 
             return 0.0
 
@@ -153,12 +221,11 @@ class PositionLifecycleService:
             "use_slippage"
         ]:
 
-            return round(
-                exit_price,
-                2
+            return cls._round_price(
+                exit_price
             )
 
-        slippage = (
+        slippage_percent = (
             EXCHANGE_CONFIG[
                 "slippage"
             ]
@@ -170,11 +237,31 @@ class PositionLifecycleService:
 
             * (
 
-                1 - slippage
+                1 - slippage_percent
             )
         )
 
-        return round(
-            adjusted_price,
-            2
+        return cls._round_price(
+            adjusted_price
+        )
+
+    # =====================================================
+    # NET PNL
+    # =====================================================
+
+    @classmethod
+    def calculate_net_pnl(
+        cls,
+        entry_price: float,
+        exit_price: float,
+        quantity: float
+    ) -> float:
+
+        return cls.calculate_unrealized_pnl(
+
+            entry_price=entry_price,
+
+            current_price=exit_price,
+
+            quantity=quantity
         )

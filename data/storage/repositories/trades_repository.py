@@ -8,6 +8,10 @@ from sqlalchemy.orm import (
     Session
 )
 
+from sqlalchemy import (
+    desc
+)
+
 from data.storage.database import (
     SessionLocal
 )
@@ -19,6 +23,10 @@ from data.storage.models import (
 
 class TradesRepository:
 
+    def __init__(self):
+
+        pass
+
     # =====================================================
     # SESSION
     # =====================================================
@@ -28,6 +36,32 @@ class TradesRepository:
     ) -> Session:
 
         return SessionLocal()
+
+    # =====================================================
+    # HELPERS
+    # =====================================================
+
+    @staticmethod
+    def _is_valid_price(
+        value: float
+    ) -> bool:
+
+        return (
+            value is not None
+            and
+            value > 0
+        )
+
+    @staticmethod
+    def _is_valid_quantity(
+        value: float
+    ) -> bool:
+
+        return (
+            value is not None
+            and
+            value > 0
+        )
 
     # =====================================================
     # CREATE TRADE
@@ -47,14 +81,18 @@ class TradesRepository:
     ):
 
         # =================================================
-        # SAFETY
+        # VALIDATION
         # =================================================
 
-        if entry_price <= 0:
+        if not self._is_valid_price(
+            entry_price
+        ):
 
             return None
 
-        if quantity <= 0:
+        if not self._is_valid_quantity(
+            quantity
+        ):
 
             return None
 
@@ -120,6 +158,34 @@ class TradesRepository:
             session.close()
 
     # =====================================================
+    # GET TRADE
+    # =====================================================
+
+    def get_trade(
+        self,
+        trade_id: int
+    ):
+
+        session = self._session()
+
+        try:
+
+            return (
+
+                session.query(Trade)
+
+                .filter(
+                    Trade.id == trade_id
+                )
+
+                .first()
+            )
+
+        finally:
+
+            session.close()
+
+    # =====================================================
     # GET OPEN TRADE
     # =====================================================
 
@@ -144,6 +210,10 @@ class TradesRepository:
                     Trade.symbol == symbol,
 
                     Trade.status == "OPEN"
+                )
+
+                .order_by(
+                    desc(Trade.id)
                 )
 
                 .first()
@@ -177,6 +247,10 @@ class TradesRepository:
                     Trade.status == "OPEN"
                 )
 
+                .order_by(
+                    desc(Trade.id)
+                )
+
                 .all()
             )
 
@@ -208,6 +282,10 @@ class TradesRepository:
                     Trade.status == "CLOSED"
                 )
 
+                .order_by(
+                    desc(Trade.closed_at)
+                )
+
                 .all()
             )
 
@@ -216,7 +294,7 @@ class TradesRepository:
             session.close()
 
     # =====================================================
-    # HAS OPEN TRADE
+    # POSITION EXISTS
     # =====================================================
 
     def has_open_trade(
@@ -226,7 +304,9 @@ class TradesRepository:
     ) -> bool:
 
         trade = self.get_open_trade(
+
             user_id=user_id,
+
             symbol=symbol
         )
 
@@ -243,11 +323,9 @@ class TradesRepository:
         unrealized_pnl: float
     ):
 
-        # =================================================
-        # SAFETY
-        # =================================================
-
-        if current_price <= 0:
+        if not self._is_valid_price(
+            current_price
+        ):
 
             return None
 
@@ -255,74 +333,75 @@ class TradesRepository:
 
         try:
 
-            trade = (
-
-                session.query(Trade)
-
-                .filter(
-                    Trade.id == trade_id
-                )
-
-                .first()
+            trade = self.get_trade(
+                trade_id
             )
 
             if not trade:
 
                 return None
 
+            managed_trade = session.merge(
+                trade
+            )
+
             # =================================================
             # PRICE
             # =================================================
 
-            trade.current_price = (
+            managed_trade.current_price = (
                 current_price
             )
 
-            trade.unrealized_pnl = (
+            managed_trade.unrealized_pnl = (
                 unrealized_pnl
             )
 
             # =================================================
-            # HIGHEST PRICE
+            # HIGH WATERMARK
             # =================================================
 
             if (
 
-                trade.highest_price is None
+                managed_trade.highest_price is None
 
                 or
 
-                current_price > trade.highest_price
+                current_price
+                >
+                managed_trade.highest_price
             ):
 
-                trade.highest_price = (
+                managed_trade.highest_price = (
                     current_price
                 )
 
             # =================================================
-            # LOWEST PRICE
+            # LOW WATERMARK
             # =================================================
 
             if (
 
-                trade.lowest_price is None
+                managed_trade.lowest_price is None
 
                 or
 
-                current_price < trade.lowest_price
+                current_price
+                <
+                managed_trade.lowest_price
             ):
 
-                trade.lowest_price = (
+                managed_trade.lowest_price = (
                     current_price
                 )
 
             session.commit()
 
             session.refresh(
-                trade
+                managed_trade
             )
 
-            return trade
+            return managed_trade
 
         except Exception:
 
@@ -346,11 +425,9 @@ class TradesRepository:
         reason: str
     ):
 
-        # =================================================
-        # SAFETY
-        # =================================================
-
-        if exit_price <= 0:
+        if not self._is_valid_price(
+            exit_price
+        ):
 
             return None
 
@@ -358,46 +435,45 @@ class TradesRepository:
 
         try:
 
-            trade = (
-
-                session.query(Trade)
-
-                .filter(
-                    Trade.id == trade_id
-                )
-
-                .first()
+            trade = self.get_trade(
+                trade_id
             )
 
             if not trade:
 
                 return None
 
-            trade.current_price = (
+            managed_trade = session.merge(
+                trade
+            )
+
+            managed_trade.current_price = (
                 exit_price
             )
 
-            trade.pnl = pnl
+            managed_trade.pnl = pnl
 
-            trade.realized_pnl = pnl
+            managed_trade.realized_pnl = pnl
 
-            trade.unrealized_pnl = 0.0
+            managed_trade.unrealized_pnl = 0.0
 
-            trade.status = "CLOSED"
+            managed_trade.status = "CLOSED"
 
-            trade.exit_reason = reason
+            managed_trade.exit_reason = (
+                reason
+            )
 
-            trade.closed_at = (
+            managed_trade.closed_at = (
                 datetime.utcnow()
             )
 
             session.commit()
 
             session.refresh(
-                trade
+                managed_trade
             )
 
-            return trade
+            return managed_trade
 
         except Exception:
 

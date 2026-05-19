@@ -12,6 +12,10 @@ from core.services.position_lifecycle_service import (
     PositionLifecycleService
 )
 
+from core.config.trade_management_config import (
+    TRADE_MANAGEMENT_CONFIG
+)
+
 from core.utils.console_logger import (
     log
 )
@@ -19,7 +23,10 @@ from core.utils.console_logger import (
 
 class PositionManagerAgent:
 
-    def __init__(self, bus):
+    def __init__(
+        self,
+        bus
+    ):
 
         self.bus = bus
 
@@ -27,138 +34,240 @@ class PositionManagerAgent:
             trades_repository
         )
 
-        self.bus.subscribe(self)
+        self.lifecycle = (
+            PositionLifecycleService
+        )
 
-    async def on_message(self, message):
+        self.config = (
+            TRADE_MANAGEMENT_CONFIG
+        )
+
+        self.bus.subscribe(
+            self
+        )
+
+    # =====================================================
+    # MESSAGE
+    # =====================================================
+
+    async def on_message(
+        self,
+        message
+    ):
 
         if not isinstance(
             message,
             MarketDataMessage
         ):
+
             return
 
-        payload = message.payload
+        payload = (
+            message.payload
+        )
 
-        positions = (
+        open_positions = (
+
             self.positions.get_open_trades(
                 user_id=payload.user_id
             )
         )
 
-        for trade in positions:
+        for trade in open_positions:
 
             if trade.symbol != payload.symbol:
 
                 continue
 
-            # =====================================================
-            # UNREALIZED PNL
-            # =====================================================
+            self._process_position(
 
-            unrealized_pnl = (
-                PositionLifecycleService
-                .calculate_unrealized_pnl(
-                    entry_price=trade.entry_price,
-                    current_price=payload.close,
-                    quantity=trade.quantity
-                )
+                trade=trade,
+
+                market_price=payload.close
             )
 
-            # =====================================================
-            # UPDATE TRADE
-            # =====================================================
+    # =====================================================
+    # PROCESS POSITION
+    # =====================================================
 
-            trade = (
-                self.positions.update_trade_price(
-                    trade_id=trade.id,
-                    current_price=payload.close,
-                    unrealized_pnl=unrealized_pnl
-                )
+    def _process_position(
+        self,
+        trade,
+        market_price: float
+    ):
+
+        # =================================================
+        # UNREALIZED PNL
+        # =================================================
+
+        unrealized_pnl = (
+
+            self.lifecycle
+            .calculate_unrealized_pnl(
+
+                entry_price=trade.entry_price,
+
+                current_price=market_price,
+
+                quantity=trade.quantity
+            )
+        )
+
+        # =================================================
+        # UPDATE TRADE
+        # =================================================
+
+        managed_trade = (
+
+            self.positions
+            .update_trade_price(
+
+                trade_id=trade.id,
+
+                current_price=market_price,
+
+                unrealized_pnl=unrealized_pnl
+            )
+        )
+
+        if not managed_trade:
+
+            return
+
+        # =================================================
+        # TRAILING STOP
+        # =================================================
+
+        trailing_stop_price = (
+            self._calculate_trailing_stop_price(
+                managed_trade
+            )
+        )
+
+        pnl = round(
+
+            managed_trade.unrealized_pnl,
+
+            2
+        )
+
+        # =================================================
+        # STOP LOSS
+        # =================================================
+
+        if market_price <= managed_trade.stop_loss:
+
+            self._close_position(
+
+                managed_trade,
+
+                market_price,
+
+                "STOP_LOSS",
+
+                pnl,
+
+                "ERROR"
             )
 
-            if not trade:
+            return
 
-                continue
+        # =================================================
+        # TAKE PROFIT
+        # =================================================
 
-            # =====================================================
-            # UPDATE HIGHEST PRICE
-            # =====================================================
+        if market_price >= managed_trade.take_profit:
 
-            if payload.close > trade.highest_price:
+            self._close_position(
 
-                trade.highest_price = (
-                    payload.close
-                )
+                managed_trade,
 
-                self.positions.session.commit()
+                market_price,
 
-            # =====================================================
-            # TRAILING PRICE
-            # =====================================================
+                "TAKE_PROFIT",
 
-            trailing_price = (
-                trade.highest_price
-                - trade.trailing_stop
+                pnl,
+
+                "SUCCESS"
             )
 
-            pnl = round(
-                trade.unrealized_pnl,
-                2
+            return
+
+        # =================================================
+        # TRAILING STOP
+        # =================================================
+
+        if market_price <= trailing_stop_price:
+
+            self._close_position(
+
+                managed_trade,
+
+                market_price,
+
+                "TRAILING_STOP",
+
+                pnl,
+
+                "WARNING"
             )
 
-            # =====================================================
-            # STOP LOSS
-            # =====================================================
+    # =====================================================
+    # TRAILING STOP
+    # =====================================================
 
-            if payload.close <= trade.stop_loss:
+    def _calculate_trailing_stop_price(
+        self,
+        trade
+    ):
 
-                self.positions.close_trade(
-                    trade_id=trade.id,
-                    exit_price=payload.close,
-                    pnl=trade.unrealized_pnl,
-                    reason="STOP_LOSS"
-                )
+        if not self.config[
+            "enable_trailing_stop"
+        ]:
 
-                log(
-                    "POSITION",
-                    f"STOP LOSS pnl={pnl}",
-                    "ERROR"
-                )
+            return float("-inf")
 
-            # =====================================================
-            # TAKE PROFIT
-            # =====================================================
+        if trade.highest_price is None:
 
-            elif payload.close >= trade.take_profit:
+            return float("-inf")
 
-                self.positions.close_trade(
-                    trade_id=trade.id,
-                    exit_price=payload.close,
-                    pnl=trade.unrealized_pnl,
-                    reason="TAKE_PROFIT"
-                )
+        trailing_distance = (
+            trade.trailing_stop
+        )
 
-                log(
-                    "POSITION",
-                    f"TAKE PROFIT pnl={pnl}",
-                    "SUCCESS"
-                )
+        return (
 
-            # =====================================================
-            # TRAILING STOP
-            # =====================================================
+            trade.highest_price
+            -
+            trailing_distance
+        )
 
-            elif payload.close <= trailing_price:
+    # =====================================================
+    # CLOSE POSITION
+    # =====================================================
 
-                self.positions.close_trade(
-                    trade_id=trade.id,
-                    exit_price=payload.close,
-                    pnl=trade.unrealized_pnl,
-                    reason="TRAILING_STOP"
-                )
+    def _close_position(
+        self,
+        trade,
+        exit_price: float,
+        reason: str,
+        pnl: float,
+        log_level: str
+    ):
 
-                log(
-                    "POSITION",
-                    f"TRAILING STOP pnl={pnl}",
-                    "WARNING"
-                )
+        self.positions.close_trade(
+
+            trade_id=trade.id,
+
+            exit_price=exit_price,
+
+            pnl=trade.unrealized_pnl,
+
+            reason=reason
+        )
+
+        log(
+            "POSITION",
+            f"{reason} pnl={pnl}",
+            log_level
+        )

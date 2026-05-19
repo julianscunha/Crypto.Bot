@@ -64,23 +64,11 @@ from core.state.market_state import (
 )
 
 
-async def main():
+# =========================================================
+# SYSTEM PANEL
+# =========================================================
 
-    # =====================================================
-    # DATABASE
-    # =====================================================
-
-    init_db()
-
-    # =====================================================
-    # CONFIG
-    # =====================================================
-
-    load_best_config()
-
-    # =====================================================
-    # SYSTEM PANEL
-    # =====================================================
+def print_system_panel():
 
     print_section(
         "CRYPTO.BOT ENGINE"
@@ -116,21 +104,25 @@ async def main():
         "SUCCESS"
     )
 
-    # =====================================================
-    # EVENT BUS
-    # =====================================================
-
-    bus = EventBus()
-
     log(
         "SYSTEM",
         "EVENT BUS      READY",
         "SUCCESS"
     )
 
-    # =====================================================
-    # AGENTS
-    # =====================================================
+    log(
+        "SYSTEM",
+        "AGENTS         READY",
+        "SUCCESS"
+    )
+
+# =========================================================
+# AGENTS
+# =========================================================
+
+def initialize_agents(
+    bus
+):
 
     AnalystAgent(bus)
 
@@ -142,24 +134,6 @@ async def main():
 
     PositionManagerAgent(bus)
 
-    log(
-        "SYSTEM",
-        "AGENTS         READY",
-        "SUCCESS"
-    )
-
-    # =====================================================
-    # WEBSOCKET
-    # =====================================================
-
-    ws = BinanceWS(
-        bus=bus,
-        user_id=0
-    )
-
-    await ws.start()
-
-
 # =========================================================
 # SESSION REPORT
 # =========================================================
@@ -170,15 +144,23 @@ def print_session_report():
         PortfolioService()
     )
 
-    snapshot = (
-        portfolio_service.build_snapshot(
+    portfolio_snapshot = (
+
+        portfolio_service
+        .build_snapshot(
+
             user_id=0,
+
             initial_balance=(
                 TRADING_CONFIG[
                     "account_balance"
                 ]
             )
         )
+    )
+
+    runtime_snapshot = (
+        market_state.snapshot()
     )
 
     ReportRenderer.print_header(
@@ -195,64 +177,70 @@ def print_session_report():
 
     ReportRenderer.print_metric(
         "Balance",
-        snapshot.balance
+        portfolio_snapshot.balance
     )
 
     ReportRenderer.print_metric(
         "Equity",
-        snapshot.equity
+        portfolio_snapshot.equity
     )
 
     ReportRenderer.print_metric(
         "Realized PnL",
-        snapshot.realized_pnl
+        portfolio_snapshot.realized_pnl
     )
 
     ReportRenderer.print_metric(
         "Unrealized PnL",
-        snapshot.unrealized_pnl
+        portfolio_snapshot.unrealized_pnl
     )
 
     ReportRenderer.print_metric(
         "Total PnL",
-        snapshot.total_pnl
+        portfolio_snapshot.total_pnl
     )
 
     ReportRenderer.print_metric(
         "Open Positions",
-        snapshot.open_positions
+        portfolio_snapshot.open_positions
     )
 
     ReportRenderer.print_metric(
         "Closed Positions",
-        snapshot.closed_positions
+        portfolio_snapshot.closed_positions
     )
 
     ReportRenderer.print_metric(
         "Exposure",
-        snapshot.exposure
+        portfolio_snapshot.exposure
     )
 
     ReportRenderer.print_metric(
         "Drawdown",
-        f"{snapshot.drawdown}%"
+        f"{portfolio_snapshot.drawdown}%"
     )
 
     # =====================================================
     # BLOCKED SIGNALS
     # =====================================================
 
-    blocked = (
-        market_state.get_blocked_signals()
+    blocked_reasons = (
+        runtime_snapshot[
+            "blocked_signal_reasons"
+        ]
     )
 
-    if blocked:
+    if blocked_reasons:
 
         ReportRenderer.print_section(
             "BLOCKED SIGNALS"
         )
 
-        for reason, count in blocked.items():
+        for reason, count in sorted(
+            blocked_reasons.items(),
+            key=lambda item: item[1],
+            reverse=True
+        ):
 
             ReportRenderer.print_metric(
                 reason,
@@ -260,43 +248,67 @@ def print_session_report():
             )
 
     # =====================================================
-    # MARKET
+    # MARKET PIPELINE
     # =====================================================
-
-    market_snapshot = (
-        market_state.snapshot()
-    )
 
     ReportRenderer.print_section(
         "MARKET"
     )
 
     ReportRenderer.print_metric(
-        "Generated Signals",
-        market_snapshot[
-            "generated_signals"
+        "Market Messages",
+        runtime_snapshot[
+            "total_market_messages"
         ]
     )
 
     ReportRenderer.print_metric(
-        "Acceptance Ratio",
+        "Analysis Requests",
+        runtime_snapshot[
+            "total_analysis_requests"
+        ]
+    )
+
+    ReportRenderer.print_metric(
+        "Generated Signals",
+        runtime_snapshot[
+            "total_generated_signals"
+        ]
+    )
+
+    ReportRenderer.print_metric(
+        "Approved Signals",
+        runtime_snapshot[
+            "total_approved_signals"
+        ]
+    )
+
+    ReportRenderer.print_metric(
+        "Rejected Signals",
+        runtime_snapshot[
+            "total_rejected_signals"
+        ]
+    )
+
+    ReportRenderer.print_metric(
+        "Signal Generation Ratio",
         (
-            f"{market_snapshot['acceptance_ratio']}%"
+            f"{runtime_snapshot['signal_generation_ratio']}%"
         )
     )
 
     ReportRenderer.print_metric(
-        "Messages",
-        market_snapshot[
-            "total_messages"
-        ]
+        "Signal Approval Ratio",
+        (
+            f"{runtime_snapshot['signal_approval_ratio']}%"
+        )
     )
 
     ReportRenderer.print_metric(
         "Websocket",
         (
             "CONNECTED"
-            if market_snapshot[
+            if runtime_snapshot[
                 "websocket_connected"
             ]
             else "DISCONNECTED"
@@ -306,7 +318,7 @@ def print_session_report():
     ReportRenderer.print_metric(
         "Active Symbols",
         len(
-            market_snapshot[
+            runtime_snapshot[
                 "active_symbols"
             ]
         )
@@ -314,13 +326,65 @@ def print_session_report():
 
     ReportRenderer.print_metric(
         "Uptime (sec)",
-        market_snapshot[
+        runtime_snapshot[
             "uptime_seconds"
         ]
     )
 
+    ReportRenderer.print_footer()
+
     print()
 
+# =========================================================
+# MAIN
+# =========================================================
+
+async def main():
+
+    # =====================================================
+    # DATABASE
+    # =====================================================
+
+    init_db()
+
+    # =====================================================
+    # CONFIG
+    # =====================================================
+
+    load_best_config()
+
+    # =====================================================
+    # SYSTEM PANEL
+    # =====================================================
+
+    print_system_panel()
+
+    # =====================================================
+    # EVENT BUS
+    # =====================================================
+
+    bus = EventBus()
+
+    # =====================================================
+    # AGENTS
+    # =====================================================
+
+    initialize_agents(
+        bus
+    )
+
+    # =====================================================
+    # WEBSOCKET
+    # =====================================================
+
+    websocket = BinanceWS(
+
+        bus=bus,
+
+        user_id=0
+    )
+
+    await websocket.start()
 
 # =========================================================
 # ENTRYPOINT
@@ -335,5 +399,11 @@ if __name__ == "__main__":
         )
 
     except KeyboardInterrupt:
+
+        log(
+            "SYSTEM",
+            "Shutdown...................... OK",
+            "WARNING"
+        )
 
         print_session_report()

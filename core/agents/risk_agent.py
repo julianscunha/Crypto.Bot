@@ -17,6 +17,14 @@ from core.config.trading_config import (
     TRADING_CONFIG
 )
 
+from core.config.trade_management_config import (
+    TRADE_MANAGEMENT_CONFIG
+)
+
+from core.config.exchange_config import (
+    EXCHANGE_CONFIG
+)
+
 from core.utils.console_logger import (
     log
 )
@@ -33,6 +41,18 @@ class RiskAgent:
 
         self.positions = (
             trades_repository
+        )
+
+        self.trading_config = (
+            TRADING_CONFIG
+        )
+
+        self.management_config = (
+            TRADE_MANAGEMENT_CONFIG
+        )
+
+        self.exchange_config = (
+            EXCHANGE_CONFIG
         )
 
         self.bus.subscribe(
@@ -60,108 +80,35 @@ class RiskAgent:
         )
 
         # =================================================
-        # ATR VALIDATION
+        # SIGNAL VALIDATION
         # =================================================
 
-        if payload.atr is None:
-
-            log(
-                "RISK",
-                "BLOCKED ATR_NOT_READY",
-                "WARNING"
-            )
-
-            return
-
-        if payload.atr <= 0:
-
-            log(
-                "RISK",
-                "BLOCKED INVALID_ATR",
-                "ERROR"
-            )
-
-            return
-
-        # =================================================
-        # SIGNAL FILTER
-        # =================================================
-
-        if payload.signal != "BUY":
-
-            log(
-                "RISK",
-                "BLOCKED INVALID_SIGNAL",
-                "WARNING"
-            )
-
-            return
-
-        # =================================================
-        # EXISTING POSITION
-        # =================================================
-
-        existing_position = (
-
-            self.positions.get_open_trade(
-
-                user_id=payload.user_id,
-
-                symbol=payload.symbol
+        valid, reason = (
+            self._validate_signal(
+                payload
             )
         )
 
-        if existing_position:
+        if not valid:
 
             log(
                 "RISK",
-                "BLOCKED POSITION_ALREADY_OPEN",
+                f"BLOCKED {reason}",
                 "WARNING"
             )
 
             return
 
         # =================================================
-        # ENTRY
+        # PRICING
         # =================================================
 
         entry_price = round(
+
             payload.entry_price,
-            2
-        )
 
-        if entry_price <= 0:
-
-            log(
-                "RISK",
-                "BLOCKED INVALID_ENTRY",
-                "ERROR"
-            )
-
-            return
-
-        # =================================================
-        # ATR CONFIG
-        # =================================================
-
-        atr_stop_multiplier = (
-
-            TRADING_CONFIG[
-                "atr_stop_multiplier"
-            ]
-        )
-
-        atr_take_profit_multiplier = (
-
-            TRADING_CONFIG[
-                "atr_take_profit_multiplier"
-            ]
-        )
-
-        atr_trailing_multiplier = (
-
-            TRADING_CONFIG[
-                "atr_trailing_multiplier"
+            self.exchange_config[
+                "price_precision"
             ]
         )
 
@@ -169,137 +116,52 @@ class RiskAgent:
         # LEVELS
         # =================================================
 
-        stop_loss = round(
-
-            entry_price
-            -
-            (
-                payload.atr
-                *
-                atr_stop_multiplier
-            ),
-
-            2
+        risk_levels = (
+            self._calculate_risk_levels(
+                payload,
+                entry_price
+            )
         )
 
-        take_profit = round(
-
-            entry_price
-            +
-            (
-                payload.atr
-                *
-                atr_take_profit_multiplier
-            ),
-
-            2
-        )
-
-        trailing_stop = round(
-
-            payload.atr
-            *
-            atr_trailing_multiplier,
-
-            2
-        )
-
-        # =================================================
-        # STOP VALIDATION
-        # =================================================
-
-        if stop_loss <= 0:
+        if not risk_levels:
 
             log(
                 "RISK",
-                "BLOCKED INVALID_STOP",
+                "BLOCKED INVALID_RISK_LEVELS",
                 "ERROR"
             )
 
             return
 
-        if stop_loss >= entry_price:
-
-            log(
-                "RISK",
-                "BLOCKED INVALID_STOP",
-                "ERROR"
-            )
-
-            return
-
-        if take_profit <= entry_price:
-
-            log(
-                "RISK",
-                "BLOCKED INVALID_TARGET",
-                "ERROR"
-            )
-
-            return
-
-        # =================================================
-        # RISK DISTANCE
-        # =================================================
-
-        risk_distance = round(
-
-            abs(
-                entry_price - stop_loss
-            ),
-
-            8
+        stop_loss = (
+            risk_levels["stop_loss"]
         )
 
-        if risk_distance <= 0:
-
-            log(
-                "RISK",
-                "BLOCKED INVALID_RISK_DISTANCE",
-                "ERROR"
-            )
-
-            return
-
-        # =================================================
-        # ACCOUNT
-        # =================================================
-
-        account_balance = (
-
-            TRADING_CONFIG[
-                "account_balance"
-            ]
+        take_profit = (
+            risk_levels["take_profit"]
         )
 
-        risk_percent = (
-
-            TRADING_CONFIG[
-                "risk_per_trade_percent"
-            ]
+        trailing_stop = (
+            risk_levels["trailing_stop"]
         )
 
-        risk_amount = round(
+        risk_distance = (
+            risk_levels["risk_distance"]
+        )
 
-            account_balance
-            *
-            (
-                risk_percent / 100
-            ),
-
-            2
+        reward_distance = (
+            risk_levels["reward_distance"]
         )
 
         # =================================================
         # POSITION SIZE
         # =================================================
 
-        quantity = round(
-
-            risk_amount
-            / risk_distance,
-
-            6
+        quantity = (
+            self._calculate_position_size(
+                entry_price,
+                risk_distance
+            )
         )
 
         if quantity <= 0:
@@ -316,59 +178,12 @@ class RiskAgent:
         # EXPOSURE
         # =================================================
 
-        notional_value = round(
-
-            quantity
-            *
-            entry_price,
-
-            2
-        )
-
-        max_exposure_percent = (
-
-            TRADING_CONFIG[
-                "max_position_exposure_percent"
-            ]
-        )
-
-        max_exposure_value = round(
-
-            account_balance
-            *
-            (
-                max_exposure_percent / 100
-            ),
-
-            2
-        )
-
-        # =================================================
-        # MICRO ACCOUNT ADAPTATION
-        # =================================================
-
-        if notional_value > max_exposure_value:
-
-            quantity = round(
-
-                max_exposure_value
-                / entry_price,
-
-                6
-            )
-
-            notional_value = round(
-
-                quantity
-                *
+        quantity = (
+            self._apply_exposure_limit(
                 entry_price,
-
-                2
+                quantity
             )
-
-        # =================================================
-        # FINAL VALIDATION
-        # =================================================
+        )
 
         if quantity <= 0:
 
@@ -381,18 +196,10 @@ class RiskAgent:
             return
 
         # =================================================
-        # REWARD
+        # RISK REWARD
         # =================================================
 
-        reward_distance = round(
-
-            take_profit
-            - entry_price,
-
-            8
-        )
-
-        risk_reward = round(
+        risk_reward_ratio = round(
 
             reward_distance
             / risk_distance,
@@ -400,17 +207,19 @@ class RiskAgent:
             2
         )
 
-        # =================================================
-        # RR FILTER
-        # =================================================
+        minimum_rr = (
+            self.trading_config[
+                "minimum_risk_reward_ratio"
+            ]
+        )
 
-        if risk_reward < 1.2:
+        if risk_reward_ratio < minimum_rr:
 
             log(
                 "RISK",
                 (
                     f"BLOCKED LOW_RR "
-                    f"rr={risk_reward}"
+                    f"rr={risk_reward_ratio}"
                 ),
                 "WARNING"
             )
@@ -440,7 +249,7 @@ class RiskAgent:
 
                 trailing_stop=trailing_stop,
 
-                risk_reward=risk_reward
+                risk_reward=risk_reward_ratio
             )
         )
 
@@ -461,7 +270,7 @@ class RiskAgent:
             "RISK",
             (
                 f"APPROVED "
-                f"rr={risk_reward} "
+                f"rr={risk_reward_ratio} "
                 f"qty={quantity}"
             ),
             "SUCCESS"
@@ -473,4 +282,318 @@ class RiskAgent:
 
         await self.bus.publish(
             decision_message
+        )
+
+    # =====================================================
+    # SIGNAL VALIDATION
+    # =====================================================
+
+    def _validate_signal(
+        self,
+        payload
+    ):
+
+        # =================================================
+        # ATR
+        # =================================================
+
+        if payload.atr is None:
+
+            return (
+                False,
+                "ATR_NOT_READY"
+            )
+
+        if payload.atr <= 0:
+
+            return (
+                False,
+                "INVALID_ATR"
+            )
+
+        # =================================================
+        # SIGNAL
+        # =================================================
+
+        if payload.signal != "BUY":
+
+            return (
+                False,
+                "INVALID_SIGNAL"
+            )
+
+        # =================================================
+        # POSITION
+        # =================================================
+
+        existing_position = (
+
+            self.positions
+            .get_open_trade(
+
+                user_id=payload.user_id,
+
+                symbol=payload.symbol
+            )
+        )
+
+        if existing_position:
+
+            return (
+                False,
+                "POSITION_ALREADY_OPEN"
+            )
+
+        # =================================================
+        # ENTRY
+        # =================================================
+
+        if payload.entry_price <= 0:
+
+            return (
+                False,
+                "INVALID_ENTRY"
+            )
+
+        return (
+            True,
+            "VALID"
+        )
+
+    # =====================================================
+    # RISK LEVELS
+    # =====================================================
+
+    def _calculate_risk_levels(
+        self,
+        payload,
+        entry_price: float
+    ):
+
+        atr_stop_multiplier = (
+            self.trading_config[
+                "atr_stop_multiplier"
+            ]
+        )
+
+        atr_take_profit_multiplier = (
+            self.trading_config[
+                "atr_take_profit_multiplier"
+            ]
+        )
+
+        atr_trailing_multiplier = (
+            self.management_config[
+                "atr_trailing_multiplier"
+            ]
+        )
+
+        precision = (
+            self.exchange_config[
+                "price_precision"
+            ]
+        )
+
+        stop_loss = round(
+
+            entry_price
+
+            - (
+
+                payload.atr
+                *
+                atr_stop_multiplier
+            ),
+
+            precision
+        )
+
+        take_profit = round(
+
+            entry_price
+
+            + (
+
+                payload.atr
+                *
+                atr_take_profit_multiplier
+            ),
+
+            precision
+        )
+
+        trailing_stop = round(
+
+            payload.atr
+            *
+            atr_trailing_multiplier,
+
+            precision
+        )
+
+        # =================================================
+        # VALIDATION
+        # =================================================
+
+        if stop_loss <= 0:
+
+            return None
+
+        if stop_loss >= entry_price:
+
+            return None
+
+        if take_profit <= entry_price:
+
+            return None
+
+        risk_distance = round(
+
+            abs(
+                entry_price
+                -
+                stop_loss
+            ),
+
+            precision
+        )
+
+        reward_distance = round(
+
+            take_profit
+            -
+            entry_price,
+
+            precision
+        )
+
+        if risk_distance <= 0:
+
+            return None
+
+        return {
+
+            "stop_loss":
+                stop_loss,
+
+            "take_profit":
+                take_profit,
+
+            "trailing_stop":
+                trailing_stop,
+
+            "risk_distance":
+                risk_distance,
+
+            "reward_distance":
+                reward_distance
+        }
+
+    # =====================================================
+    # POSITION SIZE
+    # =====================================================
+
+    def _calculate_position_size(
+        self,
+        entry_price: float,
+        risk_distance: float
+    ):
+
+        account_balance = (
+            self.trading_config[
+                "account_balance"
+            ]
+        )
+
+        risk_percent = (
+            self.trading_config[
+                "risk_per_trade_percent"
+            ]
+        )
+
+        quantity_precision = (
+            self.exchange_config[
+                "quantity_precision"
+            ]
+        )
+
+        risk_amount = (
+
+            account_balance
+
+            * (
+                risk_percent / 100
+            )
+        )
+
+        quantity = round(
+
+            risk_amount
+            / risk_distance,
+
+            quantity_precision
+        )
+
+        return max(
+            quantity,
+            0.0
+        )
+
+    # =====================================================
+    # EXPOSURE LIMIT
+    # =====================================================
+
+    def _apply_exposure_limit(
+        self,
+        entry_price: float,
+        quantity: float
+    ):
+
+        account_balance = (
+            self.trading_config[
+                "account_balance"
+            ]
+        )
+
+        max_exposure_percent = (
+            self.trading_config[
+                "max_position_exposure_percent"
+            ]
+        )
+
+        quantity_precision = (
+            self.exchange_config[
+                "quantity_precision"
+            ]
+        )
+
+        maximum_position_value = (
+
+            account_balance
+
+            * (
+                max_exposure_percent / 100
+            )
+        )
+
+        position_notional = (
+            quantity
+            * entry_price
+        )
+
+        if position_notional <= maximum_position_value:
+
+            return quantity
+
+        adjusted_quantity = round(
+
+            maximum_position_value
+            / entry_price,
+
+            quantity_precision
+        )
+
+        return max(
+            adjusted_quantity,
+            0.0
         )

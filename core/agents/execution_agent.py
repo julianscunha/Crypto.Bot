@@ -8,164 +8,322 @@ from data.storage.repositories.trades_repository import (
     trades_repository
 )
 
-from data.storage.metrics import (
-    MetricsStorage
+from core.services.trade_metrics_service import (
+    trade_metrics_service
 )
 
 from core.services.signal_quality_service import (
     signal_quality_service
 )
 
-from core.utils.console_logger import (
-    log
-)
-
 from core.services.position_lifecycle_service import (
     PositionLifecycleService
+)
+
+from core.utils.console_logger import (
+    log
 )
 
 from core.config.trading_config import (
     TRADING_CONFIG
 )
 
+from core.state.market_state import (
+    market_state
+)
+
 
 class ExecutionAgent:
 
-    def __init__(self, bus):
+    def __init__(
+        self,
+        bus
+    ):
 
         self.bus = bus
-
-        self.signal_quality = (
-            signal_quality_service
-        )
 
         self.positions = (
             trades_repository
         )
 
-        self.metrics = (
-            MetricsStorage()
+        self.signal_quality = (
+            signal_quality_service
         )
 
-        self.bus.subscribe(self)
+        self.trade_metrics = (
+            trade_metrics_service
+        )
 
-    async def on_message(self, message):
+        self.position_lifecycle = (
+            PositionLifecycleService
+        )
+
+        self.execution_mode = (
+            TRADING_CONFIG[
+                "runtime_mode"
+            ]
+        )
+
+        self.bus.subscribe(
+            self
+        )
+
+    # =====================================================
+    # MESSAGE
+    # =====================================================
+
+    async def on_message(
+        self,
+        message
+    ):
 
         if not isinstance(
             message,
             RiskDecisionMessage
         ):
+
             return
 
-        payload = message.payload
-
-        # =====================================================
-        # EXECUTION MODE
-        # =====================================================
-
-        paper_execution = (
-            TRADING_CONFIG[
-                "paper_execution"
-            ]
+        payload = (
+            message.payload
         )
 
-        # =====================================================
-        # SIGNAL FILTER
-        # =====================================================
+        # =================================================
+        # EXECUTION VALIDATION
+        # =================================================
 
-        if payload.signal != "BUY":
+        valid, reason = (
+            self._validate_execution(
+                payload
+            )
+        )
 
-            log(
-                "EXECUTION",
-                "BLOCKED INVALID_SIGNAL",
-                "ERROR"
+        if not valid:
+
+            market_state.register_rejected_signal(
+                reason
             )
 
-            return
-
-        # =====================================================
-        # EXISTING POSITION
-        # =====================================================
-
-        if self.positions.has_open_trade(
-            payload.user_id,
-            payload.symbol
-        ):
-
             log(
                 "EXECUTION",
-                "BLOCKED POSITION_ALREADY_OPEN",
+                f"BLOCKED {reason}",
                 "WARNING"
             )
 
             return
 
-        # =====================================================
-        # CREATE TRADE
-        # =====================================================
+        # =================================================
+        # EXECUTED ENTRY
+        # =================================================
 
-        entry_price = (
-            PositionLifecycleService
+        executed_entry_price = (
+
+            self.position_lifecycle
             .apply_entry_slippage(
+
                 payload.entry_price
             )
         )
 
-        self.positions.create_trade(
-            user_id=payload.user_id,
-            symbol=payload.symbol,
-            action=payload.signal,
-            entry_price=entry_price,
-            quantity=payload.quantity,
-            stop_loss=payload.stop_loss,
-            take_profit=payload.take_profit,
-            trailing_stop=payload.trailing_stop,
-            breakeven_enabled=True
+        # =================================================
+        # CREATE TRADE
+        # =================================================
+
+        created_trade = (
+
+            self.positions
+            .create_trade(
+
+                user_id=payload.user_id,
+
+                symbol=payload.symbol,
+
+                action=payload.signal,
+
+                entry_price=executed_entry_price,
+
+                quantity=payload.quantity,
+
+                stop_loss=payload.stop_loss,
+
+                take_profit=payload.take_profit,
+
+                trailing_stop=payload.trailing_stop,
+
+                breakeven_enabled=True
+            )
         )
 
-        # =====================================================
+        if not created_trade:
+
+            market_state.register_rejected_signal(
+                "TRADE_CREATION_FAILED"
+            )
+
+            log(
+                "EXECUTION",
+                "BLOCKED TRADE_CREATION_FAILED",
+                "ERROR"
+            )
+
+            return
+
+        # =================================================
+        # EXECUTION TELEMETRY
+        # =================================================
+
+        market_state.register_approved_signal()
+
+        market_state.register_order_execution(
+            self.execution_mode
+        )
+
+        # =================================================
+        # SIGNAL COOLDOWN
+        # =================================================
+
+        self.signal_quality.register_trade(
+
+            payload.user_id,
+
+            payload.symbol
+        )
+
+        # =================================================
         # EXECUTION LOG
-        # =====================================================
-
-        execution_mode = (
-            "PAPER"
-            if paper_execution
-            else "LIVE"
-        )
+        # =================================================
 
         log(
             "EXECUTION",
             (
-                f"{execution_mode} BUY "
-                f"@ {entry_price} "
+                f"{self.execution_mode} "
+                f"{payload.signal} "
+                f"entry={executed_entry_price} "
                 f"qty={payload.quantity}"
             ),
             "SUCCESS"
         )
 
-        # =====================================================
-        # COOLDOWN REGISTER
-        # =====================================================
-
-        self.signal_quality.register_trade(
-            payload.user_id,
-            payload.symbol
-        )
-
-        # =====================================================
+        # =================================================
         # PORTFOLIO METRICS
-        # =====================================================
+        # =================================================
 
-        metrics = (
-            self.metrics.get_metrics(
+        portfolio_metrics = (
+
+            self.trade_metrics
+            .get_metrics(
+
                 user_id=payload.user_id
             )
         )
 
         log(
-            "POSITION",
+            "PORTFOLIO",
             (
-                f"OPEN={metrics['open_positions']} "
-                f"PNL={metrics['pnl']}"
+                f"open={portfolio_metrics['open_positions']} "
+                f"pnl={portfolio_metrics['pnl']}"
             )
+        )
+
+    # =====================================================
+    # EXECUTION VALIDATION
+    # =====================================================
+
+    def _validate_execution(
+        self,
+        payload
+    ):
+
+        # =================================================
+        # SIGNAL
+        # =================================================
+
+        if payload.signal != "BUY":
+
+            return (
+                False,
+                "INVALID_SIGNAL"
+            )
+
+        # =================================================
+        # DUPLICATED POSITION
+        # =================================================
+
+        if self.positions.has_open_trade(
+
+            payload.user_id,
+
+            payload.symbol
+        ):
+
+            return (
+                False,
+                "POSITION_ALREADY_OPEN"
+            )
+
+        # =================================================
+        # ENTRY PRICE
+        # =================================================
+
+        if payload.entry_price <= 0:
+
+            return (
+                False,
+                "INVALID_ENTRY_PRICE"
+            )
+
+        # =================================================
+        # POSITION SIZE
+        # =================================================
+
+        if payload.quantity <= 0:
+
+            return (
+                False,
+                "INVALID_POSITION_SIZE"
+            )
+
+        # =================================================
+        # STOP LOSS
+        # =================================================
+
+        if payload.stop_loss <= 0:
+
+            return (
+                False,
+                "INVALID_STOP_LOSS"
+            )
+
+        # =================================================
+        # TAKE PROFIT
+        # =================================================
+
+        if payload.take_profit <= 0:
+
+            return (
+                False,
+                "INVALID_TAKE_PROFIT"
+            )
+
+        # =================================================
+        # RISK STRUCTURE
+        # =================================================
+
+        if payload.stop_loss >= payload.entry_price:
+
+            return (
+                False,
+                "INVALID_STOP_STRUCTURE"
+            )
+
+        if payload.take_profit <= payload.entry_price:
+
+            return (
+                False,
+                "INVALID_TARGET_STRUCTURE"
+            )
+
+        return (
+            True,
+            "VALID"
         )

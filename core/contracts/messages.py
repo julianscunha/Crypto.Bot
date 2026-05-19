@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
 from dataclasses import (
+
     dataclass,
+
     field
 )
 
@@ -11,8 +13,20 @@ from datetime import (
 
 from typing import (
     Any,
-    Optional
+    Optional,
+    Dict
 )
+
+# =========================================================
+# BASE PAYLOAD
+# =========================================================
+
+@dataclass(slots=True)
+class BasePayload:
+
+    user_id: int
+
+    symbol: str
 
 # =========================================================
 # BASE MESSAGE
@@ -29,16 +43,23 @@ class BaseMessage:
         default_factory=datetime.utcnow
     )
 
+    correlation_id: Optional[str] = None
+
+    metadata: Dict[
+        str,
+        Any
+    ] = field(
+        default_factory=dict
+    )
+
 # =========================================================
 # MARKET DATA
 # =========================================================
 
 @dataclass(slots=True)
-class MarketDataPayload:
-
-    user_id: int
-
-    symbol: str
+class MarketDataPayload(
+    BasePayload
+):
 
     open: float
 
@@ -50,24 +71,29 @@ class MarketDataPayload:
 
     volume: float
 
+    timeframe: str = "5m"
+
+    exchange: str = "BINANCE"
+
+# =========================================================
+# MARKET DATA MESSAGE
+# =========================================================
 
 @dataclass(slots=True)
 class MarketDataMessage(
     BaseMessage
 ):
 
-    pass
+    payload: MarketDataPayload
 
 # =========================================================
 # MARKET ANALYSIS
 # =========================================================
 
 @dataclass(slots=True)
-class MarketAnalysisPayload:
-
-    user_id: int
-
-    symbol: str
+class MarketAnalysisPayload(
+    BasePayload
+):
 
     analysis: str
 
@@ -75,24 +101,31 @@ class MarketAnalysisPayload:
 
     confidence: float = 0.0
 
+    market_regime: str = "UNKNOWN"
+
+    trend_strength: float = 0.0
+
+    volatility_regime: str = "UNKNOWN"
+
+# =========================================================
+# MARKET ANALYSIS MESSAGE
+# =========================================================
 
 @dataclass(slots=True)
 class MarketAnalysisMessage(
     BaseMessage
 ):
 
-    pass
+    payload: MarketAnalysisPayload
 
 # =========================================================
 # STRATEGY SIGNAL
 # =========================================================
 
 @dataclass(slots=True)
-class StrategySignalPayload:
-
-    user_id: int
-
-    symbol: str
+class StrategySignalPayload(
+    BasePayload
+):
 
     signal: str
 
@@ -102,24 +135,33 @@ class StrategySignalPayload:
 
     atr: Optional[float] = None
 
+    structure_score: float = 0.0
+
+    trend_strength: float = 0.0
+
+    volatility_regime: str = "UNKNOWN"
+
+    strategy_name: str = "PRIMARY"
+
+# =========================================================
+# STRATEGY SIGNAL MESSAGE
+# =========================================================
 
 @dataclass(slots=True)
 class StrategySignalMessage(
     BaseMessage
 ):
 
-    pass
+    payload: StrategySignalPayload
 
 # =========================================================
 # RISK DECISION
 # =========================================================
 
 @dataclass(slots=True)
-class RiskDecisionPayload:
-
-    user_id: int
-
-    symbol: str
+class RiskDecisionPayload(
+    BasePayload
+):
 
     signal: str
 
@@ -135,10 +177,19 @@ class RiskDecisionPayload:
 
     risk_reward: float = 0.0
 
+    expected_loss: float = 0.0
+
+    expected_profit: float = 0.0
+
+    execution_priority: int = 1
+
+# =========================================================
+# RISK DECISION MESSAGE
+# =========================================================
 
 @dataclass(slots=True)
 class RiskDecisionMessage(
     BaseMessage
 ):
 
-    pass
+    payload: RiskDecisionPayload

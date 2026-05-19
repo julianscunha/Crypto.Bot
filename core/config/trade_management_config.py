@@ -28,36 +28,22 @@ def positive_float(
         return fallback
 
 
-def non_negative_float(
+def percentage(
     value,
-    fallback
+    fallback,
+    minimum=0.0,
+    maximum=100.0
 ):
 
     try:
 
         value = float(value)
 
-        if value < 0:
+        if value < minimum:
 
             return fallback
 
-        return value
-
-    except Exception:
-
-        return fallback
-
-
-def positive_int(
-    value,
-    fallback
-):
-
-    try:
-
-        value = int(value)
-
-        if value <= 0:
+        if value > maximum:
 
             return fallback
 
@@ -96,179 +82,149 @@ def boolean(
     ]
 
 # =====================================================
-# EXCHANGE CONFIG
+# TRADE MANAGEMENT CONFIG
 # =====================================================
 
-EXCHANGE_CONFIG = {
+TRADE_MANAGEMENT_CONFIG = {
 
     # =================================================
-    # EXCHANGE
+    # TRAILING STOP
     # =================================================
 
-    "exchange_name":
-
-        getattr(
-            settings,
-            "EXCHANGE_NAME",
-            "BINANCE"
-        ),
-
-    # =================================================
-    # FEES
-    # =================================================
-
-    "enable_fee_simulation":
+    "enable_trailing_stop":
 
         boolean(
 
             getattr(
                 settings,
-                "ENABLE_FEE_SIMULATION",
+                "ENABLE_TRAILING_STOP",
                 True
             ),
 
             True
         ),
 
-    "maker_fee_percent":
-
-        non_negative_float(
-
-            getattr(
-                settings,
-                "MAKER_FEE_PERCENT",
-                0.001
-            ),
-
-            0.001
-        ),
-
-    "taker_fee_percent":
-
-        non_negative_float(
-
-            getattr(
-                settings,
-                "TAKER_FEE_PERCENT",
-                0.001
-            ),
-
-            0.001
-        ),
-
-    # =================================================
-    # SLIPPAGE
-    # =================================================
-
-    "enable_slippage_simulation":
+    "enable_atr_trailing":
 
         boolean(
 
             getattr(
                 settings,
-                "ENABLE_SLIPPAGE_SIMULATION",
+                "ENABLE_ATR_TRAILING",
+                False
+            ),
+
+            False
+        ),
+
+    "atr_trailing_multiplier":
+
+        positive_float(
+
+            getattr(
+                settings,
+                "ATR_TRAILING_MULTIPLIER",
+                1.0
+            ),
+
+            1.0
+        ),
+
+    # =================================================
+    # BREAKEVEN
+    # =================================================
+
+    "enable_breakeven":
+
+        boolean(
+
+            getattr(
+                settings,
+                "ENABLE_BREAKEVEN",
                 True
             ),
 
             True
         ),
 
-    "entry_slippage_percent":
+    "breakeven_trigger_percent":
 
-        non_negative_float(
-
-            getattr(
-                settings,
-                "ENTRY_SLIPPAGE_PERCENT",
-                0.0002
-            ),
-
-            0.0002
-        ),
-
-    "exit_slippage_percent":
-
-        non_negative_float(
+        percentage(
 
             getattr(
                 settings,
-                "EXIT_SLIPPAGE_PERCENT",
-                0.0002
+                "BREAKEVEN_TRIGGER_PERCENT",
+                0.50
             ),
 
-            0.0002
+            0.50,
+
+            minimum=0.05,
+
+            maximum=100.0
         ),
 
     # =================================================
-    # PRICE PRECISION
+    # PARTIAL EXIT
     # =================================================
 
-    "price_precision":
-
-        positive_int(
-
-            getattr(
-                settings,
-                "PRICE_PRECISION",
-                2
-            ),
-
-            2
-        ),
-
-    "quantity_precision":
-
-        positive_int(
-
-            getattr(
-                settings,
-                "QUANTITY_PRECISION",
-                6
-            ),
-
-            6
-        ),
-
-    # =================================================
-    # EXECUTION
-    # =================================================
-
-    "enable_partial_fill_simulation":
+    "enable_partial_take_profit":
 
         boolean(
 
             getattr(
                 settings,
-                "ENABLE_PARTIAL_FILL_SIMULATION",
+                "ENABLE_PARTIAL_TAKE_PROFIT",
                 False
             ),
 
             False
         ),
 
-    "enable_latency_simulation":
+    "partial_take_profit_percent":
+
+        percentage(
+
+            getattr(
+                settings,
+                "PARTIAL_TAKE_PROFIT_PERCENT",
+                50.0
+            ),
+
+            50.0,
+
+            minimum=1.0,
+
+            maximum=100.0
+        ),
+
+    # =================================================
+    # POSITION MANAGEMENT
+    # =================================================
+
+    "enable_dynamic_take_profit":
 
         boolean(
 
             getattr(
                 settings,
-                "ENABLE_LATENCY_SIMULATION",
+                "ENABLE_DYNAMIC_TAKE_PROFIT",
                 False
             ),
 
             False
         ),
 
-    "simulated_execution_latency_ms":
+    "enable_volatility_based_management":
 
-        positive_int(
+        boolean(
 
             getattr(
                 settings,
-                "SIMULATED_EXECUTION_LATENCY_MS",
-                50
+                "ENABLE_VOLATILITY_BASED_MANAGEMENT",
+                False
             ),
 
-            50
+            False
         )
 }

@@ -1,5 +1,0 @@
-balance
-equity
-used_margin
-daily_pnl
-max_drawdown

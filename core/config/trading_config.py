@@ -5,7 +5,7 @@ from core.config.settings import (
 )
 
 # =====================================================
-# SAFETY HELPERS
+# HELPERS
 # =====================================================
 
 def positive_float(
@@ -73,6 +73,34 @@ def percentage(
 
         return fallback
 
+
+def boolean(
+    value,
+    fallback
+):
+
+    if isinstance(
+        value,
+        bool
+    ):
+
+        return value
+
+    if value is None:
+
+        return fallback
+
+    return str(value).strip().lower() in [
+
+        "1",
+
+        "true",
+
+        "yes",
+
+        "on"
+    ]
+
 # =====================================================
 # TRADING CONFIG
 # =====================================================
@@ -80,140 +108,262 @@ def percentage(
 TRADING_CONFIG = {
 
     # =================================================
-    # POSITION
+    # ACCOUNT
+    # =================================================
+
+    "account_balance":
+
+        positive_float(
+
+            getattr(
+                settings,
+                "ACCOUNT_BALANCE",
+                1000.0
+            ),
+
+            1000.0
+        ),
+
+    # =================================================
+    # RISK MANAGEMENT
     # =================================================
 
     "risk_per_trade_percent":
 
         percentage(
-            settings.RISK_PER_TRADE_PERCENT,
-            1.0
-        ),
 
-    "account_balance":
+            getattr(
+                settings,
+                "RISK_PER_TRADE_PERCENT",
+                1.0
+            ),
 
-        positive_float(
-            settings.ACCOUNT_BALANCE,
-            1000.0
+            1.0,
+
+            minimum=0.1,
+
+            maximum=100.0
         ),
 
     "max_open_positions":
 
         positive_int(
-            settings.MAX_OPEN_POSITIONS,
+
+            getattr(
+                settings,
+                "MAX_OPEN_POSITIONS",
+                3
+            ),
+
             3
         ),
 
     "max_position_exposure_percent":
 
         percentage(
-            settings.MAX_POSITION_EXPOSURE_PERCENT,
-            25.0
+
+            getattr(
+                settings,
+                "MAX_POSITION_EXPOSURE_PERCENT",
+                25.0
+            ),
+
+            25.0,
+
+            minimum=1.0,
+
+            maximum=100.0
         ),
 
     "max_daily_loss_percent":
 
         percentage(
-            settings.MAX_DAILY_LOSS_PERCENT,
-            5.0
+
+            getattr(
+                settings,
+                "MAX_DAILY_LOSS_PERCENT",
+                5.0
+            ),
+
+            5.0,
+
+            minimum=0.5,
+
+            maximum=100.0
         ),
 
     "max_daily_trades":
 
         positive_int(
-            settings.MAX_DAILY_TRADES,
+
+            getattr(
+                settings,
+                "MAX_DAILY_TRADES",
+                20
+            ),
+
             20
         ),
 
     # =================================================
-    # ATR RISK
+    # ATR RISK MODEL
     # =================================================
 
     "atr_period":
 
         positive_int(
+
             getattr(
                 settings,
                 "ATR_PERIOD",
                 14
             ),
+
             14
         ),
 
     "atr_stop_multiplier":
 
         positive_float(
-            settings.ATR_STOP_MULTIPLIER,
+
+            getattr(
+                settings,
+                "ATR_STOP_MULTIPLIER",
+                1.0
+            ),
+
             1.0
         ),
 
     "atr_take_profit_multiplier":
 
         positive_float(
-            settings.ATR_TAKE_PROFIT_MULTIPLIER,
+
+            getattr(
+                settings,
+                "ATR_TAKE_PROFIT_MULTIPLIER",
+                2.0
+            ),
+
             2.0
         ),
 
-    "atr_trailing_multiplier":
+    "minimum_risk_reward_ratio":
 
         positive_float(
-            settings.ATR_TRAILING_MULTIPLIER,
-            1.0
+
+            getattr(
+                settings,
+                "MINIMUM_RISK_REWARD_RATIO",
+                1.2
+            ),
+
+            1.2
         ),
 
     # =================================================
-    # STRUCTURE
+    # MARKET STRUCTURE
     # =================================================
 
-    "min_structure_candles":
+    "minimum_structure_candles":
 
         positive_int(
-            settings.MIN_STRUCTURE_CANDLES,
+
+            getattr(
+                settings,
+                "MINIMUM_STRUCTURE_CANDLES",
+                20
+            ),
+
             20
         ),
 
     # =================================================
-    # MARKET
+    # MARKET DATA
     # =================================================
 
     "symbols":
 
-        settings.SYMBOLS,
+        getattr(
+            settings,
+            "SYMBOLS",
+            []
+        ),
 
     "kline_interval":
 
-        settings.KLINE_INTERVAL,
+        getattr(
+            settings,
+            "KLINE_INTERVAL",
+            "5m"
+        ),
 
     # =================================================
-    # EXECUTION
+    # EXECUTION MODE
     # =================================================
 
-    "mode":
+    "runtime_mode":
 
-        settings.MODE,
+        getattr(
+            settings,
+            "MODE",
+            "PAPER"
+        ),
 
     "paper_execution":
 
-        bool(
-            settings.ENABLE_PAPER_EXECUTION
+        boolean(
+
+            getattr(
+                settings,
+                "ENABLE_PAPER_EXECUTION",
+                True
+            ),
+
+            True
         ),
+
+    # =================================================
+    # FEATURES
+    # =================================================
 
     "enable_optimizer":
 
-        bool(
-            settings.ENABLE_OPTIMIZER
+        boolean(
+
+            getattr(
+                settings,
+                "ENABLE_OPTIMIZER",
+                False
+            ),
+
+            False
         ),
 
     "enable_market_regime":
 
-        bool(
-            settings.ENABLE_MARKET_REGIME
+        boolean(
+
+            getattr(
+                settings,
+                "ENABLE_MARKET_REGIME",
+                False
+            ),
+
+            False
         ),
 
     "enable_replay":
 
-        bool(
-            settings.ENABLE_REPLAY
+        boolean(
+
+            getattr(
+                settings,
+                "ENABLE_REPLAY",
+                False
+            ),
+
+            False
         ),
 
     # =================================================
@@ -222,7 +372,14 @@ TRADING_CONFIG = {
 
     "binance_testnet":
 
-        bool(
-            settings.BINANCE_TESTNET
+        boolean(
+
+            getattr(
+                settings,
+                "BINANCE_TESTNET",
+                True
+            ),
+
+            True
         )
 }

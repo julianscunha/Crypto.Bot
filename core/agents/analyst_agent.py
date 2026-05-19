@@ -10,7 +10,7 @@ from core.contracts.messages import (
 )
 
 from core.services.signal_quality_service import (
-    SignalQualityService
+    signal_quality_service
 )
 
 from core.services.market_structure_service import (
@@ -29,6 +29,13 @@ from core.utils.console_logger import (
     log
 )
 
+from core.config.analyst_config import (
+    ANALYST_CONFIG
+)
+
+# =====================================================
+# ANALYST AGENT
+# =====================================================
 
 class AnalystAgent:
 
@@ -39,8 +46,12 @@ class AnalystAgent:
 
         self.bus = bus
 
+        # =================================================
+        # SERVICES
+        # =================================================
+
         self.signal_quality = (
-            SignalQualityService()
+            signal_quality_service
         )
 
         self.market_structure = (
@@ -54,6 +65,18 @@ class AnalystAgent:
         self.atr_service = (
             atr_service
         )
+
+        # =================================================
+        # CONFIG
+        # =================================================
+
+        self.config = (
+            ANALYST_CONFIG
+        )
+
+        # =================================================
+        # BUS
+        # =================================================
 
         self.bus.subscribe(
             self
@@ -80,7 +103,7 @@ class AnalystAgent:
         )
 
         # =================================================
-        # UPDATE TREND ENGINE
+        # UPDATE SIGNAL QUALITY ENGINE
         # =================================================
 
         self.signal_quality.update_market_data(
@@ -137,17 +160,23 @@ class AnalystAgent:
         )
 
         # =================================================
-        # REGIME CHANGED
+        # REGIME CHANGE
         # =================================================
 
         if self.market_regime.has_changed(
+
             payload.symbol,
+
             regime
         ):
 
             log(
                 "MARKET",
-                f"REGIME {regime}"
+                (
+                    f"REGIME_CHANGED "
+                    f"symbol={payload.symbol} "
+                    f"regime={regime}"
+                )
             )
 
         # =================================================
@@ -166,7 +195,7 @@ class AnalystAgent:
         )
 
         # =================================================
-        # ATR
+        # VOLATILITY
         # =================================================
 
         atr_percent = (
@@ -180,46 +209,41 @@ class AnalystAgent:
             )
         )
 
+        volatility_regime = (
+
+            self.atr_service
+            .get_volatility_regime(
+
+                user_id=payload.user_id,
+
+                symbol=payload.symbol
+            )
+        )
+
+        # =================================================
+        # TREND STRENGTH
+        # =================================================
+
+        trend_strength = (
+            structure.get(
+                "score",
+                0.0
+            )
+        )
+
         # =================================================
         # CONFIDENCE MODEL
         # =================================================
 
-        confidence = 0.50
+        confidence = (
+            self._calculate_confidence(
 
-        # =================================================
-        # STRUCTURE BONUS
-        # =================================================
+                structure=structure,
 
-        if structure["valid"]:
+                regime=regime,
 
-            confidence += 0.20
-
-        # =================================================
-        # REGIME BONUS
-        # =================================================
-
-        if regime in [
-
-            "TRENDING",
-
-            "BULLISH"
-        ]:
-
-            confidence += 0.15
-
-        # =================================================
-        # VOLATILITY BONUS
-        # =================================================
-
-        if atr_percent is not None:
-
-            if atr_percent >= 0.30:
-
-                confidence += 0.10
-
-        confidence = round(
-            min(confidence, 1.0),
-            2
+                atr_percent=atr_percent
+            )
         )
 
         # =================================================
@@ -227,9 +251,9 @@ class AnalystAgent:
         # =================================================
 
         analysis = (
-            "BULLISH"
-            if structure["valid"]
-            else "NEUTRAL"
+            self._determine_analysis(
+                structure
+            )
         )
 
         # =================================================
@@ -247,7 +271,13 @@ class AnalystAgent:
 
                 reference_price=payload.close,
 
-                confidence=confidence
+                confidence=confidence,
+
+                market_regime=regime,
+
+                trend_strength=trend_strength,
+
+                volatility_regime=volatility_regime
             )
         )
 
@@ -267,8 +297,10 @@ class AnalystAgent:
         log(
             "ANALYST",
             (
-                f"{analysis} "
-                f"confidence={confidence}"
+                f"analysis={analysis} "
+                f"confidence={confidence} "
+                f"regime={regime} "
+                f"volatility={volatility_regime}"
             )
         )
 
@@ -279,3 +311,111 @@ class AnalystAgent:
         await self.bus.publish(
             analysis_message
         )
+
+    # =====================================================
+    # CONFIDENCE MODEL
+    # =====================================================
+
+    def _calculate_confidence(
+        self,
+        structure,
+        regime,
+        atr_percent
+    ):
+
+        confidence = (
+            self.config[
+                "base_confidence"
+            ]
+        )
+
+        # =================================================
+        # STRUCTURE BONUS
+        # =================================================
+
+        if structure.get(
+            "valid",
+            False
+        ):
+
+            confidence += (
+                self.config[
+                    "structure_bonus"
+                ]
+            )
+
+        # =================================================
+        # REGIME BONUS
+        # =================================================
+
+        bullish_regimes = (
+            self.config[
+                "bullish_regimes"
+            ]
+        )
+
+        if regime in bullish_regimes:
+
+            confidence += (
+                self.config[
+                    "regime_bonus"
+                ]
+            )
+
+        # =================================================
+        # VOLATILITY BONUS
+        # =================================================
+
+        minimum_volatility = (
+            self.config[
+                "minimum_volatility_percent"
+            ]
+        )
+
+        if atr_percent is not None:
+
+            if atr_percent >= minimum_volatility:
+
+                confidence += (
+                    self.config[
+                        "volatility_bonus"
+                    ]
+                )
+
+        # =================================================
+        # NORMALIZATION
+        # =================================================
+
+        maximum_confidence = (
+            self.config[
+                "maximum_confidence"
+            ]
+        )
+
+        return round(
+
+            min(
+                confidence,
+                maximum_confidence
+            ),
+
+            2
+        )
+
+    # =====================================================
+    # ANALYSIS MODEL
+    # =====================================================
+
+    @staticmethod
+    def _determine_analysis(
+        structure
+    ):
+
+        if structure.get(
+            "valid",
+            False
+        ):
+
+            return "BULLISH"
+
+        return "NEUTRAL"

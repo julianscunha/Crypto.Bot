@@ -4,16 +4,71 @@ from collections import (
     defaultdict
 )
 
+from core.config.ema_trend_config import (
+    EMA_TREND_CONFIG
+)
+
 
 class EmaTrendService:
 
     def __init__(self):
 
+        self.config = (
+            EMA_TREND_CONFIG
+        )
+
+        # =================================================
+        # MARKET MEMORY
+        # =================================================
+
         self.market_history = (
             defaultdict(list)
         )
 
-        self.max_history = 200
+        self.max_history = (
+            self.config[
+                "maximum_price_history"
+            ]
+        )
+
+    # =====================================================
+    # RESET
+    # =====================================================
+
+    def reset(
+        self
+    ):
+
+        self.market_history.clear()
+
+    # =====================================================
+    # HELPERS
+    # =====================================================
+
+    @staticmethod
+    def _build_key(
+        user_id: int,
+        symbol: str
+    ):
+
+        return (
+            user_id,
+            symbol
+        )
+
+    @staticmethod
+    def _safe_float(
+        value,
+        fallback=0.0
+    ):
+
+        try:
+
+            return float(value)
+
+        except Exception:
+
+            return fallback
 
     # =====================================================
     # UPDATE PRICE
@@ -26,7 +81,15 @@ class EmaTrendService:
         price: float
     ):
 
-        key = (
+        price = self._safe_float(
+            price
+        )
+
+        if price <= 0:
+
+            return
+
+        key = self._build_key(
             user_id,
             symbol
         )
@@ -40,12 +103,12 @@ class EmaTrendService:
         )
 
         # =================================================
-        # MEMORY LIMIT
+        # MEMORY CONTROL
         # =================================================
 
         if len(history) > self.max_history:
 
-            history.pop(0)
+            del history[0]
 
     # =====================================================
     # GET PRICES
@@ -57,7 +120,7 @@ class EmaTrendService:
         symbol: str
     ):
 
-        key = (
+        key = self._build_key(
             user_id,
             symbol
         )
@@ -85,6 +148,10 @@ class EmaTrendService:
 
             return None
 
+        if period <= 0:
+
+            return None
+
         if len(prices) < period:
 
             return None
@@ -103,7 +170,9 @@ class EmaTrendService:
             ema = (
 
                 (
-                    price - ema
+                    price
+                    -
+                    ema
                 )
 
                 * multiplier
@@ -116,7 +185,71 @@ class EmaTrendService:
         )
 
     # =====================================================
-    # BULLISH VALIDATION
+    # EMA SPREAD
+    # =====================================================
+
+    def calculate_ema_spread_percent(
+        self,
+        user_id: int,
+        symbol: str,
+        fast_period: int,
+        slow_period: int
+    ):
+
+        prices = self.get_prices(
+
+            user_id=user_id,
+
+            symbol=symbol
+        )
+
+        ema_fast = self.calculate_ema(
+
+            prices=prices,
+
+            period=fast_period
+        )
+
+        ema_slow = self.calculate_ema(
+
+            prices=prices,
+
+            period=slow_period
+        )
+
+        # =================================================
+        # WARMUP
+        # =================================================
+
+        if ema_fast is None:
+
+            return None
+
+        if ema_slow is None:
+
+            return None
+
+        if ema_slow <= 0:
+
+            return None
+
+        return round(
+
+            (
+                (
+                    ema_fast
+                    -
+                    ema_slow
+                )
+
+                / ema_slow
+            ) * 100,
+
+            4
+        )
+
+    # =====================================================
+    # TREND DIRECTION
     # =====================================================
 
     def is_bullish(
@@ -127,39 +260,65 @@ class EmaTrendService:
         slow_period: int
     ):
 
-        prices = self.get_prices(
-            user_id=user_id,
-            symbol=symbol
+        spread = (
+            self.calculate_ema_spread_percent(
+
+                user_id=user_id,
+
+                symbol=symbol,
+
+                fast_period=fast_period,
+
+                slow_period=slow_period
+            )
         )
 
-        ema_fast = self.calculate_ema(
-            prices=prices,
-            period=fast_period
-        )
-
-        ema_slow = self.calculate_ema(
-            prices=prices,
-            period=slow_period
-        )
-
-        # =================================================
-        # WARMUP
-        # =================================================
-
-        if ema_fast is None:
+        if spread is None:
 
             return False
 
-        if ema_slow is None:
-
-            return False
-
-        # =================================================
-        # TREND
-        # =================================================
+        minimum_spread = (
+            self.config[
+                "minimum_bullish_spread_percent"
+            ]
+        )
 
         return (
-            ema_fast >= ema_slow
+            spread >= minimum_spread
+        )
+
+    # =====================================================
+    # TREND STRENGTH
+    # =====================================================
+
+    def get_trend_strength(
+        self,
+        user_id: int,
+        symbol: str,
+        fast_period: int,
+        slow_period: int
+    ):
+
+        spread = (
+            self.calculate_ema_spread_percent(
+
+                user_id=user_id,
+
+                symbol=symbol,
+
+                fast_period=fast_period,
+
+                slow_period=slow_period
+            )
+        )
+
+        if spread is None:
+
+            return 0.0
+
+        return round(
+            abs(spread),
+            4
         )
 
 

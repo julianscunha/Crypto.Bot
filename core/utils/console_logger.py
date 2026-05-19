@@ -3,32 +3,56 @@
 import logging
 
 from pathlib import Path
-from datetime import datetime
+
+from datetime import (
+    datetime
+)
 
 from logging.handlers import (
     RotatingFileHandler
 )
 
 from colorama import (
+
     Fore,
+
     Style,
+
     init
 )
 
-init(autoreset=True)
+from core.config.logging_config import (
+    LOGGING_CONFIG
+)
 
 # =====================================================
-# LOG DIRECTORY
+# COLORAMA
+# =====================================================
+
+init(
+    autoreset=True
+)
+
+# =====================================================
+# PATHS
 # =====================================================
 
 ROOT_DIR = (
     Path(__file__)
     .resolve()
-    .parents[2]
+    .parents[
+        LOGGING_CONFIG[
+            "root_directory_depth"
+        ]
+    ]
 )
 
 LOGS_DIR = (
-    ROOT_DIR / "logs"
+    ROOT_DIR
+    /
+    LOGGING_CONFIG[
+        "logs_directory"
+    ]
 )
 
 LOGS_DIR.mkdir(
@@ -36,105 +60,207 @@ LOGS_DIR.mkdir(
 )
 
 RUNTIME_LOG_FILE = (
-    LOGS_DIR / "runtime.log"
+    LOGS_DIR
+    /
+    LOGGING_CONFIG[
+        "runtime_log_filename"
+    ]
 )
 
 ERROR_LOG_FILE = (
-    LOGS_DIR / "errors.log"
+    LOGS_DIR
+    /
+    LOGGING_CONFIG[
+        "error_log_filename"
+    ]
 )
 
 # =====================================================
-# VISUAL SETTINGS
+# VISUAL CONFIG
 # =====================================================
 
-CATEGORY_WIDTH = 16
+CATEGORY_WIDTH = (
+    LOGGING_CONFIG[
+        "category_width"
+    ]
+)
 
-SECTION_WIDTH = 60
+SECTION_WIDTH = (
+    LOGGING_CONFIG[
+        "section_width"
+    ]
+)
+
+TIMESTAMP_FORMAT = (
+    LOGGING_CONFIG[
+        "timestamp_format"
+    ]
+)
 
 # =====================================================
-# LOG COLORS
+# COLORS
 # =====================================================
 
 LOG_COLORS = {
 
-    # ==============================================
-    # DEFAULT
-    # ==============================================
+    "INFO":
+        Fore.LIGHTWHITE_EX,
 
-    "INFO": Fore.LIGHTWHITE_EX,
+    "SUCCESS":
+        Fore.GREEN,
 
-    # ==============================================
-    # SUCCESS
-    # ==============================================
+    "WARNING":
+        Fore.LIGHTYELLOW_EX,
 
-    "SUCCESS": Fore.GREEN,
+    "ERROR":
+        Fore.RED,
 
-    # ==============================================
-    # WARNING
-    # ==============================================
-
-    "WARNING": Fore.LIGHTYELLOW_EX,
-
-    # ==============================================
-    # ERROR
-    # ==============================================
-
-    "ERROR": Fore.RED
+    "DEBUG":
+        Fore.LIGHTBLACK_EX
 }
 
 # =====================================================
-# PYTHON LOGGER
+# LOGGER FACTORY
 # =====================================================
 
-runtime_logger = logging.getLogger(
-    "runtime_logger"
+def build_logger(
+    name: str,
+    level: int,
+    filename: Path
+):
+
+    logger = logging.getLogger(
+        name
+    )
+
+    logger.setLevel(
+        level
+    )
+
+    # =================================================
+    # PREVENT DUPLICATION
+    # =================================================
+
+    logger.handlers.clear()
+
+    handler = RotatingFileHandler(
+
+        filename,
+
+        maxBytes=LOGGING_CONFIG[
+            "max_log_file_size"
+        ],
+
+        backupCount=LOGGING_CONFIG[
+            "log_backup_count"
+        ],
+
+        encoding="utf-8"
+    )
+
+    formatter = logging.Formatter(
+
+        LOGGING_CONFIG[
+            "file_log_format"
+        ]
+    )
+
+    handler.setFormatter(
+        formatter
+    )
+
+    logger.addHandler(
+        handler
+    )
+
+    logger.propagate = False
+
+    return logger
+
+# =====================================================
+# LOGGERS
+# =====================================================
+
+runtime_logger = build_logger(
+
+    name="runtime_logger",
+
+    level=logging.INFO,
+
+    filename=RUNTIME_LOG_FILE
 )
 
-runtime_logger.setLevel(
-    logging.INFO
-)
+error_logger = build_logger(
 
-error_logger = logging.getLogger(
-    "error_logger"
-)
+    name="error_logger",
 
-error_logger.setLevel(
-    logging.ERROR
+    level=logging.ERROR,
+
+    filename=ERROR_LOG_FILE
 )
 
 # =====================================================
-# PREVENT DUPLICATE HANDLERS
+# HELPERS
 # =====================================================
 
-runtime_logger.handlers.clear()
+def build_log_line(
+    timestamp: str,
+    category: str,
+    message: str
+):
 
-error_logger.handlers.clear()
+    category_label = (
+        f"[{category}]"
+        .ljust(CATEGORY_WIDTH)
+    )
 
-# =====================================================
-# FILE HANDLERS
-# =====================================================
+    return (
 
-runtime_handler = RotatingFileHandler(
-    RUNTIME_LOG_FILE,
-    maxBytes=1_000_000,
-    backupCount=3,
-    encoding="utf-8"
-)
+        f"{timestamp} "
 
-error_handler = RotatingFileHandler(
-    ERROR_LOG_FILE,
-    maxBytes=1_000_000,
-    backupCount=3,
-    encoding="utf-8"
-)
+        f"{category_label} "
 
-runtime_logger.addHandler(
-    runtime_handler
-)
+        f"{message}"
+    )
 
-error_logger.addHandler(
-    error_handler
-)
+
+def build_console_line(
+    timestamp: str,
+    category: str,
+    message: str,
+    level: str
+):
+
+    category_label = (
+        f"[{category}]"
+        .ljust(CATEGORY_WIDTH)
+    )
+
+    level_color = (
+        LOG_COLORS.get(
+
+            level,
+
+            Fore.LIGHTWHITE_EX
+        )
+    )
+
+    return (
+
+        Fore.LIGHTWHITE_EX
+
+        + f"{timestamp} "
+
+        + level_color
+
+        + f"{category_label}"
+
+        + Fore.LIGHTWHITE_EX
+
+        + f" {message}"
+
+        + Style.RESET_ALL
+    )
 
 # =====================================================
 # LOGGER
@@ -146,56 +272,54 @@ def log(
     level: str = "INFO"
 ) -> None:
 
+    level = (
+        str(level)
+        .upper()
+        .strip()
+    )
+
     timestamp = (
         datetime.now()
-        .strftime("%Y-%m-%d %H:%M:%S")
+        .strftime(
+            TIMESTAMP_FORMAT
+        )
     )
 
-    category_label = (
-        f"[{category}]"
-        .ljust(CATEGORY_WIDTH)
+    log_line = build_log_line(
+
+        timestamp=timestamp,
+
+        category=category,
+
+        message=message
     )
 
-    log_line = (
-        f"{timestamp} "
-        f"{category_label} "
-        f"{message}"
+    console_line = build_console_line(
+
+        timestamp=timestamp,
+
+        category=category,
+
+        message=message,
+
+        level=level
     )
 
     # =================================================
-    # CONSOLE COLORS
+    # CONSOLE
     # =================================================
-
-    level_color = LOG_COLORS.get(
-        level,
-        Fore.LIGHTWHITE_EX
-    )
-
-    console_line = (
-        Fore.LIGHTWHITE_EX
-        + f"{timestamp} "
-        + level_color
-        + f"{category_label}"
-        + Fore.LIGHTWHITE_EX
-        + f" {message}"
-        + Style.RESET_ALL
-    )
 
     print(
         console_line
     )
 
     # =================================================
-    # RUNTIME LOG
+    # FILE LOGGING
     # =================================================
 
     runtime_logger.info(
         log_line
     )
-
-    # =================================================
-    # ERROR LOG
-    # =================================================
 
     if level == "ERROR":
 

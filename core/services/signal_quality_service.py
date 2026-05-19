@@ -21,7 +21,7 @@ from data.storage.repositories.trades_repository import (
 )
 
 from data.storage.repositories.portfolio_repository import (
-    PortfolioRepository
+    portfolio_repository
 )
 
 
@@ -38,10 +38,8 @@ class SignalQualityService:
         )
 
         self.portfolio = (
-            PortfolioRepository()
+            portfolio_repository
         )
-
-        self.cooldowns = {}
 
         self.trend_service = (
             ema_trend_service
@@ -49,6 +47,41 @@ class SignalQualityService:
 
         self.atr_service = (
             atr_service
+        )
+
+        # =================================================
+        # RUNTIME STATE
+        # =================================================
+
+        self.signal_cooldowns = {}
+
+    # =====================================================
+    # INTERNAL
+    # =====================================================
+
+    @staticmethod
+    def _safe_float(
+        value,
+        fallback=0.0
+    ):
+
+        try:
+
+            return float(value)
+
+        except Exception:
+
+            return fallback
+
+    def _build_key(
+        self,
+        user_id: int,
+        symbol: str
+    ):
+
+        return (
+            user_id,
+            symbol
         )
 
     # =====================================================
@@ -61,17 +94,17 @@ class SignalQualityService:
         symbol: str
     ):
 
-        key = (
+        key = self._build_key(
             user_id,
             symbol
         )
 
-        self.cooldowns[key] = (
+        self.signal_cooldowns[key] = (
             datetime.utcnow()
         )
 
     # =====================================================
-    # MARKET UPDATE
+    # UPDATE MARKET DATA
     # =====================================================
 
     def update_market_data(
@@ -80,8 +113,11 @@ class SignalQualityService:
     ):
 
         self.trend_service.update_price(
+
             user_id=payload.user_id,
+
             symbol=payload.symbol,
+
             price=payload.close
         )
 
@@ -96,17 +132,17 @@ class SignalQualityService:
 
         validators = [
 
-            self._validate_trend,
+            self._validate_ema_trend,
 
-            self._validate_atr,
+            self._validate_market_volatility,
 
-            self._validate_confidence,
+            self._validate_signal_confidence,
 
-            self._validate_cooldown,
+            self._validate_signal_cooldown,
 
-            self._validate_max_positions,
+            self._validate_position_limit,
 
-            self._validate_drawdown
+            self._validate_drawdown_protection
         ]
 
         for validator in validators:
@@ -128,26 +164,30 @@ class SignalQualityService:
         )
 
     # =====================================================
-    # TREND
+    # EMA TREND FILTER
     # =====================================================
 
-    def _validate_trend(
+    def _validate_ema_trend(
         self,
         payload
     ):
 
         if not self.config[
-            "enable_trend_filter"
+            "enable_ema_trend_filter"
         ]:
 
             return (
                 True,
-                "DISABLED"
+                "FILTER_DISABLED"
             )
 
         prices = (
-            self.trend_service.get_prices(
+
+            self.trend_service
+            .get_prices(
+
                 user_id=payload.user_id,
+
                 symbol=payload.symbol
             )
         )
@@ -166,7 +206,7 @@ class SignalQualityService:
 
             return (
                 True,
-                "WARMUP"
+                "EMA_WARMUP"
             )
 
         ema_fast = (
@@ -215,10 +255,10 @@ class SignalQualityService:
 
             return (
                 False,
-                "EMA_DIVISION_INVALID"
+                "EMA_REFERENCE_INVALID"
             )
 
-        trend_strength = round(
+        trend_strength_percent = round(
 
             (
                 (
@@ -233,14 +273,20 @@ class SignalQualityService:
             4
         )
 
-        bearish_threshold = (
-            self.config.get(
-                "bearish_threshold",
-                -0.50
-            )
+        minimum_trend_strength = (
+            self.config[
+                "minimum_trend_strength_percent"
+            ]
         )
 
-        if trend_strength < bearish_threshold:
+        # =================================================
+        # TREND VALIDATION
+        # =================================================
+
+        if trend_strength_percent < (
+
+            minimum_trend_strength * -1
+        ):
 
             return (
                 False,
@@ -249,14 +295,14 @@ class SignalQualityService:
 
         return (
             True,
-            "OK"
+            "TREND_VALID"
         )
 
     # =====================================================
-    # ATR
+    # VOLATILITY FILTER
     # =====================================================
 
-    def _validate_atr(
+    def _validate_market_volatility(
         self,
         payload
     ):
@@ -267,7 +313,7 @@ class SignalQualityService:
 
             return (
                 True,
-                "DISABLED"
+                "FILTER_DISABLED"
             )
 
         atr_percent = (
@@ -280,7 +326,7 @@ class SignalQualityService:
                 symbol=payload.symbol,
 
                 period=self.config[
-                    "atr_period"
+                    "atr_validation_period"
                 ]
             )
         )
@@ -288,17 +334,17 @@ class SignalQualityService:
         if atr_percent is None:
 
             return (
-                False,
-                "ATR_NOT_READY"
+                True,
+                "ATR_WARMUP"
             )
 
-        min_atr = (
+        minimum_atr_percent = (
             self.config[
-                "min_atr_percent"
+                "minimum_atr_percent"
             ]
         )
 
-        if atr_percent < min_atr:
+        if atr_percent < minimum_atr_percent:
 
             return (
                 False,
@@ -307,36 +353,39 @@ class SignalQualityService:
 
         return (
             True,
-            "OK"
+            "VOLATILITY_VALID"
         )
 
     # =====================================================
-    # CONFIDENCE
+    # SIGNAL CONFIDENCE
     # =====================================================
 
-    def _validate_confidence(
+    def _validate_signal_confidence(
         self,
         payload
     ):
 
-        threshold = (
+        minimum_confidence = (
             self.config[
-                "confidence_threshold"
+                "minimum_signal_confidence"
             ]
         )
 
-        confidence = round(
+        signal_confidence = round(
 
-            getattr(
-                payload,
-                "signal_strength",
-                0.0
+            self._safe_float(
+
+                getattr(
+                    payload,
+                    "signal_strength",
+                    0.0
+                )
             ),
 
-            2
+            4
         )
 
-        if confidence < threshold:
+        if signal_confidence < minimum_confidence:
 
             return (
                 False,
@@ -345,54 +394,56 @@ class SignalQualityService:
 
         return (
             True,
-            "OK"
+            "CONFIDENCE_VALID"
         )
 
     # =====================================================
-    # COOLDOWN
+    # SIGNAL COOLDOWN
     # =====================================================
 
-    def _validate_cooldown(
+    def _validate_signal_cooldown(
         self,
         payload
     ):
 
         if not self.config[
-            "enable_cooldown"
+            "enable_signal_cooldown"
         ]:
 
             return (
                 True,
-                "DISABLED"
+                "FILTER_DISABLED"
             )
 
-        key = (
+        key = self._build_key(
+
             payload.user_id,
+
             payload.symbol
         )
 
-        last_trade = (
-            self.cooldowns.get(key)
+        last_signal = (
+            self.signal_cooldowns.get(key)
         )
 
-        if not last_trade:
+        if not last_signal:
 
             return (
                 True,
-                "OK"
+                "COOLDOWN_READY"
             )
 
         elapsed_seconds = (
 
             datetime.utcnow()
             -
-            last_trade
+            last_signal
 
         ).total_seconds()
 
         cooldown_seconds = (
             self.config[
-                "cooldown_seconds"
+                "signal_cooldown_seconds"
             ]
         )
 
@@ -400,19 +451,19 @@ class SignalQualityService:
 
             return (
                 False,
-                "COOLDOWN_ACTIVE"
+                "SIGNAL_COOLDOWN_ACTIVE"
             )
 
         return (
             True,
-            "OK"
+            "COOLDOWN_READY"
         )
 
     # =====================================================
-    # MAX POSITIONS
+    # POSITION LIMIT
     # =====================================================
 
-    def _validate_max_positions(
+    def _validate_position_limit(
         self,
         payload
     ):
@@ -425,43 +476,43 @@ class SignalQualityService:
             )
         )
 
-        max_positions = (
+        maximum_open_positions = (
             self.config[
-                "max_open_positions"
+                "maximum_open_positions"
             ]
         )
 
-        if len(open_positions) >= max_positions:
+        if len(open_positions) >= maximum_open_positions:
 
             return (
                 False,
-                "MAX_OPEN_POSITIONS"
+                "MAXIMUM_OPEN_POSITIONS"
             )
 
         return (
             True,
-            "OK"
+            "POSITION_LIMIT_VALID"
         )
 
     # =====================================================
-    # DRAWDOWN
+    # DRAWDOWN PROTECTION
     # =====================================================
 
-    def _validate_drawdown(
+    def _validate_drawdown_protection(
         self,
         payload
     ):
 
         if not self.config[
-            "enable_drawdown_guard"
+            "enable_drawdown_protection"
         ]:
 
             return (
                 True,
-                "DISABLED"
+                "FILTER_DISABLED"
             )
 
-        snapshot = (
+        latest_snapshot = (
 
             self.portfolio
             .get_latest_snapshot(
@@ -469,29 +520,34 @@ class SignalQualityService:
             )
         )
 
-        if not snapshot:
+        if not latest_snapshot:
 
             return (
                 True,
-                "NO_SNAPSHOT"
+                "PORTFOLIO_WARMUP"
             )
 
-        drawdown_limit = (
+        maximum_drawdown_percent = (
             self.config[
-                "daily_drawdown_limit"
+                "maximum_daily_drawdown_percent"
             ]
         )
 
-        if snapshot.drawdown >= drawdown_limit:
+        if (
+
+            latest_snapshot.drawdown
+            >=
+            maximum_drawdown_percent
+        ):
 
             return (
                 False,
-                "DAILY_DRAWDOWN_LIMIT"
+                "MAXIMUM_DRAWDOWN_EXCEEDED"
             )
 
         return (
             True,
-            "OK"
+            "DRAWDOWN_VALID"
         )
 
 

@@ -4,6 +4,10 @@ from collections import (
     defaultdict
 )
 
+from statistics import (
+    mean
+)
+
 from core.config.market_structure_config import (
     MARKET_STRUCTURE_CONFIG
 )
@@ -17,11 +21,23 @@ class MarketStructureService:
             MARKET_STRUCTURE_CONFIG
         )
 
-        self.market_data = (
+        # =================================================
+        # MARKET CACHE
+        # =================================================
+
+        self.market_prices = (
             defaultdict(list)
         )
 
-        self.max_history = 300
+        # =================================================
+        # MEMORY
+        # =================================================
+
+        self.max_history = (
+            self.config[
+                "maximum_price_history"
+            ]
+        )
 
     # =====================================================
     # RESET
@@ -31,7 +47,62 @@ class MarketStructureService:
         self
     ):
 
-        self.market_data.clear()
+        self.market_prices.clear()
+
+    # =====================================================
+    # CACHE KEY
+    # =====================================================
+
+    @staticmethod
+    def _build_key(
+        user_id: int,
+        symbol: str
+    ):
+
+        return (
+            user_id,
+            symbol
+        )
+
+    # =====================================================
+    # HELPERS
+    # =====================================================
+
+    @staticmethod
+    def _safe_mean(
+        values
+    ):
+
+        if not values:
+
+            return 0.0
+
+        return mean(values)
+
+    @staticmethod
+    def _percentage_change(
+        start: float,
+        end: float
+    ):
+
+        if start <= 0:
+
+            return 0.0
+
+        return round(
+
+            (
+                (
+                    end
+                    -
+                    start
+                )
+
+                / start
+            ) * 100,
+
+            4
+        )
 
     # =====================================================
     # UPDATE MARKET DATA
@@ -44,26 +115,34 @@ class MarketStructureService:
         price: float
     ):
 
-        key = (
+        if price is None:
+
+            return
+
+        if price <= 0:
+
+            return
+
+        key = self._build_key(
             user_id,
             symbol
         )
 
         history = (
-            self.market_data[key]
+            self.market_prices[key]
         )
 
         history.append(
-            price
+            float(price)
         )
 
         # =================================================
-        # MEMORY LIMIT
+        # MEMORY CONTROL
         # =================================================
 
         if len(history) > self.max_history:
 
-            history.pop(0)
+            del history[0]
 
     # =====================================================
     # GET PRICES
@@ -75,31 +154,30 @@ class MarketStructureService:
         symbol: str
     ):
 
-        key = (
+        key = self._build_key(
             user_id,
             symbol
         )
 
-        return self.market_data[key]
+        return self.market_prices[key]
 
     # =====================================================
     # SWING HIGH
     # =====================================================
 
-    def is_swing_high(
-        self,
+    @staticmethod
+    def _is_swing_high(
         prices,
         index,
         window
     ):
 
-        # =================================================
-        # SAFETY
-        # =================================================
-
         if (
+
             index - window < 0
+
             or
+
             index + window >= len(prices)
         ):
 
@@ -140,20 +218,19 @@ class MarketStructureService:
     # SWING LOW
     # =====================================================
 
-    def is_swing_low(
-        self,
+    @staticmethod
+    def _is_swing_low(
         prices,
         index,
         window
     ):
 
-        # =================================================
-        # SAFETY
-        # =================================================
-
         if (
+
             index - window < 0
+
             or
+
             index + window >= len(prices)
         ):
 
@@ -191,7 +268,211 @@ class MarketStructureService:
         )
 
     # =====================================================
-    # MARKET STRUCTURE
+    # SWING EXTRACTION
+    # =====================================================
+
+    def _extract_swings(
+        self,
+        prices,
+        window
+    ):
+
+        swing_highs = []
+
+        swing_lows = []
+
+        for index in range(
+            window,
+            len(prices) - window
+        ):
+
+            if self._is_swing_high(
+                prices,
+                index,
+                window
+            ):
+
+                swing_highs.append(
+                    prices[index]
+                )
+
+            if self._is_swing_low(
+                prices,
+                index,
+                window
+            ):
+
+                swing_lows.append(
+                    prices[index]
+                )
+
+        return (
+            swing_highs,
+            swing_lows
+        )
+
+    # =====================================================
+    # CONSOLIDATION
+    # =====================================================
+
+    def _is_consolidating(
+        self,
+        prices
+    ):
+
+        if not self.config[
+            "enable_consolidation_filter"
+        ]:
+
+            return False
+
+        recent_window = max(
+
+            self.config[
+                "minimum_structure_candles"
+            ],
+
+            self.config[
+                "minimum_consolidation_window"
+            ]
+        )
+
+        recent = prices[
+            -recent_window:
+        ]
+
+        if len(recent) < 2:
+
+            return False
+
+        highest = max(
+            recent
+        )
+
+        lowest = min(
+            recent
+        )
+
+        if lowest <= 0:
+
+            return True
+
+        range_percent = round(
+
+            (
+                (
+                    highest
+                    -
+                    lowest
+                )
+
+                / lowest
+            ) * 100,
+
+            4
+        )
+
+        threshold = (
+            self.config[
+                "maximum_consolidation_range_percent"
+            ]
+        )
+
+        return (
+            range_percent < threshold
+        )
+
+    # =====================================================
+    # IMPULSE
+    # =====================================================
+
+    def _calculate_impulse_strength(
+        self,
+        prices
+    ):
+
+        recent_window = max(
+
+            self.config[
+                "minimum_structure_candles"
+            ],
+
+            self.config[
+                "minimum_impulse_window"
+            ]
+        )
+
+        recent = prices[
+            -recent_window:
+        ]
+
+        if len(recent) < 2:
+
+            return 0.0
+
+        return self._percentage_change(
+
+            recent[0],
+
+            recent[-1]
+        )
+
+    # =====================================================
+    # STRUCTURE SCORE
+    # =====================================================
+
+    def _calculate_structure_score(
+        self,
+        bullish_highs: bool,
+        bullish_lows: bool,
+        impulse_strength: float
+    ):
+
+        score = 0.0
+
+        # =================================================
+        # HIGHER HIGHS
+        # =================================================
+
+        if bullish_highs:
+
+            score += self.config[
+                "bullish_high_score"
+            ]
+
+        # =================================================
+        # HIGHER LOWS
+        # =================================================
+
+        if bullish_lows:
+
+            score += self.config[
+                "bullish_low_score"
+            ]
+
+        # =================================================
+        # IMPULSE
+        # =================================================
+
+        minimum_impulse = (
+            self.config[
+                "minimum_impulse_percent"
+            ]
+        )
+
+        if impulse_strength >= minimum_impulse:
+
+            score += self.config[
+                "impulse_score"
+            ]
+
+        return round(
+            score,
+            2
+        )
+
+    # =====================================================
+    # ANALYZE STRUCTURE
     # =====================================================
 
     def analyze_structure(
@@ -205,13 +486,19 @@ class MarketStructureService:
             symbol
         )
 
-        window = self.config[
-            "swing_window"
-        ]
+        swing_window = (
+            self.config[
+                "swing_detection_window"
+            ]
+        )
 
         minimum_required = max(
-            10,
-            window * 2 + 1
+
+            self.config[
+                "minimum_structure_candles"
+            ],
+
+            swing_window * 2 + 1
         )
 
         # =================================================
@@ -227,40 +514,29 @@ class MarketStructureService:
                 "reason": "INSUFFICIENT_DATA"
             }
 
-        swing_highs = []
-
-        swing_lows = []
-
-        for index in range(
-            window,
-            len(prices) - window
-        ):
-
-            if self.is_swing_high(
-                prices,
-                index,
-                window
-            ):
-
-                swing_highs.append(
-                    prices[index]
-                )
-
-            if self.is_swing_low(
-                prices,
-                index,
-                window
-            ):
-
-                swing_lows.append(
-                    prices[index]
-                )
-
         # =================================================
-        # STRUCTURE VALIDATION
+        # SWINGS
         # =================================================
 
-        if len(swing_highs) < 2:
+        swing_highs, swing_lows = (
+
+            self._extract_swings(
+                prices,
+                swing_window
+            )
+        )
+
+        # =================================================
+        # MINIMUM STRUCTURE
+        # =================================================
+
+        minimum_swings = (
+            self.config[
+                "minimum_required_swings"
+            ]
+        )
+
+        if len(swing_highs) < minimum_swings:
 
             return {
 
@@ -269,7 +545,7 @@ class MarketStructureService:
                 "reason": "NO_STRUCTURE"
             }
 
-        if len(swing_lows) < 2:
+        if len(swing_lows) < minimum_swings:
 
             return {
 
@@ -277,110 +553,95 @@ class MarketStructureService:
 
                 "reason": "NO_STRUCTURE"
             }
+
+        # =================================================
+        # DIRECTION
+        # =================================================
 
         bullish_highs = (
 
             swing_highs[-1]
+
             >
-            swing_highs[-2]
+
+            self._safe_mean(
+                swing_highs[-2:]
+            )
         )
 
         bullish_lows = (
 
             swing_lows[-1]
+
             >
-            swing_lows[-2]
+
+            self._safe_mean(
+                swing_lows[-2:]
+            )
         )
 
-        trend_strength = 0
-
-        if bullish_highs:
-
-            trend_strength += 1
-
-        if bullish_lows:
-
-            trend_strength += 1
-
         # =================================================
-        # TREND STRENGTH
+        # IMPULSE
         # =================================================
 
-        if (
+        impulse_strength = (
+            self._calculate_impulse_strength(
+                prices
+            )
+        )
 
-            trend_strength
+        # =================================================
+        # SCORE
+        # =================================================
 
-            <
+        structure_score = (
 
+            self._calculate_structure_score(
+
+                bullish_highs,
+
+                bullish_lows,
+
+                impulse_strength
+            )
+        )
+
+        minimum_score = (
             self.config[
-                "min_trend_strength"
+                "minimum_structure_score"
             ]
+        )
+
+        if structure_score < minimum_score:
+
+            return {
+
+                "valid": False,
+
+                "reason": "WEAK_STRUCTURE",
+
+                "score": structure_score,
+
+                "impulse_strength":
+                    impulse_strength
+            }
+
+        # =================================================
+        # CONSOLIDATION
+        # =================================================
+
+        if self._is_consolidating(
+            prices
         ):
 
             return {
 
                 "valid": False,
 
-                "reason": "WEAK_STRUCTURE"
+                "reason": "CONSOLIDATION",
+
+                "score": structure_score
             }
-
-        # =================================================
-        # CONSOLIDATION FILTER
-        # =================================================
-
-        if self.config[
-            "enable_consolidation_filter"
-        ]:
-
-            recent = prices[-10:]
-
-            max_price = max(
-                recent
-            )
-
-            min_price = min(
-                recent
-            )
-
-            # =============================================
-            # SAFETY
-            # =============================================
-
-            if min_price <= 0:
-
-                return {
-
-                    "valid": False,
-
-                    "reason": "INVALID_PRICE"
-                }
-
-            range_percent = (
-
-                (
-                    max_price - min_price
-                )
-
-                / min_price
-            )
-
-            if (
-
-                range_percent
-
-                <
-
-                self.config[
-                    "consolidation_threshold"
-                ]
-            ):
-
-                return {
-
-                    "valid": False,
-
-                    "reason": "CONSOLIDATION"
-                }
 
         # =================================================
         # VALID STRUCTURE
@@ -392,7 +653,16 @@ class MarketStructureService:
 
             "reason": "BULLISH_STRUCTURE",
 
-            "trend_strength": trend_strength
+            "score": structure_score,
+
+            "impulse_strength":
+                impulse_strength,
+
+            "bullish_highs":
+                bullish_highs,
+
+            "bullish_lows":
+                bullish_lows
         }
 
 

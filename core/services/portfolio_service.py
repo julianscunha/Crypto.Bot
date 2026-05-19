@@ -8,6 +8,14 @@ from data.storage.repositories.portfolio_repository import (
     PortfolioRepository
 )
 
+from core.services.trade_metrics_service import (
+    trade_metrics_service
+)
+
+from core.config.trading_config import (
+    TRADING_CONFIG
+)
+
 from core.utils.console_logger import (
     log
 )
@@ -17,32 +25,96 @@ class PortfolioService:
 
     def __init__(self):
 
-        self.trades = (
+        self.trades_repository = (
             TradesRepository()
         )
 
-        self.portfolio = (
+        self.portfolio_repository = (
             PortfolioRepository()
         )
 
+        self.trade_metrics = (
+            trade_metrics_service
+        )
+
     # =====================================================
-    # BUILD SNAPSHOT
+    # HELPERS
+    # =====================================================
+
+    @staticmethod
+    def _safe_round(
+        value: float
+    ) -> float:
+
+        return round(
+            float(value or 0.0),
+            2
+        )
+
+    @staticmethod
+    def _calculate_drawdown_percent(
+        peak_equity: float,
+        current_equity: float
+    ) -> float:
+
+        if peak_equity <= 0:
+
+            return 0.0
+
+        drawdown = (
+
+            (
+                peak_equity
+                -
+                current_equity
+            )
+
+            / peak_equity
+        ) * 100
+
+        return round(
+            max(drawdown, 0.0),
+            2
+        )
+
+    # =====================================================
+    # SNAPSHOT
     # =====================================================
 
     def build_snapshot(
         self,
         user_id: int,
-        initial_balance: float = 1000.0
+        initial_balance: float | None = None
     ):
 
+        # =================================================
+        # CONFIG
+        # =================================================
+
+        if initial_balance is None:
+
+            initial_balance = (
+                TRADING_CONFIG[
+                    "account_balance"
+                ]
+            )
+
+        # =================================================
+        # TRADES
+        # =================================================
+
         open_trades = (
-            self.trades.get_open_trades(
+
+            self.trades_repository
+            .get_open_trades(
                 user_id=user_id
             )
         )
 
         closed_trades = (
-            self.trades.get_closed_trades(
+
+            self.trades_repository
+            .get_closed_trades(
                 user_id=user_id
             )
         )
@@ -51,127 +123,107 @@ class PortfolioService:
         # REALIZED PNL
         # =================================================
 
-        realized_pnl = round(
+        realized_pnl = self._safe_round(
 
             sum(
 
                 trade.realized_pnl or 0.0
 
                 for trade in closed_trades
-            ),
-
-            2
+            )
         )
 
         # =================================================
         # UNREALIZED PNL
         # =================================================
 
-        unrealized_pnl = round(
+        unrealized_pnl = self._safe_round(
 
             sum(
 
                 trade.unrealized_pnl or 0.0
 
                 for trade in open_trades
-            ),
-
-            2
+            )
         )
 
         # =================================================
         # TOTAL PNL
         # =================================================
 
-        total_pnl = round(
+        total_pnl = self._safe_round(
+
             realized_pnl
             +
-            unrealized_pnl,
-            2
+            unrealized_pnl
         )
 
         # =================================================
         # BALANCE
         # =================================================
 
-        balance = round(
+        balance = self._safe_round(
+
             initial_balance
             +
-            realized_pnl,
-            2
+            realized_pnl
         )
 
         # =================================================
         # EQUITY
         # =================================================
 
-        equity = round(
+        equity = self._safe_round(
+
             balance
             +
-            unrealized_pnl,
-            2
+            unrealized_pnl
         )
 
         # =================================================
-        # EXPOSURE
+        # OPEN EXPOSURE
         # =================================================
 
-        exposure = round(
+        open_exposure = (
 
-            sum(
+            self.trade_metrics
+            .get_open_exposure(
+                user_id=user_id
+            )
+        )
 
-                (
-                    trade.current_price or 0.0
-                )
+        # =================================================
+        # PEAK EQUITY
+        # =================================================
 
-                *
-
-                (
-                    trade.quantity or 0.0
-                )
-
-                for trade in open_trades
-            ),
-
-            2
+        peak_equity = max(
+            initial_balance,
+            balance,
+            equity
         )
 
         # =================================================
         # DRAWDOWN
         # =================================================
 
-        peak_reference = max(
-            initial_balance,
-            balance
-        )
+        drawdown_percent = (
 
-        if peak_reference <= 0:
+            self._calculate_drawdown_percent(
 
-            drawdown = 0.0
+                peak_equity,
 
-        else:
-
-            drawdown = round(
-
-                (
-                    (
-                        peak_reference
-                        -
-                        equity
-                    )
-
-                    / peak_reference
-                ) * 100,
-
-                2
+                equity
             )
+        )
 
         # =================================================
         # SNAPSHOT
         # =================================================
 
-        snapshot = (
-            self.portfolio.create_snapshot(
+        portfolio_snapshot = (
+
+            self.portfolio_repository
+            .create_snapshot(
 
                 user_id=user_id,
 
@@ -193,23 +245,29 @@ class PortfolioService:
                     closed_trades
                 ),
 
-                exposure=exposure,
+                exposure=open_exposure,
 
-                drawdown=drawdown
+                drawdown=drawdown_percent
             )
         )
 
         # =================================================
-        # PORTFOLIO LOG
+        # TELEMETRY
         # =================================================
 
         log(
             "PORTFOLIO",
             (
-                f"EQUITY={snapshot.equity} "
-                f"PNL={snapshot.total_pnl} "
-                f"DD={snapshot.drawdown}%"
+                f"EQUITY={portfolio_snapshot.equity} "
+                f"BALANCE={portfolio_snapshot.balance} "
+                f"PNL={portfolio_snapshot.total_pnl} "
+                f"DD={portfolio_snapshot.drawdown}%"
             )
         )
 
-        return snapshot
+        return portfolio_snapshot
+
+
+portfolio_service = (
+    PortfolioService()
+)

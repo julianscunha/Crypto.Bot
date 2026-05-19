@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from collections import defaultdict
+from collections import (
+    defaultdict
+)
 
-from core.config.trading_config import (
-    TRADING_CONFIG
+from core.config.atr_config import (
+    ATR_CONFIG
 )
 
 
@@ -11,11 +13,62 @@ class AtrService:
 
     def __init__(self):
 
+        self.config = (
+            ATR_CONFIG
+        )
+
+        # =================================================
+        # MARKET MEMORY
+        # =================================================
+
         self.market_data = (
             defaultdict(list)
         )
 
-        self.max_candles = 500
+        self.max_candles = (
+            self.config[
+                "maximum_candle_history"
+            ]
+        )
+
+    # =====================================================
+    # RESET
+    # =====================================================
+
+    def reset(
+        self
+    ):
+
+        self.market_data.clear()
+
+    # =====================================================
+    # HELPERS
+    # =====================================================
+
+    @staticmethod
+    def _build_key(
+        user_id: int,
+        symbol: str
+    ):
+
+        return (
+            user_id,
+            symbol
+        )
+
+    @staticmethod
+    def _safe_float(
+        value,
+        fallback=0.0
+    ):
+
+        try:
+
+            return float(value)
+
+        except Exception:
+
+            return fallback
 
     # =====================================================
     # UPDATE CANDLE
@@ -30,7 +83,39 @@ class AtrService:
         close: float
     ):
 
-        key = (
+        high = self._safe_float(
+            high
+        )
+
+        low = self._safe_float(
+            low
+        )
+
+        close = self._safe_float(
+            close
+        )
+
+        # =================================================
+        # VALIDATION
+        # =================================================
+
+        if high <= 0:
+
+            return
+
+        if low <= 0:
+
+            return
+
+        if close <= 0:
+
+            return
+
+        if low > high:
+
+            return
+
+        key = self._build_key(
             user_id,
             symbol
         )
@@ -43,18 +128,20 @@ class AtrService:
 
             {
                 "high": high,
+
                 "low": low,
+
                 "close": close
             }
         )
 
         # =================================================
-        # MEMORY LIMIT
+        # MEMORY CONTROL
         # =================================================
 
         if len(candles) > self.max_candles:
 
-            candles.pop(0)
+            del candles[0]
 
     # =====================================================
     # GET CANDLES
@@ -66,12 +153,15 @@ class AtrService:
         symbol: str
     ):
 
-        key = (
+        key = self._build_key(
             user_id,
             symbol
         )
 
-        return self.market_data[key]
+        return self.market_data.get(
+            key,
+            []
+        )
 
     # =====================================================
     # TRUE RANGE
@@ -83,58 +173,63 @@ class AtrService:
         previous_close
     ):
 
+        previous_close = (
+            self._safe_float(
+                previous_close
+            )
+        )
+
+        if previous_close <= 0:
+
+            return 0.0
+
         high_low = (
+
             current_candle["high"]
-            - current_candle["low"]
+            -
+            current_candle["low"]
         )
 
         high_close = abs(
+
             current_candle["high"]
-            - previous_close
+            -
+            previous_close
         )
 
         low_close = abs(
+
             current_candle["low"]
-            - previous_close
+            -
+            previous_close
         )
 
-        return max(
-            high_low,
-            high_close,
-            low_close
+        return round(
+
+            max(
+
+                high_low,
+
+                high_close,
+
+                low_close
+            ),
+
+            8
         )
 
     # =====================================================
-    # ATR
+    # TRUE RANGES
     # =====================================================
 
-    def calculate_atr(
+    def calculate_true_ranges(
         self,
-        user_id: int,
-        symbol: str,
-        period: int = None
+        candles
     ):
 
-        if period is None:
+        if len(candles) < 2:
 
-            period = (
-                TRADING_CONFIG[
-                    "atr_period"
-                ]
-            )
-
-        candles = self.get_candles(
-            user_id,
-            symbol
-        )
-
-        # =================================================
-        # WARMUP
-        # =================================================
-
-        if len(candles) < period + 1:
-
-            return None
+            return []
 
         true_ranges = []
 
@@ -153,7 +248,9 @@ class AtrService:
 
             tr = (
                 self.calculate_true_range(
+
                     current,
+
                     previous["close"]
                 )
             )
@@ -162,11 +259,57 @@ class AtrService:
                 tr
             )
 
+        return true_ranges
+
+    # =====================================================
+    # ATR
+    # =====================================================
+
+    def calculate_atr(
+        self,
+        user_id: int,
+        symbol: str,
+        period: int | None = None
+    ):
+
+        if period is None:
+
+            period = (
+                self.config[
+                    "default_atr_period"
+                ]
+            )
+
+        candles = self.get_candles(
+
+            user_id,
+
+            symbol
+        )
+
+        # =================================================
+        # WARMUP
+        # =================================================
+
+        if len(candles) < period + 1:
+
+            return None
+
+        true_ranges = (
+            self.calculate_true_ranges(
+                candles
+            )
+        )
+
+        if not true_ranges:
+
+            return None
+
         recent_true_ranges = (
             true_ranges[-period:]
         )
 
-        if not recent_true_ranges:
+        if len(recent_true_ranges) < period:
 
             return None
 
@@ -188,19 +331,21 @@ class AtrService:
         self,
         user_id: int,
         symbol: str,
-        period: int = None
+        period: int | None = None
     ):
 
         if period is None:
 
             period = (
-                TRADING_CONFIG[
-                    "atr_period"
+                self.config[
+                    "default_atr_period"
                 ]
             )
 
         candles = self.get_candles(
+
             user_id,
+
             symbol
         )
 
@@ -208,10 +353,15 @@ class AtrService:
 
             return None
 
-        atr = self.calculate_atr(
-            user_id,
-            symbol,
-            period
+        atr = (
+            self.calculate_atr(
+
+                user_id=user_id,
+
+                symbol=symbol,
+
+                period=period
+            )
         )
 
         if atr is None:
@@ -231,13 +381,63 @@ class AtrService:
             return None
 
         atr_percent = (
-            atr / current_close
+            atr
+            /
+            current_close
         ) * 100
 
         return round(
             atr_percent,
             4
         )
+
+    # =====================================================
+    # VOLATILITY REGIME
+    # =====================================================
+
+    def get_volatility_regime(
+        self,
+        user_id: int,
+        symbol: str,
+        period: int | None = None
+    ):
+
+        atr_percent = (
+            self.calculate_atr_percent(
+
+                user_id=user_id,
+
+                symbol=symbol,
+
+                period=period
+            )
+        )
+
+        if atr_percent is None:
+
+            return "UNKNOWN"
+
+        low_threshold = (
+            self.config[
+                "low_volatility_threshold"
+            ]
+        )
+
+        high_threshold = (
+            self.config[
+                "high_volatility_threshold"
+            ]
+        )
+
+        if atr_percent < low_threshold:
+
+            return "LOW"
+
+        if atr_percent > high_threshold:
+
+            return "HIGH"
+
+        return "NORMAL"
 
 
 atr_service = (

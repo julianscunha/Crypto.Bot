@@ -40,7 +40,9 @@ def env_bool(
 
 def env_int(
     key: str,
-    default: int
+    default: int,
+    minimum: int | None = None,
+    maximum: int | None = None
 ) -> int:
 
     try:
@@ -52,6 +54,20 @@ def env_int(
             )
         )
 
+        if minimum is not None:
+
+            value = max(
+                value,
+                minimum
+            )
+
+        if maximum is not None:
+
+            value = min(
+                value,
+                maximum
+            )
+
         return value
 
     except Exception:
@@ -61,7 +77,9 @@ def env_int(
 
 def env_float(
     key: str,
-    default: float
+    default: float,
+    minimum: float | None = None,
+    maximum: float | None = None
 ) -> float:
 
     try:
@@ -72,6 +90,20 @@ def env_float(
                 default
             )
         )
+
+        if minimum is not None:
+
+            value = max(
+                value,
+                minimum
+            )
+
+        if maximum is not None:
+
+            value = min(
+                value,
+                maximum
+            )
 
         return value
 
@@ -112,10 +144,6 @@ def env_list(
         if item.strip()
     ]
 
-    # =================================================
-    # UNIQUE VALUES
-    # =================================================
-
     return list(
         dict.fromkeys(values)
     )
@@ -132,8 +160,8 @@ class Settings:
 
     MODE = env_str(
         "MODE",
-        "paper"
-    )
+        "PAPER"
+    ).upper()
 
     # =================================================
     # API
@@ -145,8 +173,14 @@ class Settings:
     )
 
     API_PORT = env_int(
+
         "API_PORT",
-        8000
+
+        8000,
+
+        minimum=1,
+
+        maximum=65535
     )
 
     # =================================================
@@ -178,37 +212,80 @@ class Settings:
     )
 
     # =================================================
-    # RISK ENGINE
+    # ACCOUNT
     # =================================================
 
     ACCOUNT_BALANCE = env_float(
+
         "ACCOUNT_BALANCE",
-        100.0
+
+        100.0,
+
+        minimum=1.0
     )
 
+    # =================================================
+    # RISK MANAGEMENT
+    # =================================================
+
     RISK_PER_TRADE_PERCENT = env_float(
+
         "RISK_PER_TRADE_PERCENT",
-        0.25
+
+        1.0,
+
+        minimum=0.01,
+
+        maximum=100.0
     )
 
     MAX_OPEN_POSITIONS = env_int(
+
         "MAX_OPEN_POSITIONS",
-        3
+
+        3,
+
+        minimum=1
     )
 
     MAX_POSITION_EXPOSURE_PERCENT = env_float(
+
         "MAX_POSITION_EXPOSURE_PERCENT",
-        5.0
+
+        25.0,
+
+        minimum=0.1,
+
+        maximum=100.0
     )
 
     MAX_DAILY_LOSS_PERCENT = env_float(
+
         "MAX_DAILY_LOSS_PERCENT",
-        5.0
+
+        5.0,
+
+        minimum=0.1,
+
+        maximum=100.0
     )
 
     MAX_DAILY_TRADES = env_int(
+
         "MAX_DAILY_TRADES",
-        20
+
+        20,
+
+        minimum=1
+    )
+
+    MINIMUM_RISK_REWARD_RATIO = env_float(
+
+        "MINIMUM_RISK_REWARD_RATIO",
+
+        1.2,
+
+        minimum=0.1
     )
 
     # =================================================
@@ -216,32 +293,369 @@ class Settings:
     # =================================================
 
     ATR_PERIOD = env_int(
+
         "ATR_PERIOD",
-        14
+
+        14,
+
+        minimum=1
     )
 
     ATR_STOP_MULTIPLIER = env_float(
+
         "ATR_STOP_MULTIPLIER",
-        1.0
+
+        1.0,
+
+        minimum=0.1
     )
 
     ATR_TAKE_PROFIT_MULTIPLIER = env_float(
-        "ATR_TAKE_PROFIT_MULTIPLIER",
-        3.0
-    )
 
-    ATR_TRAILING_MULTIPLIER = env_float(
-        "ATR_TRAILING_MULTIPLIER",
-        2.0
+        "ATR_TAKE_PROFIT_MULTIPLIER",
+
+        2.0,
+
+        minimum=0.1
     )
 
     # =================================================
     # STRUCTURE
     # =================================================
 
-    MIN_STRUCTURE_CANDLES = env_int(
-        "MIN_STRUCTURE_CANDLES",
-        6
+    MINIMUM_STRUCTURE_CANDLES = env_int(
+
+        "MINIMUM_STRUCTURE_CANDLES",
+
+        20,
+
+        minimum=5
+    )
+
+    # =================================================
+    # STRATEGY
+    # =================================================
+
+    MINIMUM_SIGNAL_STRENGTH = env_float(
+
+        "MINIMUM_SIGNAL_STRENGTH",
+
+        0.50,
+
+        minimum=0.01,
+
+        maximum=1.0
+    )
+
+    # =================================================
+    # TRADE MANAGEMENT
+    # =================================================
+
+    ENABLE_TRAILING_STOP = env_bool(
+        "ENABLE_TRAILING_STOP",
+        True
+    )
+
+    ENABLE_ATR_TRAILING = env_bool(
+        "ENABLE_ATR_TRAILING",
+        False
+    )
+
+    ATR_TRAILING_MULTIPLIER = env_float(
+
+        "ATR_TRAILING_MULTIPLIER",
+
+        1.0,
+
+        minimum=0.1
+    )
+
+    ENABLE_BREAKEVEN = env_bool(
+        "ENABLE_BREAKEVEN",
+        True
+    )
+
+    BREAKEVEN_TRIGGER_PERCENT = env_float(
+
+        "BREAKEVEN_TRIGGER_PERCENT",
+
+        0.50,
+
+        minimum=0.01,
+
+        maximum=100.0
+    )
+
+    ENABLE_PARTIAL_TAKE_PROFIT = env_bool(
+        "ENABLE_PARTIAL_TAKE_PROFIT",
+        False
+    )
+
+    PARTIAL_TAKE_PROFIT_PERCENT = env_float(
+
+        "PARTIAL_TAKE_PROFIT_PERCENT",
+
+        50.0,
+
+        minimum=1.0,
+
+        maximum=100.0
+    )
+
+    ENABLE_DYNAMIC_TAKE_PROFIT = env_bool(
+        "ENABLE_DYNAMIC_TAKE_PROFIT",
+        False
+    )
+
+    ENABLE_VOLATILITY_BASED_MANAGEMENT = env_bool(
+        "ENABLE_VOLATILITY_BASED_MANAGEMENT",
+        False
+    )
+
+    # =================================================
+    # SIGNAL QUALITY
+    # =================================================
+
+    MIN_SIGNAL_CONFIDENCE = env_float(
+
+        "MIN_SIGNAL_CONFIDENCE",
+
+        0.45,
+
+        minimum=0.01,
+
+        maximum=1.0
+    )
+
+    ENABLE_SIGNAL_COOLDOWN = env_bool(
+        "ENABLE_SIGNAL_COOLDOWN",
+        True
+    )
+
+    SIGNAL_COOLDOWN_SECONDS = env_int(
+
+        "SIGNAL_COOLDOWN_SECONDS",
+
+        5,
+
+        minimum=0
+    )
+
+    ENABLE_EMA_TREND_FILTER = env_bool(
+        "ENABLE_EMA_TREND_FILTER",
+        True
+    )
+
+    EMA_FAST_PERIOD = env_int(
+
+        "EMA_FAST_PERIOD",
+
+        9,
+
+        minimum=1
+    )
+
+    EMA_SLOW_PERIOD = env_int(
+
+        "EMA_SLOW_PERIOD",
+
+        21,
+
+        minimum=2
+    )
+
+    MIN_TREND_STRENGTH_PERCENT = env_float(
+
+        "MIN_TREND_STRENGTH_PERCENT",
+
+        0.15,
+
+        minimum=0.0
+    )
+
+    ENABLE_VOLATILITY_FILTER = env_bool(
+        "ENABLE_VOLATILITY_FILTER",
+        True
+    )
+
+    ATR_VALIDATION_PERIOD = env_int(
+
+        "ATR_VALIDATION_PERIOD",
+
+        14,
+
+        minimum=1
+    )
+
+    MINIMUM_ATR_PERCENT = env_float(
+
+        "MINIMUM_ATR_PERCENT",
+
+        0.01,
+
+        minimum=0.0
+    )
+
+    ENABLE_DRAWDOWN_PROTECTION = env_bool(
+        "ENABLE_DRAWDOWN_PROTECTION",
+        True
+    )
+
+    MAXIMUM_DAILY_DRAWDOWN_PERCENT = env_float(
+
+        "MAXIMUM_DAILY_DRAWDOWN_PERCENT",
+
+        5.0,
+
+        minimum=0.1,
+
+        maximum=100.0
+    )
+
+    # =================================================
+    # MARKET STRUCTURE
+    # =================================================
+
+    STRUCTURE_MAX_PRICE_HISTORY = env_int(
+
+        "STRUCTURE_MAX_PRICE_HISTORY",
+
+        300,
+
+        minimum=50
+    )
+
+    STRUCTURE_SWING_WINDOW = env_int(
+
+        "STRUCTURE_SWING_WINDOW",
+
+        2,
+
+        minimum=1
+    )
+
+    STRUCTURE_MIN_REQUIRED_SWINGS = env_int(
+
+        "STRUCTURE_MIN_REQUIRED_SWINGS",
+
+        2,
+
+        minimum=1
+    )
+
+    STRUCTURE_MIN_CANDLES = env_int(
+
+        "STRUCTURE_MIN_CANDLES",
+
+        20,
+
+        minimum=5
+    )
+
+    STRUCTURE_MIN_SCORE = env_float(
+
+        "STRUCTURE_MIN_SCORE",
+
+        2.0,
+
+        minimum=0.1
+    )
+
+    STRUCTURE_MIN_IMPULSE_WINDOW = env_int(
+
+        "STRUCTURE_MIN_IMPULSE_WINDOW",
+
+        5,
+
+        minimum=2
+    )
+
+    STRUCTURE_MIN_IMPULSE_PERCENT = env_float(
+
+        "STRUCTURE_MIN_IMPULSE_PERCENT",
+
+        0.10,
+
+        minimum=0.0
+    )
+
+    STRUCTURE_IMPULSE_SCORE = env_float(
+
+        "STRUCTURE_IMPULSE_SCORE",
+
+        1.0,
+
+        minimum=0.1
+    )
+
+    STRUCTURE_BULLISH_HIGH_SCORE = env_float(
+
+        "STRUCTURE_BULLISH_HIGH_SCORE",
+
+        1.0,
+
+        minimum=0.1
+    )
+
+    STRUCTURE_BULLISH_LOW_SCORE = env_float(
+
+        "STRUCTURE_BULLISH_LOW_SCORE",
+
+        1.0,
+
+        minimum=0.1
+    )
+
+    STRUCTURE_ENABLE_CONSOLIDATION_FILTER = env_bool(
+        "STRUCTURE_ENABLE_CONSOLIDATION_FILTER",
+        True
+    )
+
+    STRUCTURE_MIN_CONSOLIDATION_WINDOW = env_int(
+
+        "STRUCTURE_MIN_CONSOLIDATION_WINDOW",
+
+        10,
+
+        minimum=2
+    )
+
+    STRUCTURE_MAX_CONSOLIDATION_RANGE = env_float(
+
+        "STRUCTURE_MAX_CONSOLIDATION_RANGE",
+
+        0.30,
+
+        minimum=0.01
+    )
+
+    STRUCTURE_ENABLE_FAKE_BREAKOUT_FILTER = env_bool(
+        "STRUCTURE_ENABLE_FAKE_BREAKOUT_FILTER",
+        False
+    )
+
+    STRUCTURE_MIN_BREAKOUT_DISTANCE_PERCENT = env_float(
+
+        "STRUCTURE_MIN_BREAKOUT_DISTANCE_PERCENT",
+
+        0.20,
+
+        minimum=0.0
+    )
+
+    STRUCTURE_REQUIRE_BOS_CONFIRMATION = env_bool(
+        "STRUCTURE_REQUIRE_BOS_CONFIRMATION",
+        False
+    )
+
+    STRUCTURE_ENABLE_REGIME_AWARE = env_bool(
+        "STRUCTURE_ENABLE_REGIME_AWARE",
+        False
+    )
+
+    STRUCTURE_ENABLE_ADAPTIVE_THRESHOLDS = env_bool(
+        "STRUCTURE_ENABLE_ADAPTIVE_THRESHOLDS",
+        False
     )
 
     # =================================================
@@ -260,7 +674,7 @@ class Settings:
 
     ENABLE_MARKET_REGIME = env_bool(
         "ENABLE_MARKET_REGIME",
-        True
+        False
     )
 
     ENABLE_REPLAY = env_bool(
@@ -275,20 +689,22 @@ class Settings:
     LOG_LEVEL = env_str(
         "LOG_LEVEL",
         "INFO"
-    )
+    ).upper()
 
     # =================================================
     # MARKET
     # =================================================
 
     SYMBOLS = env_list(
+
         "SYMBOLS",
-        "BTCUSDT,ETHUSDT,SOLUSDT"
+
+        "BTCUSDT,ETHUSDT"
     )
 
     KLINE_INTERVAL = env_str(
         "KLINE_INTERVAL",
-        "1m"
+        "5m"
     )
 
 

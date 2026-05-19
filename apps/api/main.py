@@ -1,17 +1,31 @@
 # -*- coding: utf-8 -*-
 
-from fastapi import FastAPI
-from datetime import datetime
-
-from core.config.settings import settings
-from core.state.market_state import market_state
-
-from data.storage.repositories.portfolio_repository import (
-    PortfolioRepository
+from datetime import (
+    datetime
 )
 
-from data.storage.metrics import (
-    MetricsStorage
+from typing import (
+    List
+)
+
+from fastapi import (
+    FastAPI
+)
+
+from core.config.settings import (
+    settings
+)
+
+from core.state.market_state import (
+    market_state
+)
+
+from core.services.trade_metrics_service import (
+    trade_metrics_service
+)
+
+from data.storage.repositories.portfolio_repository import (
+    portfolio_repository
 )
 
 from data.storage.repositories.trades_repository import (
@@ -26,64 +40,248 @@ from apps.api.schemas.portfolio_schema import (
     PortfolioResponse
 )
 
-from typing import List
-
 from apps.api.schemas.trade_schema import (
     TradeResponse
 )
 
 from apps.api.schemas.dashboard_schema import (
+
     DashboardResponse,
+
     RuntimeResponse
 )
 
+# =====================================================
+# API
+# =====================================================
+
 app = FastAPI(
+
     title="Crypto.Bot API",
-    version="1.0.0"
+
+    version="2.1.0"
 )
 
-portfolio_repository = PortfolioRepository()
-
-metrics_storage = MetricsStorage()
-
 # =====================================================
-# HEALTH
+# CONSTANTS
 # =====================================================
 
-@app.get("/health")
-async def health():
+DEFAULT_USER_ID = 0
 
-    return {
-        "status": "ok",
-        "mode": settings.MODE,
-        "timestamp": datetime.utcnow()
-    }
+RECENT_CLOSED_TRADES_LIMIT = 5
 
 # =====================================================
-# RUNTIME
+# HELPERS
 # =====================================================
 
-@app.get("/runtime")
-async def runtime():
+def build_empty_portfolio_response():
 
-    snapshot = (
+    return PortfolioResponse(
+
+        balance=0.0,
+
+        equity=0.0,
+
+        realized_pnl=0.0,
+
+        unrealized_pnl=0.0,
+
+        total_pnl=0.0,
+
+        open_positions=0,
+
+        closed_positions=0,
+
+        exposure=0.0,
+
+        drawdown=0.0,
+
+        created_at=datetime.utcnow()
+    )
+
+
+def build_open_trade_response(
+    trade
+):
+
+    return TradeResponse(
+
+        id=trade.id,
+
+        symbol=trade.symbol,
+
+        action=trade.action,
+
+        entry_price=trade.entry_price,
+
+        current_price=trade.current_price,
+
+        quantity=trade.quantity,
+
+        pnl=trade.pnl,
+
+        unrealized_pnl=trade.unrealized_pnl,
+
+        status=trade.status
+    )
+
+
+def build_closed_trade_response(
+    trade
+):
+
+    return TradeResponse(
+
+        id=trade.id,
+
+        symbol=trade.symbol,
+
+        action=trade.action,
+
+        entry_price=trade.entry_price,
+
+        current_price=trade.current_price,
+
+        quantity=trade.quantity,
+
+        pnl=trade.pnl,
+
+        realized_pnl=trade.realized_pnl,
+
+        exit_reason=trade.exit_reason,
+
+        status=trade.status,
+
+        created_at=trade.created_at,
+
+        closed_at=trade.closed_at
+    )
+
+
+def build_portfolio_response(
+    snapshot
+):
+
+    if not snapshot:
+
+        return build_empty_portfolio_response()
+
+    return PortfolioResponse(
+
+        balance=snapshot.balance,
+
+        equity=snapshot.equity,
+
+        realized_pnl=snapshot.realized_pnl,
+
+        unrealized_pnl=snapshot.unrealized_pnl,
+
+        total_pnl=snapshot.total_pnl,
+
+        open_positions=snapshot.open_positions,
+
+        closed_positions=snapshot.closed_positions,
+
+        exposure=snapshot.exposure,
+
+        drawdown=snapshot.drawdown,
+
+        created_at=snapshot.created_at
+    )
+
+
+def build_runtime_response():
+
+    runtime_snapshot = (
         market_state.snapshot()
     )
 
-    return {
+    return RuntimeResponse(
 
-        "mode": settings.MODE,
+        # =================================================
+        # CONNECTION
+        # =================================================
 
-        "symbols": settings.SYMBOLS,
+        websocket_connected=runtime_snapshot[
+            "websocket_connected"
+        ],
 
-        "api_host": settings.API_HOST,
+        # =================================================
+        # MARKET INGESTION
+        # =================================================
 
-        "api_port": settings.API_PORT,
+        total_messages=runtime_snapshot[
+            "total_market_messages"
+        ],
 
-        "log_level": settings.LOG_LEVEL,
+        active_symbols=runtime_snapshot[
+            "active_symbols"
+        ],
 
-        "runtime": snapshot
-    }
+        # =================================================
+        # ANALYSIS PIPELINE
+        # =================================================
+
+        total_analysis_requests=runtime_snapshot[
+            "total_analysis_requests"
+        ],
+
+        total_generated_signals=runtime_snapshot[
+            "total_generated_signals"
+        ],
+
+        total_approved_signals=runtime_snapshot[
+            "total_approved_signals"
+        ],
+
+        total_rejected_signals=runtime_snapshot[
+            "total_rejected_signals"
+        ],
+
+        # =================================================
+        # EXECUTION PIPELINE
+        # =================================================
+
+        total_executed_orders=runtime_snapshot[
+            "total_executed_orders"
+        ],
+
+        total_closed_positions=runtime_snapshot[
+            "total_closed_positions"
+        ],
+
+        # =================================================
+        # TELEMETRY
+        # =================================================
+
+        blocked_signal_reasons=runtime_snapshot[
+            "blocked_signal_reasons"
+        ],
+
+        execution_reasons=runtime_snapshot[
+            "execution_reasons"
+        ],
+
+        # =================================================
+        # METRICS
+        # =================================================
+
+        signal_generation_ratio=runtime_snapshot[
+            "signal_generation_ratio"
+        ],
+
+        signal_approval_ratio=runtime_snapshot[
+            "signal_approval_ratio"
+        ],
+
+        execution_ratio=runtime_snapshot[
+            "execution_ratio"
+        ],
+
+        uptime_seconds=runtime_snapshot[
+            "uptime_seconds"
+        ]
+    )
 
 # =====================================================
 # ROOT
@@ -93,10 +291,54 @@ async def runtime():
 async def root():
 
     return {
+
         "name": "Crypto.Bot",
-        "status": "running"
+
+        "status": "running",
+
+        "mode": settings.MODE,
+
+        "version": "2.1.0"
     }
-    
+
+# =====================================================
+# HEALTH
+# =====================================================
+
+@app.get("/health")
+async def health():
+
+    runtime_response = (
+        build_runtime_response()
+    )
+
+    return {
+
+        "status": "ok",
+
+        "mode": settings.MODE,
+
+        "timestamp": datetime.utcnow(),
+
+        "websocket_connected":
+            runtime_response.websocket_connected,
+
+        "uptime_seconds":
+            runtime_response.uptime_seconds
+    }
+
+# =====================================================
+# RUNTIME
+# =====================================================
+
+@app.get(
+    "/runtime",
+    response_model=RuntimeResponse
+)
+async def runtime():
+
+    return build_runtime_response()
+
 # =====================================================
 # PORTFOLIO
 # =====================================================
@@ -107,61 +349,19 @@ async def root():
 )
 async def portfolio():
 
-    snapshot = (
+    latest_snapshot = (
+
         portfolio_repository
         .get_latest_snapshot(
-            user_id=0
+
+            user_id=DEFAULT_USER_ID
         )
     )
 
-    if not snapshot:
-    
-        return PortfolioResponse(
-            balance=0,
-            equity=0,
-            realized_pnl=0,
-            unrealized_pnl=0,
-            total_pnl=0,
-            open_positions=0,
-            closed_positions=0,
-            exposure=0,
-            drawdown=0,
-            created_at=datetime.utcnow()
-        )
+    return build_portfolio_response(
+        latest_snapshot
+    )
 
-    return {
-
-        "balance":
-            snapshot.balance,
-
-        "equity":
-            snapshot.equity,
-
-        "realized_pnl":
-            snapshot.realized_pnl,
-
-        "unrealized_pnl":
-            snapshot.unrealized_pnl,
-
-        "total_pnl":
-            snapshot.total_pnl,
-
-        "open_positions":
-            snapshot.open_positions,
-
-        "closed_positions":
-            snapshot.closed_positions,
-
-        "exposure":
-            snapshot.exposure,
-
-        "drawdown":
-            snapshot.drawdown,
-
-        "created_at":
-            snapshot.created_at
-    }
-    
 # =====================================================
 # METRICS
 # =====================================================
@@ -172,10 +372,17 @@ async def portfolio():
 )
 async def metrics():
 
-    return (
-        metrics_storage.get_metrics(
-            user_id=0
+    metrics_data = (
+
+        trade_metrics_service
+        .get_metrics(
+
+            user_id=DEFAULT_USER_ID
         )
+    )
+
+    return MetricsResponse(
+        **metrics_data
     )
 
 # =====================================================
@@ -188,48 +395,23 @@ async def metrics():
 )
 async def open_trades():
 
-    trades = (
+    open_positions = (
+
         trades_repository
         .get_open_trades(
-            user_id=0
+
+            user_id=DEFAULT_USER_ID
         )
     )
 
     return [
 
-        {
-            "id":
-                trade.id,
+        build_open_trade_response(
+            trade
+        )
 
-            "symbol":
-                trade.symbol,
-
-            "action":
-                trade.action,
-
-            "entry_price":
-                trade.entry_price,
-
-            "current_price":
-                trade.current_price,
-
-            "quantity":
-                trade.quantity,
-
-            "pnl":
-                trade.pnl,
-
-            "unrealized_pnl":
-                trade.unrealized_pnl,
-
-            "status":
-                trade.status
-
-        }
-
-        for trade in trades
+        for trade in open_positions
     ]
-
 
 # =====================================================
 # CLOSED TRADES
@@ -241,57 +423,24 @@ async def open_trades():
 )
 async def closed_trades():
 
-    trades = (
+    closed_positions = (
+
         trades_repository
         .get_closed_trades(
-            user_id=0
+
+            user_id=DEFAULT_USER_ID
         )
     )
 
     return [
 
-        {
-            "id":
-                trade.id,
+        build_closed_trade_response(
+            trade
+        )
 
-            "symbol":
-                trade.symbol,
-
-            "action":
-                trade.action,
-
-            "entry_price":
-                trade.entry_price,
-
-            "current_price":
-                trade.current_price,
-
-            "quantity":
-                trade.quantity,
-
-            "pnl":
-                trade.pnl,
-
-            "realized_pnl":
-                trade.realized_pnl,
-
-            "exit_reason":
-                trade.exit_reason,
-
-            "status":
-                trade.status,
-
-            "created_at":
-                trade.created_at,
-
-            "closed_at":
-                trade.closed_at
-
-        }
-
-        for trade in trades
+        for trade in closed_positions
     ]
-    
+
 # =====================================================
 # DASHBOARD
 # =====================================================
@@ -302,108 +451,71 @@ async def closed_trades():
 )
 async def dashboard():
 
-    metrics = (
-        metrics_storage.get_metrics(
-            user_id=0
-        )
-    )
+    portfolio_snapshot = (
 
-    snapshot = (
         portfolio_repository
         .get_latest_snapshot(
-            user_id=0
+
+            user_id=DEFAULT_USER_ID
         )
     )
 
-    if not snapshot:
+    metrics_data = (
 
-        snapshot = PortfolioResponse(
-            balance=0,
-            equity=0,
-            realized_pnl=0,
-            unrealized_pnl=0,
-            total_pnl=0,
-            open_positions=0,
-            closed_positions=0,
-            exposure=0,
-            drawdown=0,
-            created_at=datetime.utcnow()
-        )
+        trade_metrics_service
+        .get_metrics(
 
-    else:
-
-        snapshot = PortfolioResponse(
-            balance=snapshot.balance,
-            equity=snapshot.equity,
-            realized_pnl=snapshot.realized_pnl,
-            unrealized_pnl=snapshot.unrealized_pnl,
-            total_pnl=snapshot.total_pnl,
-            open_positions=snapshot.open_positions,
-            closed_positions=snapshot.closed_positions,
-            exposure=snapshot.exposure,
-            drawdown=snapshot.drawdown,
-            created_at=snapshot.created_at
-        )
-
-    open_trades_data = (
-        trades_repository.get_open_trades(
-            user_id=0
+            user_id=DEFAULT_USER_ID
         )
     )
 
-    closed_trades_data = (
-        trades_repository.get_closed_trades(
-            user_id=0
+    open_positions = (
+
+        trades_repository
+        .get_open_trades(
+
+            user_id=DEFAULT_USER_ID
         )
     )
 
-    open_trades = [
+    closed_positions = (
 
-        TradeResponse(
-            id=trade.id,
-            symbol=trade.symbol,
-            action=trade.action,
-            entry_price=trade.entry_price,
-            current_price=trade.current_price,
-            quantity=trade.quantity,
-            pnl=trade.pnl,
-            unrealized_pnl=trade.unrealized_pnl,
-            status=trade.status
+        trades_repository
+        .get_closed_trades(
+
+            user_id=DEFAULT_USER_ID
         )
-
-        for trade in open_trades_data
-    ]
-
-    recent_closed_trades = [
-
-        TradeResponse(
-            id=trade.id,
-            symbol=trade.symbol,
-            action=trade.action,
-            entry_price=trade.entry_price,
-            current_price=trade.current_price,
-            quantity=trade.quantity,
-            pnl=trade.pnl,
-            realized_pnl=trade.realized_pnl,
-            exit_reason=trade.exit_reason,
-            status=trade.status,
-            created_at=trade.created_at,
-            closed_at=trade.closed_at
-        )
-
-        for trade in closed_trades_data[-5:]
-    ]
-
-    runtime = RuntimeResponse(
-        websocket_connected=False,
-        total_messages=0,
-        active_symbols=[]
     )
 
     return DashboardResponse(
-        runtime=runtime,
-        metrics=MetricsResponse(**metrics),
-        portfolio=snapshot,
-        open_trades=open_trades,
-        recent_closed_trades=recent_closed_trades
+
+        runtime=build_runtime_response(),
+
+        metrics=MetricsResponse(
+            **metrics_data
+        ),
+
+        portfolio=build_portfolio_response(
+            portfolio_snapshot
+        ),
+
+        open_trades=[
+
+            build_open_trade_response(
+                trade
+            )
+
+            for trade in open_positions
+        ],
+
+        recent_closed_trades=[
+
+            build_closed_trade_response(
+                trade
+            )
+
+            for trade in closed_positions[
+                -RECENT_CLOSED_TRADES_LIMIT:
+            ]
+        ]
     )

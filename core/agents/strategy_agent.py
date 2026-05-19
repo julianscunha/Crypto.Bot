@@ -29,6 +29,10 @@ from data.features.indicators import (
     atr
 )
 
+from core.config.strategy_config import (
+    STRATEGY_CONFIG
+)
+
 
 class StrategyAgent:
 
@@ -45,6 +49,10 @@ class StrategyAgent:
 
         self.market_structure = (
             market_structure_service
+        )
+
+        self.strategy_config = (
+            STRATEGY_CONFIG
         )
 
         self.bus.subscribe(
@@ -72,6 +80,12 @@ class StrategyAgent:
         )
 
         # =================================================
+        # ANALYSIS TELEMETRY
+        # =================================================
+
+        market_state.register_analysis_request()
+
+        # =================================================
         # MARKET DATA
         # =================================================
 
@@ -88,7 +102,7 @@ class StrategyAgent:
 
         if not prices:
 
-            market_state.increment_block_reason(
+            market_state.register_rejected_signal(
                 "NO_MARKET_DATA"
             )
 
@@ -104,7 +118,7 @@ class StrategyAgent:
 
         if atr_value is None:
 
-            market_state.increment_block_reason(
+            market_state.register_rejected_signal(
                 "ATR_NOT_READY"
             )
 
@@ -112,7 +126,7 @@ class StrategyAgent:
 
         if atr_value <= 0:
 
-            market_state.increment_block_reason(
+            market_state.register_rejected_signal(
                 "INVALID_ATR"
             )
 
@@ -139,8 +153,41 @@ class StrategyAgent:
 
         if not structure["valid"]:
 
-            market_state.increment_block_reason(
+            market_state.register_rejected_signal(
                 structure["reason"]
+            )
+
+            return
+
+        # =================================================
+        # CONFIDENCE
+        # =================================================
+
+        confidence = round(
+
+            float(
+
+                getattr(
+                    payload,
+                    "confidence",
+                    0.50
+                )
+            ),
+
+            2
+        )
+
+        minimum_signal_strength = (
+
+            self.strategy_config[
+                "minimum_signal_strength"
+            ]
+        )
+
+        if confidence < minimum_signal_strength:
+
+            market_state.register_rejected_signal(
+                "LOW_SIGNAL_STRENGTH"
             )
 
             return
@@ -160,18 +207,12 @@ class StrategyAgent:
 
                 entry_price=payload.reference_price,
 
-                signal_strength=round(
+                signal_strength=confidence,
 
-                    getattr(
-                        payload,
-                        "confidence",
-                        0.50
-                    ),
-
+                atr=round(
+                    atr_value,
                     2
-                ),
-
-                atr=atr_value
+                )
             )
         )
 
@@ -189,7 +230,7 @@ class StrategyAgent:
 
         if not valid:
 
-            market_state.increment_block_reason(
+            market_state.register_rejected_signal(
                 reason
             )
 
@@ -199,19 +240,24 @@ class StrategyAgent:
         # GENERATED SIGNAL
         # =================================================
 
-        market_state.increment_generated_signal()
+        market_state.register_generated_signal()
+
+        # =================================================
+        # TELEMETRY
+        # =================================================
 
         log(
             "STRATEGY",
             (
                 f"SIGNAL BUY "
-                f"strength={signal_payload.signal_strength}"
+                f"strength={signal_payload.signal_strength} "
+                f"atr={signal_payload.atr}"
             ),
             "SUCCESS"
         )
 
         # =================================================
-        # PUBLISH
+        # MESSAGE
         # =================================================
 
         signal_message = (
@@ -222,6 +268,10 @@ class StrategyAgent:
                 payload=signal_payload
             )
         )
+
+        # =================================================
+        # PUBLISH
+        # =================================================
 
         await self.bus.publish(
             signal_message
