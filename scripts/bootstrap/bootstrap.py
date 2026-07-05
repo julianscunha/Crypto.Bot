@@ -55,6 +55,12 @@ def write_bootstrap_log(
     content: str
 ):
 
+    BOOTSTRAP_LOG.parent.mkdir(
+        parents=True,
+
+        exist_ok=True
+    )
+
     with open(
         BOOTSTRAP_LOG,
         "a",

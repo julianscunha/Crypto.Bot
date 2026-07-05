@@ -17,6 +17,15 @@ from data.storage.models import (
     Trade
 )
 
+from core.services.trade_analytics import (
+    compute_equity_curve_stats,
+    compute_profit_factor,
+    compute_risk_reward,
+    compute_recovery_factor,
+    compute_sharpe_ratio,
+    compute_sortino_ratio
+)
+
 
 class TradeMetricsService:
 
@@ -367,6 +376,129 @@ class TradeMetricsService:
         finally:
 
             session.close()
+
+    # =====================================================
+    # ADVANCED METRICS (RISK-ADJUSTED RETURN, STREAKS)
+    # =====================================================
+    #
+    # Distinct from get_metrics() above: that one answers "how is
+    # this account doing right now" (winrate, PnL, open exposure).
+    # This answers "how consistent/risky is this trading strategy
+    # over its full history" -- Sharpe/Sortino, the true historical
+    # max drawdown (peak-to-trough across ALL closed trades ever,
+    # not the session-scoped drawdown PortfolioService tracks for
+    # circuit-breaker purposes), and win/loss streaks. Computed via
+    # core.services.trade_analytics, the same pure functions
+    # backtest/engine/metrics_engine.py uses, so live and backtest
+    # numbers are never computed by two different, silently
+    # drifting implementations.
+
+    def get_advanced_metrics(
+        self,
+        user_id: int
+    ):
+
+        session = self._session()
+
+        try:
+
+            closed_trades = (
+
+                session.query(
+                    Trade
+                )
+
+                .filter(
+
+                    Trade.user_id == user_id,
+
+                    Trade.status == "CLOSED"
+                )
+
+                .order_by(
+                    Trade.closed_at.asc()
+                )
+
+                .all()
+            )
+
+        finally:
+
+            session.close()
+
+        pnls = [
+            trade.pnl or 0.0
+            for trade in closed_trades
+        ]
+
+        curve_stats = (
+            compute_equity_curve_stats(
+                pnls
+            )
+        )
+
+        wins = (
+            curve_stats["wins"]
+        )
+
+        losses = (
+            curve_stats["losses"]
+        )
+
+        total_pnl = (
+            self._safe_float(
+                sum(pnls)
+            )
+        )
+
+        return {
+
+            "sharpe_ratio":
+                compute_sharpe_ratio(
+                    pnls
+                ),
+
+            "sortino_ratio":
+                compute_sortino_ratio(
+                    pnls
+                ),
+
+            "max_drawdown":
+                curve_stats["max_drawdown"],
+
+            "profit_factor":
+                compute_profit_factor(
+                    wins,
+                    losses
+                ),
+
+            "risk_reward":
+                compute_risk_reward(
+                    wins,
+                    losses
+                ),
+
+            "recovery_factor":
+                compute_recovery_factor(
+                    total_pnl,
+                    curve_stats["max_drawdown"]
+                ),
+
+            "max_win_streak":
+                curve_stats["max_win_streak"],
+
+            "max_loss_streak":
+                curve_stats["max_loss_streak"],
+
+            "current_win_streak":
+                curve_stats["current_win_streak"],
+
+            "current_loss_streak":
+                curve_stats["current_loss_streak"],
+
+            "sample_size":
+                len(pnls)
+        }
 
     # =====================================================
     # PERFORMANCE SUMMARY

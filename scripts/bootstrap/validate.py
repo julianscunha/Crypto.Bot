@@ -217,6 +217,46 @@ def validate_venv():
     return False
 
 # =====================================================
+# FRONTEND VALIDATION
+# =====================================================
+#
+# Informational only, like validate_venv(): the frontend is on the
+# roadmap (see README_FULL.md) and not built yet in this project, so
+# its absence must never fail validate_environment() or block
+# startup. This just surfaces the status proactively at boot instead
+# of only discovering it when menu option [4]/[5] is selected.
+
+def validate_frontend():
+
+    frontend_path = (
+        ROOT / "frontend"
+    )
+
+    if frontend_path.exists():
+
+        log(
+            "SYSTEM",
+            status_line(
+                "Frontend",
+                "OK"
+            ),
+            "SUCCESS"
+        )
+
+        return True
+
+    log(
+        "SYSTEM",
+        status_line(
+            "Frontend",
+            "NOT_BUILT_YET"
+        ),
+        "WARNING"
+    )
+
+    return False
+
+# =====================================================
 # ENVIRONMENT VALIDATION
 # =====================================================
 
@@ -232,6 +272,8 @@ def validate_environment():
     ]
 
     validate_venv()
+
+    validate_frontend()
 
     success = all(
         validations

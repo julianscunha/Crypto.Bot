@@ -8,12 +8,24 @@ from core.config.signal_quality_config import (
     SIGNAL_QUALITY_CONFIG
 )
 
+from core.config.trading_config import (
+    TRADING_CONFIG
+)
+
 from core.services.ema_trend_service import (
     ema_trend_service
 )
 
 from core.services.atr_service import (
     atr_service
+)
+
+from core.services.risk_protection_service import (
+    risk_protection_service
+)
+
+from core.services.market_regime_service import (
+    market_regime_service
 )
 
 from data.storage.repositories.trades_repository import (
@@ -47,6 +59,14 @@ class SignalQualityService:
 
         self.atr_service = (
             atr_service
+        )
+
+        self.risk_protection = (
+            risk_protection_service
+        )
+
+        self.market_regime = (
+            market_regime_service
         )
 
         # =================================================
@@ -134,6 +154,8 @@ class SignalQualityService:
 
             self._validate_ema_trend,
 
+            self._validate_market_regime_alignment,
+
             self._validate_market_volatility,
 
             self._validate_signal_confidence,
@@ -142,7 +164,11 @@ class SignalQualityService:
 
             self._validate_position_limit,
 
-            self._validate_drawdown_protection
+            self._validate_drawdown_protection,
+
+            self._validate_daily_loss_limit,
+
+            self._validate_daily_trade_limit
         ]
 
         for validator in validators:
@@ -296,6 +322,71 @@ class SignalQualityService:
         return (
             True,
             "TREND_VALID"
+        )
+
+    # =====================================================
+    # MARKET REGIME ALIGNMENT
+    # =====================================================
+    #
+    # enable_market_regime_alignment existed in
+    # core/config/signal_quality_config.py since early in this
+    # project, but no code anywhere ever read it.
+    # core.services.market_regime_service already runs
+    # unconditionally inside AnalystAgent (detecting BULLISH/
+    # BEARISH/TRENDING/SIDEWAYS per symbol from recent price action)
+    # -- it was already computed every candle, just never connected
+    # to any gating decision here.
+    #
+    # This blocks only on BEARISH specifically. This codebase is
+    # long-only (every signal this pipeline can act on is a BUY --
+    # see BinanceTradingClient's docstring and ExecutionAgent's
+    # validation), so BEARISH is the one regime that directly
+    # contradicts the position's only possible direction. SIDEWAYS/
+    # TRENDING-but-not-bearish are deliberately allowed through: a
+    # technically valid signal during a flat or mixed market isn't
+    # inherently wrong the way one fighting a confirmed downtrend is,
+    # and blocking on those too would make this filter far more
+    # restrictive than the data actually justifies.
+
+    def _validate_market_regime_alignment(
+        self,
+        payload
+    ):
+
+        if not self.config[
+            "enable_market_regime_alignment"
+        ]:
+
+            return (
+                True,
+                "FILTER_DISABLED"
+            )
+
+        regime = (
+
+            self.market_regime
+            .detect_regime(
+                payload.symbol
+            )
+        )
+
+        if regime == "UNKNOWN":
+
+            return (
+                True,
+                "REGIME_WARMUP"
+            )
+
+        if regime == "BEARISH":
+
+            return (
+                False,
+                "BEARISH_REGIME"
+            )
+
+        return (
+            True,
+            "REGIME_ALIGNED"
         )
 
     # =====================================================
@@ -548,6 +639,75 @@ class SignalQualityService:
         return (
             True,
             "DRAWDOWN_VALID"
+        )
+
+    # =====================================================
+    # DAILY LOSS LIMIT
+    # =====================================================
+
+    def _validate_daily_loss_limit(
+        self,
+        payload
+    ):
+
+        if not self.config[
+            "enable_daily_loss_limit"
+        ]:
+
+            return (
+                True,
+                "FILTER_DISABLED"
+            )
+
+        account_balance = (
+            TRADING_CONFIG[
+                "account_balance"
+            ]
+        )
+
+        allowed, reason = (
+
+            self.risk_protection
+            .check_daily_loss_limit(
+                user_id=payload.user_id,
+                account_balance=account_balance
+            )
+        )
+
+        return (
+            allowed,
+            reason
+        )
+
+    # =====================================================
+    # DAILY TRADE LIMIT
+    # =====================================================
+
+    def _validate_daily_trade_limit(
+        self,
+        payload
+    ):
+
+        if not self.config[
+            "enable_daily_trade_limit"
+        ]:
+
+            return (
+                True,
+                "FILTER_DISABLED"
+            )
+
+        allowed, reason = (
+
+            self.risk_protection
+            .check_daily_trade_limit(
+                user_id=payload.user_id
+            )
+        )
+
+        return (
+            allowed,
+            reason
         )
 
 

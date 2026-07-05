@@ -118,6 +118,37 @@ class Base(
 
 def init_db():
 
+    # Rodar migrations pendentes antes de criar tabelas
+    # Garante que colunas adicionadas via Alembic existam
+    # mesmo quando o banco já existia (optimizer, backtest, etc.)
+    try:
+
+        from alembic.config import Config as AlembicConfig
+        from alembic import command as alembic_command
+        from pathlib import Path
+        import logging
+
+        # Suprimir logs verbosos do Alembic no stdout
+        logging.getLogger("alembic").setLevel(logging.WARNING)
+
+        # Caminho absoluto baseado no arquivo database.py — independente do cwd
+        _db_file = Path(__file__).resolve()
+        _project_root = _db_file.parents[2]  # data/storage/database.py → project root
+
+        alembic_cfg = AlembicConfig(
+            str(_project_root / "alembic.ini")
+        )
+        # Garantir que alembic encontre os scripts na raiz correta
+        alembic_cfg.set_main_option("script_location", str(_project_root / "alembic"))
+
+        alembic_command.upgrade(alembic_cfg, "head")
+
+    except Exception:
+
+        # Se alembic falhar (ex: banco novo sem tabela alembic_version),
+        # cai no create_all abaixo que cria tudo do zero
+        pass
+
     from data.storage.models import (
 
         Trade,

@@ -75,6 +75,44 @@ def env_int(
         return default
 
 
+def env_int_aliased(
+    keys: tuple,
+    default: int,
+    minimum: int | None = None,
+    maximum: int | None = None
+) -> int:
+
+    """
+    Like env_int, but accepts multiple possible env var names and
+    uses the first one that's actually set, in order. Exists because
+    this project ended up with more than one name representing the
+    same setting in different places (STRUCTURE_MIN_CANDLES in
+    market_structure_config.py, MINIMUM_STRUCTURE_CANDLES in
+    trading_config.py) -- a person setting a third, equally
+    reasonable variant (MIN_STRUCTURE_CANDLES) had it silently
+    ignored, with every signal staying gated behind the 20-candle
+    default with no error or warning anywhere.
+    """
+
+    for key in keys:
+
+        if os.getenv(key) is not None:
+
+            return env_int(
+                key,
+                default,
+                minimum=minimum,
+                maximum=maximum
+            )
+
+    return env_int(
+        keys[0],
+        default,
+        minimum=minimum,
+        maximum=maximum
+    )
+
+
 def env_float(
     key: str,
     default: float,
@@ -212,6 +250,24 @@ class Settings:
     )
 
     # =================================================
+    # LIVE TRADING SAFETY
+    # =================================================
+    #
+    # Deliberately separate from MODE and BINANCE_TESTNET. A person
+    # could set MODE=live and BINANCE_TESTNET=false in one .env edit
+    # while believing they were still configuring testnet -- that
+    # single edit must not be enough to enable real-money order
+    # placement. This has to be set to true as its own, explicit
+    # step. See core/services/binance_trading_client.py's
+    # MainnetNotConfirmedError and core/services/execution_router.py
+    # for where this is actually enforced.
+
+    LIVE_TRADING_CONFIRMED = env_bool(
+        "LIVE_TRADING_CONFIRMED",
+        False
+    )
+
+    # =================================================
     # ACCOUNT
     # =================================================
 
@@ -239,9 +295,28 @@ class Settings:
         maximum=100.0
     )
 
-    MAX_OPEN_POSITIONS = env_int(
+    # =================================================
+    # MAX_OPEN_POSITIONS
+    # =================================================
+    #
+    # Accepts both names this setting has been written under: the
+    # config that's actually enforced
+    # (core/config/signal_quality_config.py's "maximum_open_positions",
+    # checked by SignalQualityService._validate_position_limit) reads
+    # MAXIMUM_OPEN_POSITIONS, but a person reasonably types
+    # MAX_OPEN_POSITIONS (the name this very settings.py attribute
+    # is called). Without this alias, setting MAX_OPEN_POSITIONS in
+    # .env appeared to work (no error, the attribute exists) but had
+    # zero effect on actual position-limit enforcement -- the real
+    # check silently kept using its own 3-position default instead.
 
-        "MAX_OPEN_POSITIONS",
+    MAX_OPEN_POSITIONS = env_int_aliased(
+
+        (
+            "MAX_OPEN_POSITIONS",
+
+            "MAXIMUM_OPEN_POSITIONS"
+        ),
 
         3,
 
@@ -288,19 +363,6 @@ class Settings:
         minimum=0.1
     )
 
-    # =================================================
-    # ATR
-    # =================================================
-
-    ATR_PERIOD = env_int(
-
-        "ATR_PERIOD",
-
-        14,
-
-        minimum=1
-    )
-
     ATR_STOP_MULTIPLIER = env_float(
 
         "ATR_STOP_MULTIPLIER",
@@ -322,10 +384,24 @@ class Settings:
     # =================================================
     # STRUCTURE
     # =================================================
+    #
+    # Accepts every name variant this setting has been written
+    # under across this project's config files, plus a third,
+    # equally reasonable name a person might type -- previously,
+    # setting MIN_STRUCTURE_CANDLES in .env had no effect at all
+    # because neither this nor STRUCTURE_MIN_CANDLES (below)
+    # recognized it, and every signal stayed gated behind the
+    # 20-candle default with no error or warning anywhere.
 
-    MINIMUM_STRUCTURE_CANDLES = env_int(
+    MINIMUM_STRUCTURE_CANDLES = env_int_aliased(
 
-        "MINIMUM_STRUCTURE_CANDLES",
+        (
+            "MINIMUM_STRUCTURE_CANDLES",
+
+            "STRUCTURE_MIN_CANDLES",
+
+            "MIN_STRUCTURE_CANDLES"
+        ),
 
         20,
 
@@ -543,9 +619,24 @@ class Settings:
         minimum=1
     )
 
-    STRUCTURE_MIN_CANDLES = env_int(
+    # =================================================
+    # STRUCTURE_MIN_CANDLES
+    # =================================================
+    #
+    # See MINIMUM_STRUCTURE_CANDLES above for the full explanation
+    # -- both settings represent the same underlying concept and
+    # must accept the same name variants so a person configuring
+    # one doesn't unknowingly miss the other.
 
-        "STRUCTURE_MIN_CANDLES",
+    STRUCTURE_MIN_CANDLES = env_int_aliased(
+
+        (
+            "STRUCTURE_MIN_CANDLES",
+
+            "MINIMUM_STRUCTURE_CANDLES",
+
+            "MIN_STRUCTURE_CANDLES"
+        ),
 
         20,
 

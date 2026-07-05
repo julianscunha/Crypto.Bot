@@ -26,6 +26,53 @@ from core.config.logging_config import (
 )
 
 # =====================================================
+# WINDOWS-SAFE ROTATING HANDLER
+# =====================================================
+#
+# RotatingFileHandler.doRollover() calls os.rename() on the log
+# file. On Windows specifically, renaming a file that's still open
+# in another handle (a second process writing to the same
+# runtime.log/errors.log -- e.g. running the Optimizer while the
+# Runner is still active, or two Optimizer instances at once) raises
+# PermissionError ([WinError 32]). The stdlib's default behavior lets
+# that exception propagate out of every single log call until the
+# file is rotated, which crashes whatever was running (confirmed:
+# OptimizerEngine.optimize() dying mid-run from this). Linux/macOS
+# don't have this restriction (a rename can replace an open file),
+# which is why this was never seen there.
+#
+# This subclass catches exactly that failure mode during rollover
+# and falls back to simply continuing to write to the existing file
+# -- the log temporarily exceeds max_log_file_size until the lock
+# clears and a later rollover succeeds, which is a far better
+# outcome than losing the actual program run over a log housekeeping
+# operation.
+
+class WindowsSafeRotatingFileHandler(
+    RotatingFileHandler
+):
+
+    def doRollover(self):
+
+        try:
+
+            super().doRollover()
+
+        except PermissionError:
+
+            # another process/handle still has the log file open --
+            # skip rotation this time and keep writing to it. The
+            # stream may have been closed by the base implementation
+            # before the rename failed, so make sure it's usable
+            # again before returning.
+            if (
+                self.stream is None
+                or self.stream.closed
+            ):
+
+                self.stream = self._open()
+
+# =====================================================
 # COLORAMA
 # =====================================================
 
@@ -143,7 +190,7 @@ def build_logger(
 
     logger.handlers.clear()
 
-    handler = RotatingFileHandler(
+    handler = WindowsSafeRotatingFileHandler(
 
         filename,
 

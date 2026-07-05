@@ -270,7 +270,8 @@ class BinanceWS:
                     "WEBSOCKET",
                     (
                         f"RECONNECT "
-                        f"attempt={self.reconnect_attempts}"
+                        f"attempt={self.reconnect_attempts} "
+                        f"reason={type(error).__name__}: {error}"
                     ),
                     "WARNING"
                 )

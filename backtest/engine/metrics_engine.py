@@ -8,6 +8,13 @@ from data.storage.repositories.trades_repository import (
     trades_repository
 )
 
+from core.services.trade_analytics import (
+    compute_equity_curve_stats,
+    compute_profit_factor,
+    compute_risk_reward,
+    compute_recovery_factor
+)
+
 
 class MetricsEngine:
 
@@ -34,113 +41,64 @@ class MetricsEngine:
             )
         )
 
-        equity = 0
-
-        peak = 0
-
-        max_drawdown = 0
-
-        wins = []
-
-        losses = []
-
-        current_win_streak = 0
-
-        current_loss_streak = 0
-
-        max_win_streak = 0
-
-        max_loss_streak = 0
-
         # =====================================================
         # EQUITY + STREAKS
         # =====================================================
+        #
+        # get_closed_trades() orders by closed_at DESC; the equity
+        # curve must walk forward in time, oldest trade first.
 
-        for trade in trades:
+        pnls = [
+            trade.pnl
+            for trade in reversed(trades)
+        ]
 
-            equity += trade.pnl
-
-            if equity > peak:
-
-                peak = equity
-
-            drawdown = (
-                equity - peak
+        curve_stats = (
+            compute_equity_curve_stats(
+                pnls
             )
+        )
 
-            if drawdown < max_drawdown:
+        max_drawdown = (
+            curve_stats["max_drawdown"]
+        )
 
-                max_drawdown = drawdown
+        wins = (
+            curve_stats["wins"]
+        )
 
-            # =============================================
-            # WIN / LOSS ANALYTICS
-            # =============================================
+        losses = (
+            curve_stats["losses"]
+        )
 
-            if trade.pnl > 0:
+        max_win_streak = (
+            curve_stats["max_win_streak"]
+        )
 
-                wins.append(
-                    trade.pnl
-                )
-
-                current_win_streak += 1
-
-                current_loss_streak = 0
-
-                if (
-                    current_win_streak
-                    > max_win_streak
-                ):
-
-                    max_win_streak = (
-                        current_win_streak
-                    )
-
-            else:
-
-                losses.append(
-                    abs(trade.pnl)
-                )
-
-                current_loss_streak += 1
-
-                current_win_streak = 0
-
-                if (
-                    current_loss_streak
-                    > max_loss_streak
-                ):
-
-                    max_loss_streak = (
-                        current_loss_streak
-                    )
+        max_loss_streak = (
+            curve_stats["max_loss_streak"]
+        )
 
         # =====================================================
         # QUANT METRICS
         # =====================================================
 
-        gross_profit = (
-            sum(wins)
-        )
-
-        gross_loss = (
-            sum(losses)
-        )
-
         profit_factor = (
-            gross_profit / gross_loss
-            if gross_loss > 0
-            else 0
+            compute_profit_factor(
+                wins,
+                losses
+            )
         )
 
         avg_win = (
-            gross_profit / len(wins)
-            if len(wins) > 0
+            sum(wins) / len(wins)
+            if wins
             else 0
         )
-        
+
         avg_loss = (
-            gross_loss / len(losses)
-            if len(losses) > 0
+            sum(losses) / len(losses)
+            if losses
             else 0
         )
 
@@ -161,9 +119,10 @@ class MetricsEngine:
         )
 
         risk_reward = (
-            avg_win / avg_loss
-            if avg_loss > 0
-            else 0
+            compute_risk_reward(
+                wins,
+                losses
+            )
         )
 
         pnl = (
@@ -171,9 +130,10 @@ class MetricsEngine:
         )
 
         recovery_factor = (
-            pnl / abs(max_drawdown)
-            if max_drawdown != 0
-            else pnl
+            compute_recovery_factor(
+                pnl,
+                max_drawdown
+            )
         )
 
         # =====================================================

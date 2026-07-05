@@ -29,6 +29,10 @@ from core.utils.console_logger import (
     log
 )
 
+from core.state.market_state import (
+    market_state
+)
+
 
 class RiskAgent:
 
@@ -91,6 +95,10 @@ class RiskAgent:
 
         if not valid:
 
+            market_state.register_rejected_signal(
+                reason
+            )
+
             log(
                 "RISK",
                 f"BLOCKED {reason}",
@@ -124,6 +132,10 @@ class RiskAgent:
         )
 
         if not risk_levels:
+
+            market_state.register_rejected_signal(
+                "INVALID_RISK_LEVELS"
+            )
 
             log(
                 "RISK",
@@ -160,11 +172,16 @@ class RiskAgent:
         quantity = (
             self._calculate_position_size(
                 entry_price,
-                risk_distance
+                risk_distance,
+                symbol=payload.symbol
             )
         )
 
         if quantity <= 0:
+
+            market_state.register_rejected_signal(
+                "INVALID_POSITION_SIZE"
+            )
 
             log(
                 "RISK",
@@ -187,11 +204,83 @@ class RiskAgent:
 
         if quantity <= 0:
 
+            market_state.register_rejected_signal(
+                "EXPOSURE_LIMIT"
+            )
+
             log(
                 "RISK",
                 "BLOCKED EXPOSURE_LIMIT",
                 "WARNING"
             )
+
+            return
+
+        # =================================================
+        # LOT SIZE / NOTIONAL GUARD
+        # =================================================
+        #
+        # Binance rejects orders below the symbol's minimum quantity
+        # (LOT_SIZE filter) or minimum notional value (MIN_NOTIONAL
+        # filter). Both are checked here before touching the exchange
+        # so the failure is logged as INVALID_POSITION_SIZE with a
+        # clear reason rather than surfacing as a raw Binance API
+        # error (-1013 LOT_SIZE or -1013 NOTIONAL). This is the main
+        # failure mode when account balance is small (e.g. $10 with
+        # RISK=0.25% = $0.025/trade, well below any symbol's notional
+        # floor). See exchange_config.py for configurable thresholds.
+
+        min_order_quantity = (
+            self.exchange_config.get(
+                "min_order_quantity",
+                0.00001
+            )
+        )
+
+        # Usa min_notional real do símbolo via exchange_filters
+        # (carregado no startup via Binance exchangeInfo).
+        # Fallback para o valor configurado no .env.
+        _env_notional = self.exchange_config.get("min_order_notional", 0.0)
+        from core.services.exchange_filters import get_filters
+        _sym_filters = get_filters(payload.symbol)
+        _sym_notional = _sym_filters.get("min_notional", 0.0)
+        min_order_notional = max(_env_notional, _sym_notional)
+
+        min_order_quantity = max(
+            min_order_quantity,
+            _sym_filters.get("min_qty", 0.0)
+        )
+
+        order_notional = (
+            quantity * entry_price
+        )
+
+        if (
+            quantity < min_order_quantity
+            or (
+                min_order_notional > 0
+                and order_notional < min_order_notional
+            )
+        ):
+
+            market_state.register_rejected_signal(
+                "INVALID_POSITION_SIZE"
+            )
+
+            log(
+                "RISK",
+                (
+                    f"BLOCKED INVALID_POSITION_SIZE "
+                    f"qty={quantity} "
+                    f"notional={order_notional:.4f} "
+                    f"min_qty={min_order_quantity} "
+                    f"min_notional={min_order_notional} -- "
+                    "increase account balance or RISK_PER_TRADE_PERCENT"
+                ),
+                "WARNING"
+            )
+
+            return
 
             return
 
@@ -214,6 +303,10 @@ class RiskAgent:
         )
 
         if risk_reward_ratio < minimum_rr:
+
+            market_state.register_rejected_signal(
+                "LOW_RR"
+            )
 
             log(
                 "RISK",
@@ -496,13 +589,13 @@ class RiskAgent:
     def _calculate_position_size(
         self,
         entry_price: float,
-        risk_distance: float
+        risk_distance: float,
+        symbol: str = ""
     ):
 
-        account_balance = (
-            self.trading_config[
-                "account_balance"
-            ]
+        from core.services.runtime_balance import get_balance
+        account_balance = get_balance(
+            self.trading_config["account_balance"]
         )
 
         risk_percent = (
@@ -511,11 +604,13 @@ class RiskAgent:
             ]
         )
 
-        quantity_precision = (
-            self.exchange_config[
-                "quantity_precision"
-            ]
-        )
+        # Usa precision real do símbolo via exchange_filters
+        _base_prec = self.exchange_config["quantity_precision"]
+        if symbol:
+            from core.services.exchange_filters import get_filters
+            quantity_precision = get_filters(symbol).get("qty_precision", _base_prec)
+        else:
+            quantity_precision = _base_prec
 
         risk_amount = (
 
@@ -549,10 +644,9 @@ class RiskAgent:
         quantity: float
     ):
 
-        account_balance = (
-            self.trading_config[
-                "account_balance"
-            ]
+        from core.services.runtime_balance import get_balance
+        account_balance = get_balance(
+            self.trading_config["account_balance"]
         )
 
         max_exposure_percent = (

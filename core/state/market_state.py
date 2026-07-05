@@ -16,6 +16,122 @@ class MarketState:
         self.reset()
 
     # =====================================================
+    # FROM PERSISTED STATE (CROSS-PROCESS)
+    # =====================================================
+    #
+    # Reconstructs a MarketState instance from a dict shaped like
+    # RuntimeStateRepository.get()'s return value, so the API
+    # process can reuse snapshot()'s existing uptime/ratio
+    # calculations instead of duplicating that logic. Used when the
+    # API needs to report telemetry that was actually written by
+    # the Runner process (a separate OS process -- see
+    # data/storage/repositories/runtime_state_repository.py for why
+    # this indirection exists at all).
+
+    @classmethod
+    def from_persisted(
+        cls,
+        data: dict
+    ):
+
+        instance = cls()
+
+        instance.started_at = (
+            data.get("started_at")
+            or instance.started_at
+        )
+
+        instance.websocket_connected = bool(
+            data.get(
+                "websocket_connected",
+                False
+            )
+        )
+
+        instance.total_market_messages = int(
+            data.get(
+                "total_market_messages",
+                0
+            )
+        )
+
+        instance.last_market_message_at = (
+            data.get(
+                "last_market_message_at"
+            )
+        )
+
+        instance.active_symbols = set(
+            data.get(
+                "active_symbols",
+                []
+            )
+            or []
+        )
+
+        instance.total_analysis_requests = int(
+            data.get(
+                "total_analysis_requests",
+                0
+            )
+        )
+
+        instance.total_generated_signals = int(
+            data.get(
+                "total_generated_signals",
+                0
+            )
+        )
+
+        instance.total_approved_signals = int(
+            data.get(
+                "total_approved_signals",
+                0
+            )
+        )
+
+        instance.total_rejected_signals = int(
+            data.get(
+                "total_rejected_signals",
+                0
+            )
+        )
+
+        instance.total_executed_orders = int(
+            data.get(
+                "total_executed_orders",
+                0
+            )
+        )
+
+        instance.total_closed_positions = int(
+            data.get(
+                "total_closed_positions",
+                0
+            )
+        )
+
+        instance.blocked_signal_reasons = defaultdict(
+            int,
+            data.get(
+                "blocked_signal_reasons",
+                {}
+            )
+            or {}
+        )
+
+        instance.execution_reasons = defaultdict(
+            int,
+            data.get(
+                "execution_reasons",
+                {}
+            )
+            or {}
+        )
+
+        return instance
+
+    # =====================================================
     # RESET
     # =====================================================
 
@@ -118,6 +234,19 @@ class MarketState:
             self.active_symbols.add(
                 symbol
             )
+
+    # =====================================================
+    # KLINE (alias used by ingestion clients)
+    # =====================================================
+
+    def register_kline(
+        self,
+        symbol: str
+    ):
+
+        self.register_market_message(
+            symbol
+        )
 
     # =====================================================
     # ANALYSIS

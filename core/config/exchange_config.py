@@ -102,18 +102,6 @@ def boolean(
 EXCHANGE_CONFIG = {
 
     # =================================================
-    # EXCHANGE
-    # =================================================
-
-    "exchange_name":
-
-        getattr(
-            settings,
-            "EXCHANGE_NAME",
-            "BINANCE"
-        ),
-
-    # =================================================
     # FEES
     # =================================================
 
@@ -223,52 +211,53 @@ EXCHANGE_CONFIG = {
             getattr(
                 settings,
                 "QUANTITY_PRECISION",
-                6
+                4
             ),
 
-            6
+            4
         ),
 
     # =================================================
-    # EXECUTION
+    # LOT SIZE / NOTIONAL GUARDS
     # =================================================
+    #
+    # Binance rejects orders where qty < LOT_SIZE minimum or where
+    # qty * price < MIN_NOTIONAL. These defaults are conservative
+    # estimates for testnet/mainnet spot -- the real minimums vary
+    # by symbol (BTCUSDT: 0.00001 BTC, ETHUSDT: 0.0001 ETH, both
+    # with $10 notional minimum on mainnet). With $10 of capital
+    # and RISK=0.25%, the risk amount per trade is $0.025 -- far
+    # below any symbol's notional minimum. The RiskAgent checks
+    # these before placing a real order so the failure is logged as
+    # INVALID_POSITION_SIZE rather than a Binance API error.
+    #
+    # Set in .env:
+    #   MIN_ORDER_QUANTITY=0.00001   # absolute quantity floor
+    #   MIN_ORDER_NOTIONAL=1.0       # quantity * entry_price floor
 
-    "enable_partial_fill_simulation":
+    "min_order_quantity":
 
-        boolean(
+        positive_float(
 
             getattr(
                 settings,
-                "ENABLE_PARTIAL_FILL_SIMULATION",
-                False
+                "MIN_ORDER_QUANTITY",
+                0.00001
             ),
 
-            False
+            0.00001
         ),
 
-    "enable_latency_simulation":
+    "min_order_notional":
 
-        boolean(
-
-            getattr(
-                settings,
-                "ENABLE_LATENCY_SIMULATION",
-                False
-            ),
-
-            False
-        ),
-
-    "simulated_execution_latency_ms":
-
-        positive_int(
+        positive_float(
 
             getattr(
                 settings,
-                "SIMULATED_EXECUTION_LATENCY_MS",
-                50
+                "MIN_ORDER_NOTIONAL",
+                0.0
             ),
 
-            50
+            0.0
         )
 }

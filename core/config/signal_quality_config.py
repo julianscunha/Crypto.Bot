@@ -267,7 +267,7 @@ SIGNAL_QUALITY_CONFIG = {
 
             getattr(
                 settings,
-                "MAXIMUM_OPEN_POSITIONS",
+                "MAX_OPEN_POSITIONS",
                 3
             ),
 
@@ -309,6 +309,43 @@ SIGNAL_QUALITY_CONFIG = {
         ),
 
     # =================================================
+    # DAILY CIRCUIT BREAKERS
+    # =================================================
+    #
+    # Distinct from drawdown protection above (which measures since
+    # the current session started): these gate against the UTC-day
+    # boundary specifically, via core/services/risk_protection_service.py.
+    # The underlying limits (max_daily_loss_percent, max_daily_trades)
+    # already exist in core/config/trading_config.py; these flags
+    # just control whether SignalQualityService enforces them.
+
+    "enable_daily_loss_limit":
+
+        boolean(
+
+            getattr(
+                settings,
+                "ENABLE_DAILY_LOSS_LIMIT",
+                True
+            ),
+
+            True
+        ),
+
+    "enable_daily_trade_limit":
+
+        boolean(
+
+            getattr(
+                settings,
+                "ENABLE_DAILY_TRADE_LIMIT",
+                True
+            ),
+
+            True
+        ),
+
+    # =================================================
     # MARKET REGIME
     # =================================================
 
@@ -319,66 +356,6 @@ SIGNAL_QUALITY_CONFIG = {
             getattr(
                 settings,
                 "ENABLE_MARKET_REGIME_ALIGNMENT",
-                False
-            ),
-
-            False
-        ),
-
-    # =================================================
-    # SIGNAL SPACING
-    # =================================================
-
-    "minimum_signal_spacing_candles":
-
-        positive_int(
-
-            getattr(
-                settings,
-                "MINIMUM_SIGNAL_SPACING_CANDLES",
-                1
-            ),
-
-            1
-        ),
-
-    # =================================================
-    # ADVANCED FILTERING
-    # =================================================
-
-    "enable_adaptive_signal_filters":
-
-        boolean(
-
-            getattr(
-                settings,
-                "ENABLE_ADAPTIVE_SIGNAL_FILTERS",
-                False
-            ),
-
-            False
-        ),
-
-    "enable_dynamic_cooldown":
-
-        boolean(
-
-            getattr(
-                settings,
-                "ENABLE_DYNAMIC_COOLDOWN",
-                False
-            ),
-
-            False
-        ),
-
-    "enable_weighted_signal_validation":
-
-        boolean(
-
-            getattr(
-                settings,
-                "ENABLE_WEIGHTED_SIGNAL_VALIDATION",
                 False
             ),
 

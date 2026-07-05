@@ -2,6 +2,11 @@
 
 import asyncio
 
+from backtest.reports.progress_writer import (
+    write_progress,
+    clear_progress
+)
+
 from data.storage.database import (
     init_db
 )
@@ -38,8 +43,18 @@ from core.services.market_structure_service import (
     market_structure_service
 )
 
+from core.config.settings import (
+    settings
+)
 
-DATASETS = [
+from data.ingestion.binance_history import (
+    fetch_historical_klines,
+    write_klines_csv,
+    BinanceHistoryError
+)
+
+
+SYNTHETIC_DATASETS = [
 
     "backtest/datasets/bullish.csv",
 
@@ -51,6 +66,106 @@ DATASETS = [
 ]
 
 USER_ID = 999
+
+# =====================================================
+# REAL HISTORICAL DATA
+# =====================================================
+#
+# Same convention as backtest/optimizer/optimizer_engine.py's
+# OptimizerEngine._prepare_datasets(): fetch real market history from
+# Binance's public klines endpoint before backtesting, instead of
+# always replaying the same small, fixed synthetic CSVs. Falls back
+# to those synthetic datasets (with a clear warning, never a crash)
+# if the fetch fails for any reason -- a network hiccup must never
+# block running a backtest at all, it should just visibly use
+# weaker data.
+#
+# Unlike the optimizer, this has no train/validation split: a
+# regular backtest run is evaluating the CURRENT configured strategy
+# against real history, not tuning/selecting parameters, so there's
+# no overfitting risk from "validating" against the same data it ran
+# against.
+
+HISTORY_DAYS = 90
+
+HISTORY_OUTPUT_DIR = "backtest/datasets/live_history"
+
+
+async def prepare_datasets():
+
+    try:
+
+        return await _fetch_real_datasets()
+
+    except Exception as error:
+
+        log(
+            "SYSTEM",
+            (
+                "BACKTEST REAL DATA FETCH FAILED "
+                f"{error} -- falling back to synthetic "
+                "example datasets in backtest/datasets/"
+            ),
+            "WARNING"
+        )
+
+        return SYNTHETIC_DATASETS
+
+
+async def _fetch_real_datasets():
+
+    symbols = settings.SYMBOLS
+
+    interval = settings.KLINE_INTERVAL
+
+    log(
+        "SYSTEM",
+        (
+            "BACKTEST FETCHING REAL HISTORY "
+            f"symbols={symbols} interval={interval} "
+            f"days={HISTORY_DAYS}"
+        )
+    )
+
+    dataset_paths = []
+
+    for symbol in symbols:
+
+        candles = await fetch_historical_klines(
+            symbol=symbol,
+            interval=interval,
+            days=HISTORY_DAYS
+        )
+
+        if not candles:
+
+            raise BinanceHistoryError(
+                f"No historical candles returned for {symbol}"
+            )
+
+        dataset_path = (
+            f"{HISTORY_OUTPUT_DIR}/{symbol.lower()}_backtest.csv"
+        )
+
+        write_klines_csv(
+            candles,
+            dataset_path
+        )
+
+        log(
+            "SYSTEM",
+            (
+                "BACKTEST REAL DATA READY "
+                f"symbol={symbol} candles={len(candles)}"
+            ),
+            "SUCCESS"
+        )
+
+        dataset_paths.append(
+            dataset_path
+        )
+
+    return dataset_paths
 
 
 async def main():
@@ -64,6 +179,12 @@ async def main():
     print()
 
     # =====================================================
+    # DATASETS (REAL HISTORY, WITH SYNTHETIC FALLBACK)
+    # =====================================================
+
+    datasets = await prepare_datasets()
+
+    # =====================================================
     # STARTUP
     # =====================================================
 
@@ -74,7 +195,7 @@ async def main():
 
     log(
         "SYSTEM",
-        f"DATASETS       {len(DATASETS)}"
+        f"DATASETS       {len(datasets)}"
     )
 
     log(
@@ -92,7 +213,9 @@ async def main():
     # RESET STATE
     # =====================================================
 
-    trades_repository.reset()
+    trades_repository.reset(
+        user_id=USER_ID
+    )
 
     log(
         "SYSTEM",
@@ -103,7 +226,7 @@ async def main():
     # REPLAY ENGINE
     # =====================================================
 
-    for dataset in DATASETS:
+    for idx, dataset in enumerate(datasets, start=1):
 
         print()
 
@@ -111,6 +234,15 @@ async def main():
             "=" * 20
             + f" {dataset.split('/')[-1]} "
             + "=" * 20
+        )
+
+        write_progress(
+            current=idx,
+            total=len(datasets),
+            phase=(
+                f"Processando dataset {idx} de {len(datasets)}: "
+                f"{dataset.split('/')[-1]}"
+            )
         )
 
         market_structure_service.reset()
@@ -123,6 +255,8 @@ async def main():
         )
 
         await replay.replay()
+
+    clear_progress()
 
     # =====================================================
     # METRICS
@@ -305,5 +439,9 @@ async def main():
 
 
 if __name__ == "__main__":
+
+    from core.utils.event_loop import configure_event_loop
+
+    configure_event_loop()
 
     asyncio.run(main())

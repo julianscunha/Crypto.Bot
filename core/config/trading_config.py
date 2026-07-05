@@ -145,19 +145,6 @@ TRADING_CONFIG = {
             maximum=100.0
         ),
 
-    "max_open_positions":
-
-        positive_int(
-
-            getattr(
-                settings,
-                "MAX_OPEN_POSITIONS",
-                3
-            ),
-
-            3
-        ),
-
     "max_position_exposure_percent":
 
         percentage(
@@ -208,19 +195,6 @@ TRADING_CONFIG = {
     # =================================================
     # ATR RISK MODEL
     # =================================================
-
-    "atr_period":
-
-        positive_int(
-
-            getattr(
-                settings,
-                "ATR_PERIOD",
-                14
-            ),
-
-            14
-        ),
 
     "atr_stop_multiplier":
 
@@ -279,26 +253,6 @@ TRADING_CONFIG = {
         ),
 
     # =================================================
-    # MARKET DATA
-    # =================================================
-
-    "symbols":
-
-        getattr(
-            settings,
-            "SYMBOLS",
-            []
-        ),
-
-    "kline_interval":
-
-        getattr(
-            settings,
-            "KLINE_INTERVAL",
-            "5m"
-        ),
-
-    # =================================================
     # EXECUTION MODE
     # =================================================
 
@@ -317,66 +271,6 @@ TRADING_CONFIG = {
             getattr(
                 settings,
                 "ENABLE_PAPER_EXECUTION",
-                True
-            ),
-
-            True
-        ),
-
-    # =================================================
-    # FEATURES
-    # =================================================
-
-    "enable_optimizer":
-
-        boolean(
-
-            getattr(
-                settings,
-                "ENABLE_OPTIMIZER",
-                False
-            ),
-
-            False
-        ),
-
-    "enable_market_regime":
-
-        boolean(
-
-            getattr(
-                settings,
-                "ENABLE_MARKET_REGIME",
-                False
-            ),
-
-            False
-        ),
-
-    "enable_replay":
-
-        boolean(
-
-            getattr(
-                settings,
-                "ENABLE_REPLAY",
-                False
-            ),
-
-            False
-        ),
-
-    # =================================================
-    # BINANCE
-    # =================================================
-
-    "binance_testnet":
-
-        boolean(
-
-            getattr(
-                settings,
-                "BINANCE_TESTNET",
                 True
             ),
 

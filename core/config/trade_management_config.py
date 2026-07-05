@@ -165,40 +165,6 @@ TRADE_MANAGEMENT_CONFIG = {
         ),
 
     # =================================================
-    # PARTIAL EXIT
-    # =================================================
-
-    "enable_partial_take_profit":
-
-        boolean(
-
-            getattr(
-                settings,
-                "ENABLE_PARTIAL_TAKE_PROFIT",
-                False
-            ),
-
-            False
-        ),
-
-    "partial_take_profit_percent":
-
-        percentage(
-
-            getattr(
-                settings,
-                "PARTIAL_TAKE_PROFIT_PERCENT",
-                50.0
-            ),
-
-            50.0,
-
-            minimum=1.0,
-
-            maximum=100.0
-        ),
-
-    # =================================================
     # POSITION MANAGEMENT
     # =================================================
 
@@ -215,16 +181,33 @@ TRADE_MANAGEMENT_CONFIG = {
             False
         ),
 
-    "enable_volatility_based_management":
+    "dynamic_take_profit_proximity_percent":
 
-        boolean(
+        percentage(
 
             getattr(
                 settings,
-                "ENABLE_VOLATILITY_BASED_MANAGEMENT",
-                False
+                "DYNAMIC_TAKE_PROFIT_PROXIMITY_PERCENT",
+                90.0
             ),
 
-            False
+            90.0,
+
+            minimum=50.0,
+
+            maximum=99.0
+        ),
+
+    "dynamic_take_profit_atr_multiplier":
+
+        positive_float(
+
+            getattr(
+                settings,
+                "DYNAMIC_TAKE_PROFIT_ATR_MULTIPLIER",
+                1.0
+            ),
+
+            1.0
         )
 }

@@ -1,0 +1,96 @@
+/* =====================================================
+   DESIGN TOKENS
+   ===================================================== */
+
+:root {
+  /* surfaces */
+  --bg-base: #0a0e14;
+  --bg-panel: #10151d;
+  --bg-panel-raised: #151b24;
+  --bg-input: #0d1219;
+  --hairline: #232b38;
+  --hairline-strong: #313c4d;
+
+  /* text */
+  --text-primary: #e4e9f2;
+  --text-secondary: #8b96a8;
+  --text-tertiary: #566073;
+
+  /* signal colors (mirrors core/utils/console_logger.py) */
+  --signal-positive: #00e08f;
+  --signal-positive-dim: #00e08f1a;
+  --signal-negative: #ff4d6d;
+  --signal-negative-dim: #ff4d6d1a;
+  --signal-warning: #ffb020;
+  --signal-warning-dim: #ffb0201a;
+  --signal-neutral: #5b8cff;
+  --signal-neutral-dim: #5b8cff1a;
+
+  /* type */
+  --font-display: "JetBrains Mono", monospace;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --radius: 2px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+::selection {
+  background: var(--signal-neutral-dim);
+}
+
+/* visible keyboard focus -- never remove outline without replacing it */
+:focus-visible {
+  outline: 2px solid var(--signal-neutral);
+  outline-offset: 2px;
+}
+
+/* scrollbar, terminal-flavored */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
+  border-radius: var(--radius);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

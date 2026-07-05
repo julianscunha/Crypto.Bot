@@ -21,22 +21,25 @@ from sqlalchemy import (
 
 from sqlalchemy.orm import (
 
-    DeclarativeBase,
-
     Mapped,
 
     mapped_column
 )
 
+from data.storage.database import (
+    Base
+)
+
 # =====================================================
 # BASE
 # =====================================================
-
-class Base(
-    DeclarativeBase
-):
-
-    pass
+#
+# Base is shared with data.storage.database so that
+# Base.metadata.create_all() in init_db() actually registers
+# these tables. Two separate DeclarativeBase classes here and
+# in database.py would silently produce two disconnected
+# metadata registries, leaving init_db() unable to create any
+# of these tables on a fresh database.
 
 # =====================================================
 # TRADE
@@ -153,6 +156,12 @@ class Trade(
         default=False
     )
 
+    take_profit_extended: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False
+    )
+
     # =================================================
     # PNL
     # =================================================
@@ -173,6 +182,26 @@ class Trade(
         Float,
         nullable=False,
         default=0.0
+    )
+
+    # =================================================
+    # LIVE ORDER TRACKING
+    # =================================================
+    #
+    # Real Binance order identifiers -- NULL for PAPER trades,
+    # which never place a real order. See migration
+    # add_live_order_tracking_columns for the full rationale on why
+    # these are needed before LIVE exits can touch the exchange
+    # instead of only updating this local row.
+
+    entry_order_id: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True
+    )
+
+    order_list_id: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True
     )
 
     # =================================================
@@ -328,9 +357,144 @@ class PortfolioSnapshot(
         default=0.0
     )
 
+    # =================================================
+    # SESSION SCOPING
+    # =================================================
+    #
+    # Records the account_balance the bot was configured with at
+    # the time of this snapshot. PortfolioService uses this to
+    # scope "historical peak equity" (for drawdown %) to snapshots
+    # from the SAME configuration -- without it, deliberately
+    # resetting the paper account (e.g. lowering account_balance
+    # from 100 to 10 in core/config/trading_config.py) gets
+    # misread as a 90% real trading loss, since the old $100 peak
+    # would otherwise still count as "historical" against a new
+    # $10 baseline that was never actually $100.
+
+    initial_balance: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=0.0
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
         default=datetime.utcnow,
         index=True
+    )
+
+# =====================================================
+# RUNTIME STATE
+# =====================================================
+#
+# Single-row table (always id=1, upserted) sharing live market/
+# runtime telemetry between OS processes. apps/trader/runner.py
+# (the Binance WebSocket + agent pipeline) and apps/api/main.py
+# (the FastAPI dashboard backend) run as SEPARATE subprocesses under
+# Full Stack -- they do not share memory. core.state.market_state's
+# MarketState class is an in-memory singleton, so without this
+# table, websocket_connected/active_symbols/signal counters written
+# by the Runner process are invisible to the API process forever,
+# and the dashboard's "FEED DOWN" / signal pipeline panels never
+# reflect reality regardless of how long the bot has been running.
+#
+# JSON columns (active_symbols, blocked_signal_reasons,
+# execution_reasons) are simple enough here that normalizing them
+# into separate tables would add complexity without real benefit at
+# this scale -- this is small, frequently-overwritten telemetry, not
+# an audit trail.
+
+class RuntimeState(
+    Base
+):
+
+    __tablename__ = "runtime_state"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True
+    )
+
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+
+    websocket_connected: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False
+    )
+
+    total_market_messages: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    last_market_message_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+
+    active_symbols_json: Mapped[str] = mapped_column(
+        String(500),
+        nullable=False,
+        default="[]"
+    )
+
+    total_analysis_requests: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    total_generated_signals: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    total_approved_signals: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    total_rejected_signals: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    total_executed_orders: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    total_closed_positions: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    blocked_signal_reasons_json: Mapped[str] = mapped_column(
+        String(2000),
+        nullable=False,
+        default="{}"
+    )
+
+    execution_reasons_json: Mapped[str] = mapped_column(
+        String(2000),
+        nullable=False,
+        default="{}"
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow
     )

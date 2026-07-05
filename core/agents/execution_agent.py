@@ -20,6 +20,10 @@ from core.services.position_lifecycle_service import (
     PositionLifecycleService
 )
 
+from core.services.execution_router import (
+    execution_router
+)
+
 from core.utils.console_logger import (
     log
 )
@@ -56,6 +60,10 @@ class ExecutionAgent:
 
         self.position_lifecycle = (
             PositionLifecycleService
+        )
+
+        self.execution_router = (
+            execution_router
         )
 
         self.execution_mode = (
@@ -113,60 +121,38 @@ class ExecutionAgent:
             return
 
         # =================================================
-        # EXECUTED ENTRY
+        # EXECUTION (PAPER OR LIVE -- DECIDED BY THE ROUTER)
         # =================================================
 
-        executed_entry_price = (
+        execution_result = (
 
-            self.position_lifecycle
-            .apply_entry_slippage(
-
-                payload.entry_price
+            await self.execution_router
+            .execute(
+                payload
             )
         )
 
-        # =================================================
-        # CREATE TRADE
-        # =================================================
-
-        created_trade = (
-
-            self.positions
-            .create_trade(
-
-                user_id=payload.user_id,
-
-                symbol=payload.symbol,
-
-                action=payload.signal,
-
-                entry_price=executed_entry_price,
-
-                quantity=payload.quantity,
-
-                stop_loss=payload.stop_loss,
-
-                take_profit=payload.take_profit,
-
-                trailing_stop=payload.trailing_stop,
-
-                breakeven_enabled=True
-            )
-        )
-
-        if not created_trade:
+        if not execution_result.success:
 
             market_state.register_rejected_signal(
-                "TRADE_CREATION_FAILED"
+                execution_result.reason
             )
 
             log(
                 "EXECUTION",
-                "BLOCKED TRADE_CREATION_FAILED",
+                f"BLOCKED {execution_result.reason}",
                 "ERROR"
             )
 
             return
+
+        created_trade = (
+            execution_result.trade
+        )
+
+        executed_entry_price = (
+            created_trade.entry_price
+        )
 
         # =================================================
         # EXECUTION TELEMETRY

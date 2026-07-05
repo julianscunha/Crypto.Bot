@@ -1,0 +1,242 @@
+.shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+
+.shell__sidebar {
+  background: var(--bg-panel);
+  border-right: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 24px;
+}
+
+.brand__mark {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  background: var(--signal-positive);
+  color: #06140e;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.5px;
+}
+
+.brand__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.brand__name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.brand__sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.nav__item {
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.nav__item:hover {
+  background: var(--bg-panel-raised);
+  color: var(--text-primary);
+}
+
+.nav__item--active {
+  background: var(--bg-panel-raised);
+  color: var(--text-primary);
+  box-shadow: inset 2px 0 0 var(--signal-positive);
+}
+
+.shell__bottom {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shell__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 4px;
+  border-top: 1px solid var(--hairline);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot--ok {
+  background: var(--signal-positive);
+  box-shadow: 0 0 8px var(--signal-positive);
+}
+
+.status-dot--off {
+  background: var(--signal-negative);
+}
+
+.shell__status-text {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.shell__status-label {
+  color: var(--text-secondary);
+}
+
+.shell__status-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 1px;
+}
+
+.shell__mode {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.shell__ping {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+/* Play/Stop button */
+.runner-toggle {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--hairline);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  letter-spacing: 0.04em;
+}
+
+.runner-toggle--stop {
+  background: rgba(220, 53, 69, 0.12);
+  border-color: rgba(220, 53, 69, 0.4);
+  color: #e57373;
+}
+
+.runner-toggle--stop:hover:not(:disabled) {
+  background: rgba(220, 53, 69, 0.22);
+  border-color: rgba(220, 53, 69, 0.7);
+}
+
+.runner-toggle--start {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: var(--signal-positive);
+}
+
+.runner-toggle--start:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.7);
+}
+
+.runner-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.runner-error {
+  font-size: 10px;
+  color: var(--signal-negative);
+  padding: 0 4px;
+  line-height: 1.4;
+}
+
+.shell__main {
+  padding: 28px 32px 48px;
+  overflow-x: hidden;
+}
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .shell__sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+  }
+
+  .brand {
+    padding: 0;
+  }
+
+  .nav {
+    flex-direction: row;
+  }
+
+  .shell__status {
+    border-top: none;
+    margin-top: 0;
+    padding: 0;
+  }
+
+  .shell__status-text {
+    display: none;
+  }
+
+  .shell__main {
+    padding: 20px 16px 40px;
+  }
+}

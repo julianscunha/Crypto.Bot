@@ -2,6 +2,13 @@
 
 import asyncio
 
+import atexit
+
+from core.utils.runner_pid import (
+    write_runner_pid,
+    clear_runner_pid
+)
+
 from core.bus.event_bus import (
     EventBus
 )
@@ -63,6 +70,10 @@ from core.state.market_state import (
     market_state
 )
 
+from data.storage.repositories.runtime_state_repository import (
+    runtime_state_repository
+)
+
 
 # =========================================================
 # SYSTEM PANEL
@@ -70,51 +81,57 @@ from core.state.market_state import (
 
 def print_system_panel():
 
-    print_section(
-        "CRYPTO.BOT ENGINE"
-    )
+    from core.config.trading_config import TRADING_CONFIG
+    from core.config.trade_management_config import TRADE_MANAGEMENT_CONFIG
 
-    log(
-        "SYSTEM",
-        (
-            f"MODE           "
-            f"{settings.MODE.upper()}"
-        )
-    )
+    mode    = settings.MODE.upper()
+    testnet = getattr(settings, 'BINANCE_TESTNET', True)
+    mode_label = f"LIVE {'TESTNET' if testnet else 'MAINNET ⚠'}" if mode == 'LIVE' else 'PAPER'
+    mode_level = 'SUCCESS' if (mode == 'LIVE' and testnet) else 'WARNING'
 
-    log(
-        "SYSTEM",
-        (
-            "SYMBOLS        "
-            f"{' '.join(settings.SYMBOLS)}"
-        )
-    )
+    balance    = TRADING_CONFIG.get('account_balance', 0)
+    risk       = TRADING_CONFIG.get('risk_per_trade_percent', 0)
+    rr_min     = TRADING_CONFIG.get('minimum_risk_reward_ratio', 0)
+    max_pos    = getattr(settings, 'MAX_OPEN_POSITIONS', '?')
+    risk_amt   = round(balance * risk / 100, 4)
+    max_trades = TRADING_CONFIG.get('max_daily_trades', '?')
+    max_loss   = TRADING_CONFIG.get('max_daily_loss_percent', '?')
+    max_dd     = TRADING_CONFIG.get('maximum_daily_drawdown_percent', '?')
 
-    log(
-        "SYSTEM",
-        (
-            f"TIMEFRAME      "
-            f"{settings.KLINE_INTERVAL}"
-        )
-    )
+    try:
+        import json as _json
+        from pathlib import Path as _Path
+        bc_path = _Path('core/config/best_config.json')
+        if bc_path.exists():
+            bc     = _json.loads(bc_path.read_text(encoding='utf-8'))
+            params = bc.get('params', bc)
+            tp = params.get('atr_take_profit_multiplier', TRADING_CONFIG.get('atr_take_profit_multiplier', '?'))
+            sl = params.get('atr_stop_multiplier',        TRADING_CONFIG.get('atr_stop_multiplier', '?'))
+            tr = params.get('atr_trailing_multiplier',    TRADE_MANAGEMENT_CONFIG.get('atr_trailing_multiplier', '?'))
+        else:
+            tp = TRADING_CONFIG.get('atr_take_profit_multiplier', '?')
+            sl = TRADING_CONFIG.get('atr_stop_multiplier', '?')
+            tr = TRADE_MANAGEMENT_CONFIG.get('atr_trailing_multiplier', '?')
+        rr_val = round(tp / sl, 2) if isinstance(tp, (int,float)) and isinstance(sl, (int,float)) and sl > 0 else '?'
+    except Exception:
+        tp = sl = tr = rr_val = '?'
 
-    log(
-        "SYSTEM",
-        "DATABASE       CONNECTED",
-        "SUCCESS"
-    )
+    print_section('CRYPTO.BOT ENGINE')
 
-    log(
-        "SYSTEM",
-        "EVENT BUS      READY",
-        "SUCCESS"
-    )
-
-    log(
-        "SYSTEM",
-        "AGENTS         READY",
-        "SUCCESS"
-    )
+    log('SYSTEM', f'MODO           {mode_label}', mode_level)
+    log('SYSTEM', f'PARES          {" · ".join(settings.SYMBOLS)}')
+    log('SYSTEM', f'TIMEFRAME      {settings.KLINE_INTERVAL}')
+    print()
+    log('SYSTEM', f'SALDO          ${balance}')
+    log('SYSTEM', f'RISCO/TRADE    {risk}%  →  ${risk_amt} por trade')
+    log('SYSTEM', f'RR MÍNIMO      {rr_min}')
+    log('SYSTEM', f'MÁX. POSIÇÕES  {max_pos}')
+    log('SYSTEM', f'ATR            TP×{tp}  SL×{sl}  TRAILING×{tr}  RR={rr_val}')
+    log('SYSTEM', f'LIMITES        trades={max_trades}  perda={max_loss}%  drawdown={max_dd}%')
+    print()
+    log('SYSTEM', 'DATABASE       CONNECTED', 'SUCCESS')
+    log('SYSTEM', 'EVENT BUS      READY',     'SUCCESS')
+    log('SYSTEM', 'AGENTS         READY',     'SUCCESS')
 
 # =========================================================
 # AGENTS
@@ -336,8 +353,67 @@ def print_session_report():
     print()
 
 # =========================================================
+# RUNTIME STATE FLUSH
+# =========================================================
+#
+# market_state is an in-memory singleton local to this process.
+# Under Full Stack (scripts/bootstrap/launcher.py), the API runs as
+# a SEPARATE OS process and has its own, permanently-empty copy --
+# it never sees writes made here. This task periodically persists
+# this process's market_state to the database so the API can read
+# real telemetry (websocket_connected, active_symbols, signal
+# counters) instead of always reporting the zeroed defaults,
+# regardless of how long the bot has actually been running.
+#
+# A short interval (2s) keeps the dashboard feeling live without
+# writing to SQLite on every single market message/signal -- WAL
+# mode (see data/storage/database.py) makes this cheap regardless,
+# but there's no reason to flush more often than the frontend polls
+# the API for it (every 3s -- see frontend/src/pages/Dashboard.jsx).
+
+RUNTIME_STATE_FLUSH_INTERVAL_SECONDS = 2
+
+
+async def flush_runtime_state_periodically():
+
+    while True:
+
+        await asyncio.sleep(
+            RUNTIME_STATE_FLUSH_INTERVAL_SECONDS
+        )
+
+        try:
+
+            runtime_state_repository.upsert(
+                market_state.snapshot()
+            )
+
+        except Exception as error:
+
+            log(
+                "SYSTEM",
+                (
+                    "RUNTIME STATE FLUSH FAILED "
+                    f"{error}"
+                ),
+                "WARNING"
+            )
+
+# =========================================================
 # MAIN
 # =========================================================
+
+def _get_env_mode() -> str:
+    """Lê MODE do .env em tempo real para não depender do objeto settings."""
+    try:
+        from core.config.settings_repository import (
+            _read_raw_lines,
+            _parse_current_values,
+        )
+        return _parse_current_values(_read_raw_lines()).get("MODE", "paper").lower()
+    except Exception:
+        return settings.MODE.lower()
+
 
 async def main():
 
@@ -351,7 +427,101 @@ async def main():
     # CONFIG
     # =====================================================
 
-    load_best_config()
+    # Carrega config silenciosamente — as infos aparecem no painel ENGINE
+    import io as _io
+    import sys as _sys
+    _null = _io.StringIO()
+    _sys.stdout, _old_stdout = _null, _sys.stdout
+    try:
+        load_best_config()
+    finally:
+        _sys.stdout = _old_stdout
+
+    # Saldo inicial: valor do .env (sobrescrito pela Binance em LIVE)
+    from core.services.runtime_balance import set_balance
+    from core.config.trading_config import TRADING_CONFIG
+    set_balance(TRADING_CONFIG.get("account_balance", 0.0))
+
+    # =====================================================
+    # LIVE BALANCE SYNC
+    # =====================================================
+    #
+    # Em modo LIVE, busca o saldo USDT real da Binance e
+    # atualiza ACCOUNT_BALANCE no .env automaticamente.
+    # Em modo PAPER, usa o valor configurado manualmente.
+
+    if settings.MODE.strip().lower() == "live" or _get_env_mode() == "live":
+
+        try:
+
+            from core.services.binance_trading_client import (
+                BinanceTradingClient
+            )
+
+            from core.config.settings_repository import (
+                update_settings
+            )
+
+            client = BinanceTradingClient(
+
+                api_key=settings.BINANCE_API_KEY,
+
+                api_secret=settings.BINANCE_SECRET_KEY,
+
+                testnet=settings.BINANCE_TESTNET,
+
+                live_trading_confirmed=(
+                    settings.LIVE_TRADING_CONFIRMED
+                )
+            )
+
+            account = (
+                await client.get_account_info()
+            )
+
+            usdt_balance = next(
+                (
+                    float(b["free"])
+                    for b in account.get("balances", [])
+                    if b["asset"] == "USDT"
+                ),
+                None
+            )
+
+            if usdt_balance is not None:
+
+                from core.services.runtime_balance import set_balance
+                set_balance(usdt_balance)
+
+                log(
+                    "SYSTEM",
+                    f"Saldo USDT da Binance: ${usdt_balance:.2f}",
+                    "SUCCESS"
+                )
+
+            # Carregar filtros reais (stepSize, tickSize) por símbolo
+            from core.services.exchange_filters import load_filters
+
+            await load_filters(
+                client=client,
+                symbols=settings.SYMBOLS
+            )
+
+            # Reconciliar estado da exchange com banco local
+            from core.services.startup_reconciler import reconcile_on_startup
+
+            await reconcile_on_startup(client)
+
+        except Exception as error:
+
+            log(
+                "SYSTEM",
+                (
+                    f"Falha ao buscar saldo da Binance: {error} — "
+                    "usando valor configurado em ACCOUNT_BALANCE"
+                ),
+                "WARNING"
+            )
 
     # =====================================================
     # SYSTEM PANEL
@@ -384,7 +554,21 @@ async def main():
         user_id=0
     )
 
-    await websocket.start()
+    # =====================================================
+    # RUNTIME STATE FLUSH (BACKGROUND)
+    # =====================================================
+
+    flush_task = asyncio.create_task(
+        flush_runtime_state_periodically()
+    )
+
+    try:
+
+        await websocket.start()
+
+    finally:
+
+        flush_task.cancel()
 
 # =========================================================
 # ENTRYPOINT
@@ -392,7 +576,19 @@ async def main():
 
 if __name__ == "__main__":
 
+    write_runner_pid()
+
+    atexit.register(
+        clear_runner_pid
+    )
+
     try:
+
+        # aiohttp requires SelectorEventLoop on Windows -- see
+        # core/utils/event_loop.py for the full explanation.
+        from core.utils.event_loop import configure_event_loop
+
+        configure_event_loop()
 
         asyncio.run(
             main()

@@ -8,6 +8,10 @@ from core.config.trading_config import (
     TRADING_CONFIG
 )
 
+from core.config.trade_management_config import (
+    TRADE_MANAGEMENT_CONFIG
+)
+
 from core.utils.console_logger import (
     log
 )
@@ -42,14 +46,36 @@ def load_best_config():
 
         data = json.load(f)
 
-    params = data.get(
-        "params",
-        {}
+    # =====================================================
+    # PARAMS
+    # =====================================================
+    #
+    # OptimizerEngine writes best_config.json as a flat dict of
+    # params (json.dump(best_result["params"], f, ...)), not wrapped
+    # under a "params" key. Support both shapes defensively.
+
+    params = (
+        data.get("params", data)
+        if isinstance(data, dict)
+        else {}
     )
 
-    TRADING_CONFIG.update(
-        params
-    )
+    # =====================================================
+    # ROUTE PARAMS TO THE CONFIG THAT OWNS EACH KEY
+    # =====================================================
+    #
+    # atr_trailing_multiplier belongs to TRADE_MANAGEMENT_CONFIG;
+    # everything else the optimizer tunes belongs to TRADING_CONFIG.
+
+    for key, value in params.items():
+
+        if key in TRADE_MANAGEMENT_CONFIG:
+
+            TRADE_MANAGEMENT_CONFIG[key] = value
+
+        else:
+
+            TRADING_CONFIG[key] = value
 
     # =====================================================
     # CONFIG LOGS
@@ -66,7 +92,7 @@ def load_best_config():
             "ATR CONFIG "
             f"SL={TRADING_CONFIG['atr_stop_multiplier']} "
             f"TP={TRADING_CONFIG['atr_take_profit_multiplier']} "
-            f"TS={TRADING_CONFIG['atr_trailing_multiplier']}"
+            f"TS={TRADE_MANAGEMENT_CONFIG['atr_trailing_multiplier']}"
         )
     )
 
@@ -84,6 +110,6 @@ def load_best_config():
         (
             "STRUCTURE CONFIG "
             f"MIN_CANDLES="
-            f"{TRADING_CONFIG['min_structure_candles']}"
+            f"{TRADING_CONFIG['minimum_structure_candles']}"
         )
     )

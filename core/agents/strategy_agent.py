@@ -10,7 +10,7 @@ from core.contracts.messages import (
 )
 
 from core.services.signal_quality_service import (
-    SignalQualityService
+    signal_quality_service
 )
 
 from core.services.market_structure_service import (
@@ -44,7 +44,7 @@ class StrategyAgent:
         self.bus = bus
 
         self.signal_quality = (
-            SignalQualityService()
+            signal_quality_service
         )
 
         self.market_structure = (

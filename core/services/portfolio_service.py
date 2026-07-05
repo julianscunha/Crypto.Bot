@@ -195,11 +195,32 @@ class PortfolioService:
         # =================================================
         # PEAK EQUITY
         # =================================================
+        #
+        # True historical peak, not just this snapshot's values:
+        # using only initial_balance/balance/equity here would
+        # understate drawdown any time equity has fallen from a
+        # higher point reached in an earlier snapshot.
+        #
+        # Scoped to the current initial_balance (see
+        # PortfolioRepository.get_max_equity) so that deliberately
+        # resetting the paper account's configured balance is never
+        # misread as a real trading loss against a stale, higher
+        # peak from a previous configuration.
+
+        historical_peak = (
+
+            self.portfolio_repository
+            .get_max_equity(
+                user_id=user_id,
+                initial_balance=initial_balance
+            )
+        )
 
         peak_equity = max(
             initial_balance,
             balance,
-            equity
+            equity,
+            historical_peak
         )
 
         # =================================================
@@ -247,7 +268,9 @@ class PortfolioService:
 
                 exposure=open_exposure,
 
-                drawdown=drawdown_percent
+                drawdown=drawdown_percent,
+
+                initial_balance=initial_balance
             )
         )
 

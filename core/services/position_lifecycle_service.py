@@ -115,12 +115,12 @@ class PositionLifecycleService:
         # =================================================
 
         if EXCHANGE_CONFIG[
-            "use_fees"
+            "enable_fee_simulation"
         ]:
 
             taker_fee_percent = (
                 EXCHANGE_CONFIG[
-                    "taker_fee"
+                    "taker_fee_percent"
                 ]
             )
 
@@ -174,7 +174,7 @@ class PositionLifecycleService:
             return 0.0
 
         if not EXCHANGE_CONFIG[
-            "use_slippage"
+            "enable_slippage_simulation"
         ]:
 
             return cls._round_price(
@@ -183,7 +183,7 @@ class PositionLifecycleService:
 
         slippage_percent = (
             EXCHANGE_CONFIG[
-                "slippage"
+                "entry_slippage_percent"
             ]
         )
 
@@ -218,7 +218,7 @@ class PositionLifecycleService:
             return 0.0
 
         if not EXCHANGE_CONFIG[
-            "use_slippage"
+            "enable_slippage_simulation"
         ]:
 
             return cls._round_price(
@@ -227,7 +227,7 @@ class PositionLifecycleService:
 
         slippage_percent = (
             EXCHANGE_CONFIG[
-                "slippage"
+                "exit_slippage_percent"
             ]
         )
 
