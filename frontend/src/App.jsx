@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { usePolling } from "./hooks/usePolling";
 import { api, ApiError } from "./api/client";
 import { Dashboard } from "./pages/Dashboard";
@@ -8,9 +8,9 @@ import "./App.css";
 import "./components.css";
 
 const NAV_ITEMS = [
-  { id: "dashboard", label: "Monitor" },
-  { id: "tools", label: "Ferramentas" },
-  { id: "settings", label: "Configurações" },
+  { id: "dashboard", label: "MONITOR" },
+  { id: "tools", label: "FERRAMENTAS" },
+  { id: "settings", label: "CONFIGURAÇÕES" },
 ];
 
 const MODE_LABELS = {
@@ -137,10 +137,10 @@ export default function App() {
             }
           >
             {isTogglingRunner
-              ? "Aguarde…"
+              ? "Aguardando…"
               : isRunning
-              ? "⏹ Parar bot"
-              : "▶ Iniciar bot"}
+              ? "⏹ PARAR BOT"
+              : "▶ INICIAR BOT"}
           </button>
 
           {runnerError && (
@@ -152,7 +152,7 @@ export default function App() {
             <span className={`status-dot ${isConnected ? "status-dot--ok" : "status-dot--off"}`} />
             <div className="shell__status-text">
               <span className="shell__status-label">
-                {isConnected ? "API conectada" : "API offline"}
+                {isConnected ? "API CONECTADA" : "API OFFLINE"}
               </span>
               <div className="shell__status-meta">
                 {mode && (

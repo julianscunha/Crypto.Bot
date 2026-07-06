@@ -152,39 +152,43 @@
   letter-spacing: 0.02em;
 }
 
-/* Play/Stop button */
+/* Play/Stop button - refined */
 .runner-toggle {
   width: 100%;
-  padding: 7px 10px;
-  border-radius: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
   border: 1px solid var(--hairline);
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  letter-spacing: 0.04em;
+  transition: all 0.15s ease;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .runner-toggle--stop {
-  background: rgba(220, 53, 69, 0.12);
-  border-color: rgba(220, 53, 69, 0.4);
-  color: #e57373;
+  background: var(--signal-negative-dim);
+  border-color: var(--signal-negative);
+  color: var(--signal-negative);
 }
 
 .runner-toggle--stop:hover:not(:disabled) {
-  background: rgba(220, 53, 69, 0.22);
-  border-color: rgba(220, 53, 69, 0.7);
+  background: var(--signal-negative);
+  color: var(--bg-base);
+  box-shadow: 0 0 12px var(--signal-negative);
 }
 
 .runner-toggle--start {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.4);
+  background: var(--signal-positive-dim);
+  border-color: var(--signal-positive);
   color: var(--signal-positive);
 }
 
 .runner-toggle--start:hover:not(:disabled) {
-  background: rgba(16, 185, 129, 0.22);
-  border-color: rgba(16, 185, 129, 0.7);
+  background: var(--signal-positive);
+  color: var(--bg-base);
+  box-shadow: 0 0 12px var(--signal-positive);
 }
 
 .runner-toggle:disabled {

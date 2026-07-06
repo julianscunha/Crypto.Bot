@@ -20,7 +20,7 @@ async function request(path, options = {}) {
       },
       ...options,
     });
-  } catch (networkError) {
+  } catch (_networkError) {
     throw new ApiError(
       "Could not reach the API. Is it running?",
       0,
@@ -79,7 +79,7 @@ export const api = {
   // Mede o round-trip real em ms comparando timestamp local com o do servidor
   async getPing() {
     const sent = Date.now();
-    const data = await request("/health");
+    await request("/health");
     const received = Date.now();
     return received - sent;
   },
