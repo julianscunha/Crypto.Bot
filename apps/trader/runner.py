@@ -406,12 +406,14 @@ async def flush_runtime_state_periodically():
 def _get_env_mode() -> str:
     """Lê MODE do .env em tempo real para não depender do objeto settings."""
     try:
-        from core.config.settings_repository import (
-            _read_raw_lines,
-            _parse_current_values,
-        )
-        return _parse_current_values(_read_raw_lines()).get("MODE", "paper").lower()
-    except Exception:
+        from core.config.settings_repository import ENV_PATH
+        for line in ENV_PATH.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith("MODE=") and not line.startswith("#"):
+                return line.split("=", 1)[1].strip().strip('"').strip("'").lower()
+        return "paper"
+    except Exception as e:
+        log("SYSTEM", f"_get_env_mode falhou: {e} — usando {settings.MODE}", "WARNING")
         return settings.MODE.lower()
 
 
@@ -450,7 +452,11 @@ async def main():
     # atualiza ACCOUNT_BALANCE no .env automaticamente.
     # Em modo PAPER, usa o valor configurado manualmente.
 
-    if settings.MODE.strip().lower() == "live" or _get_env_mode() == "live":
+    _current_mode = _get_env_mode()
+
+    log("SYSTEM", f"MODO DETECTADO: {_current_mode.upper()}")
+
+    if _current_mode == "live":
 
         try:
 

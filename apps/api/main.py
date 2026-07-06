@@ -725,18 +725,19 @@ def _start_job(job_type: str, module: str, extra_args: list = None):
 
     global _active_thread
 
-    # Job travado? Verifica se a thread ainda está viva
+    # Auto-reset se thread morreu mas status ainda é "running"
     if _current_job["status"] == "running":
-        if _active_thread is not None and _active_thread.is_alive():
+        thread_alive = _active_thread is not None and _active_thread.is_alive()
+        if not thread_alive:
+            with _job_lock:
+                _current_job["status"] = "error"
+                _current_job["finished_at"] = _time.time()
+                _current_job["error"] = "Job interrompido inesperadamente."
+        else:
             raise HTTPException(
                 status_code=409,
                 detail="Já existe um job em execução. Aguarde terminar."
             )
-        else:
-            # Thread morreu sem atualizar status — limpar
-            with _job_lock:
-                _current_job["status"] = "error"
-                _current_job["error"] = "Job interrompido inesperadamente."
 
     from core.utils.runner_pid import read_runner_pid
     from core.services.process_manager_service import _is_process_alive
@@ -789,7 +790,7 @@ def _extract_summary(result, job_type: str) -> dict:
 
 
 @app.get("/jobs/estimate")
-async def jobs_estimate(type: str = "optimizer", days: int = 90):
+async def jobs_estimate(jtype: str = "optimizer", days: int = 90):
     """
     Estima tempo de execução baseado no histórico real.
     Se não há histórico, retorna None (frontend mostra "—").
@@ -798,7 +799,7 @@ async def jobs_estimate(type: str = "optimizer", days: int = 90):
     history = _load_history()
     matches = [
         h for h in history
-        if h.get("type") == type
+        if h.get("type") == jtype
         and h.get("status") == "done"
         and h.get("elapsed_seconds")
     ]
@@ -806,7 +807,7 @@ async def jobs_estimate(type: str = "optimizer", days: int = 90):
     if not matches:
         return {"estimate_seconds": None, "based_on": None}
 
-    if type == "optimizer":
+    if jtype == "optimizer":
         # Encontrar execução com mesmo número de dias para referência
         same_days = [
             h for h in matches
@@ -834,6 +835,7 @@ async def jobs_estimate(type: str = "optimizer", days: int = 90):
     }
 
 
+@app.get("/jobs/history")
 async def jobs_history(page: int = 1):
     history = _load_history()
     per_page = MAX_HISTORY

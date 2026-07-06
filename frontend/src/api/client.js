@@ -69,7 +69,7 @@ export const api = {
   getLiveBalance: () => request("/account/live-balance"),
   getJobProgress: () => request("/jobs/progress"),
   getJobHistory: (page = 1) => request(`/jobs/history?page=${page}`),
-  getJobEstimate: (type, days) => request(`/jobs/estimate?type=${type}&days=${days ?? ""}`),
+  getJobEstimate: (job_type, days) => request(`/jobs/estimate?jtype=${job_type}&days=${days ?? ""}`),
   previewApply: () => request("/jobs/preview-apply"),
   resetJob: () => request("/jobs/reset", { method: "POST" }),
   runOptimizer: (days = 90) => request(`/jobs/optimizer?days=${days}`, { method: "POST" }),
