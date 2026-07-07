@@ -171,7 +171,6 @@ class RiskAgent:
 
         quantity = (
             self._calculate_position_size(
-                entry_price,
                 risk_distance,
                 symbol=payload.symbol
             )
@@ -588,7 +587,6 @@ class RiskAgent:
 
     def _calculate_position_size(
         self,
-        entry_price: float,
         risk_distance: float,
         symbol: str = ""
     ):

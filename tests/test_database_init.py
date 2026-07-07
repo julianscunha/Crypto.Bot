@@ -8,8 +8,6 @@ _isolated_test_database fixture swaps SessionLocal to), so it needs
 its own dedicated exercise to get covered.
 """
 
-import sqlite3
-
 import tempfile
 
 import os

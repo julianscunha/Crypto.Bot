@@ -119,7 +119,7 @@ def print_system_panel():
     print_section('CRYPTO.BOT ENGINE')
 
     log('SYSTEM', f'MODO           {mode_label}', mode_level)
-    log('SYSTEM', f'PARES          {" · ".join(settings.SYMBOLS)}')
+    log('SYSTEM', f'PARES          {" | ".join(settings.SYMBOLS)}')
     log('SYSTEM', f'TIMEFRAME      {settings.KLINE_INTERVAL}')
     print()
     log('SYSTEM', f'SALDO          ${balance}')
@@ -464,9 +464,6 @@ async def main():
                 BinanceTradingClient
             )
 
-            from core.config.settings_repository import (
-                update_settings
-            )
 
             client = BinanceTradingClient(
 

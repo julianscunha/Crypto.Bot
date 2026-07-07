@@ -22,7 +22,6 @@ Cenários cobertos:
 
 from core.utils.console_logger import log
 from data.storage.repositories.trades_repository import trades_repository
-from core.config.settings import settings
 
 
 DEFAULT_USER_ID = 0
@@ -79,9 +78,6 @@ async def _reconcile_trade(client, trade) -> None:
     # =========================================================
 
     try:
-
-        from core.services.binance_trading_client import BinanceTradingError
-
         status = await client.get_order_list_status(
             symbol=symbol,
             order_list_id=int(trade.order_list_id)
@@ -152,9 +148,6 @@ async def _emergency_close(client, trade) -> None:
     trade_id = trade.id
 
     try:
-
-        from core.services.binance_trading_client import BinanceTradingError
-
         await client.place_market_order(
             symbol=symbol,
             side="SELL",

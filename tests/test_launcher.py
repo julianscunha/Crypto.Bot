@@ -268,15 +268,21 @@ class TestStartFullstack:
 
         fake_api_process.wait.return_value = None
 
-        with patch(
-            "scripts.bootstrap.launcher.subprocess.Popen",
-            side_effect=[fake_api_process]
-        ) as mock_popen:
+        # isolates the assertion from terminate_process()'s own
+        # OS-specific branching (on Windows it shells out to taskkill
+        # via subprocess.run, which itself uses Popen internally --
+        # that's covered by TestTerminateProcess, not this test)
+        with patch("scripts.bootstrap.launcher.os.name", "posix"):
 
-            start_fullstack()
+            with patch(
+                "scripts.bootstrap.launcher.subprocess.Popen",
+                side_effect=[fake_api_process]
+            ) as mock_popen:
 
-            # Only API is started; Runner is no longer auto-started
-            assert mock_popen.call_count == 1
+                start_fullstack()
+
+                # Only API is started; Runner is no longer auto-started
+                assert mock_popen.call_count == 1
 
     def test_does_not_raise_when_npm_not_on_path(
         self,
@@ -287,20 +293,24 @@ class TestStartFullstack:
 
         fake_api_process.wait.return_value = None
 
-        with patch(
-            "scripts.bootstrap.launcher.shutil.which",
-            return_value=None
-        ):
+        # isolates the assertion from terminate_process()'s own
+        # OS-specific branching (see test_does_not_raise_when_frontend_missing)
+        with patch("scripts.bootstrap.launcher.os.name", "posix"):
 
             with patch(
-                "scripts.bootstrap.launcher.subprocess.Popen",
-                side_effect=[fake_api_process]
-            ) as mock_popen:
+                "scripts.bootstrap.launcher.shutil.which",
+                return_value=None
+            ):
 
-                start_fullstack()
+                with patch(
+                    "scripts.bootstrap.launcher.subprocess.Popen",
+                    side_effect=[fake_api_process]
+                ) as mock_popen:
 
-                # only API started; no runner, no frontend
-                assert mock_popen.call_count == 1
+                    start_fullstack()
+
+                    # only API started; no runner, no frontend
+                    assert mock_popen.call_count == 1
 
     def test_starts_api_with_uvicorn_command(
         self,
@@ -386,29 +396,33 @@ class TestStartFullstack:
 
         fake_api_process.wait.return_value = None
 
-        with patch(
-            "scripts.bootstrap.launcher.subprocess.Popen",
-            side_effect=[fake_api_process]
-        ) as mock_popen:
+        # isolates the assertion from terminate_process()'s own
+        # OS-specific branching (see test_does_not_raise_when_frontend_missing)
+        with patch("scripts.bootstrap.launcher.os.name", "posix"):
 
-            start_fullstack()
+            with patch(
+                "scripts.bootstrap.launcher.subprocess.Popen",
+                side_effect=[fake_api_process]
+            ) as mock_popen:
 
-            assert mock_popen.call_count == 1
+                start_fullstack()
 
-            first_call_args = mock_popen.call_args_list[0][0][0]
+                assert mock_popen.call_count == 1
 
-            assert "uvicorn" in first_call_args
+                first_call_args = mock_popen.call_args_list[0][0][0]
 
-            # Runner must NOT have been started
-            all_args = [
-                call[0][0]
-                for call in mock_popen.call_args_list
-            ]
+                assert "uvicorn" in first_call_args
 
-            assert not any(
-                "apps.trader.runner" in str(args)
-                for args in all_args
-            )
+                # Runner must NOT have been started
+                all_args = [
+                    call[0][0]
+                    for call in mock_popen.call_args_list
+                ]
+
+                assert not any(
+                    "apps.trader.runner" in str(args)
+                    for args in all_args
+                )
 
     def test_terminates_api_process_on_completion(
         self,
@@ -448,38 +462,42 @@ class TestStartFullstack:
 
         fake_frontend_process.wait.return_value = None
 
-        with patch(
-            "scripts.bootstrap.launcher.shutil.which",
-            return_value=LINUX_NPM_PATH
-        ):
+        # isolates the assertion from terminate_process()'s own
+        # OS-specific branching (see test_does_not_raise_when_frontend_missing)
+        with patch("scripts.bootstrap.launcher.os.name", "posix"):
 
             with patch(
-                "scripts.bootstrap.launcher.frontend_dependencies_installed",
-                return_value=True
+                "scripts.bootstrap.launcher.shutil.which",
+                return_value=LINUX_NPM_PATH
             ):
 
                 with patch(
-                    "scripts.bootstrap.launcher.subprocess.Popen",
-                    side_effect=[
-                        fake_api_process,
-                        fake_frontend_process
-                    ]
-                ) as mock_popen:
+                    "scripts.bootstrap.launcher.frontend_dependencies_installed",
+                    return_value=True
+                ):
 
-                    start_fullstack()
+                    with patch(
+                        "scripts.bootstrap.launcher.subprocess.Popen",
+                        side_effect=[
+                            fake_api_process,
+                            fake_frontend_process
+                        ]
+                    ) as mock_popen:
 
-                    # API + frontend only (runner no longer auto-started)
-                    assert mock_popen.call_count == 2
+                        start_fullstack()
 
-                    second_call_args = mock_popen.call_args_list[1][0][0]
+                        # API + frontend only (runner no longer auto-started)
+                        assert mock_popen.call_count == 2
 
-                    assert second_call_args == [
-                        LINUX_NPM_PATH,
-                        "run",
-                        "dev"
-                    ]
+                        second_call_args = mock_popen.call_args_list[1][0][0]
 
-                    assert fake_frontend_process.wait.call_count >= 1
+                        assert second_call_args == [
+                            LINUX_NPM_PATH,
+                            "run",
+                            "dev"
+                        ]
+
+                        assert fake_frontend_process.wait.call_count >= 1
 
     def test_windows_npm_cmd_resolution_end_to_end(
         self,

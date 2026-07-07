@@ -66,7 +66,7 @@ def show_menu():
     risk    = TRADING_CONFIG.get("risk_per_trade_percent", "?")
     rr_min  = TRADING_CONFIG.get("minimum_risk_reward_ratio", "?")
     max_pos = getattr(settings, "MAX_OPEN_POSITIONS", "?")
-    symbols = " · ".join(settings.SYMBOLS)
+    symbols = " | ".join(settings.SYMBOLS)
     tf      = settings.KLINE_INTERVAL
 
     print_section("CONFIGURAÇÃO ATIVA")

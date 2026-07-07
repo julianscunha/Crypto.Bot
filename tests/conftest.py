@@ -17,6 +17,20 @@ but mutating the existing factory's bind affects every reference to it.
 
 import os
 
+# core/config/settings.py calls load_dotenv() at import time with no
+# path, which reads the real project .env -- including
+# LIVE_TRADING_CONFIRMED and live Binance credentials, if the
+# developer has ever set them locally. dotenv's load_dotenv() never
+# overrides variables already present in os.environ, so setting safe
+# defaults here (before any test module imports core.config.settings)
+# guarantees the suite never inherits a real "confirmed" live-trading
+# flag or real API keys, no matter what's sitting in the real .env.
+os.environ.setdefault("MODE", "paper")
+os.environ.setdefault("BINANCE_TESTNET", "true")
+os.environ.setdefault("LIVE_TRADING_CONFIRMED", "false")
+os.environ.setdefault("BINANCE_API_KEY", "")
+os.environ.setdefault("BINANCE_SECRET_KEY", "")
+
 import tempfile
 
 from pathlib import Path
@@ -41,8 +55,6 @@ def _isolated_test_logs():
     import logging
 
     from logging.handlers import RotatingFileHandler
-
-    from core.utils import console_logger
 
     tmp_dir = tempfile.mkdtemp(
         prefix="crypto_bot_test_logs_"

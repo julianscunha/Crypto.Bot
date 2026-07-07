@@ -218,8 +218,8 @@ class TestPrepareDatasetsSuccess:
             assert "live_history" in path
 
         assert (
-            engine.VALIDATION_DATASET
-            == engine.VALIDATION_DATASETS[0]
+            engine.VALIDATION_DATASETS[0]
+            == engine.VALIDATION_DATASET
         )
 
     def test_writes_real_csv_files_to_disk(self):

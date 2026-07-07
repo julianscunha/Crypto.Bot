@@ -11,8 +11,6 @@ core/services/signal_quality_service.py's validate() pipeline (see
 test_signal_quality_service.py for the integration-level coverage).
 """
 
-import pytest
-
 from core.services.risk_protection_service import (
     RiskProtectionService
 )

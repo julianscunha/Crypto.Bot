@@ -497,7 +497,6 @@ class BinanceTradingClient:
                 continue
             for f in sym.get("filters", []):
                 if f["filterType"] == "LOT_SIZE":
-                    step = float(f["stepSize"])
                     # número de casas decimais do stepSize
                     filters["qty_precision"] = (
                         len(f["stepSize"].rstrip("0").split(".")[-1])

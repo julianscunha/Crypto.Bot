@@ -596,7 +596,15 @@ class TestSettingsEndpoint:
         client
     ):
 
+        # a restart is only triggered when the runner was already
+        # running (see apps/api/main.py) -- simulate that here
         with patch(
+            "core.utils.runner_pid.read_runner_pid",
+            return_value=4242
+        ), patch(
+            "core.services.process_manager_service._is_process_alive",
+            return_value=True
+        ), patch(
             "apps.api.main.restart_runner"
         ) as mock_restart:
 
@@ -817,7 +825,15 @@ class TestSettingsEndpoint:
             ProcessManagerError
         )
 
+        # a restart is only triggered when the runner was already
+        # running (see apps/api/main.py) -- simulate that here
         with patch(
+            "core.utils.runner_pid.read_runner_pid",
+            return_value=4242
+        ), patch(
+            "core.services.process_manager_service._is_process_alive",
+            return_value=True
+        ), patch(
             "apps.api.main.restart_runner",
             side_effect=ProcessManagerError(
                 "simulated: process would not die"
@@ -831,7 +847,7 @@ class TestSettingsEndpoint:
 
         assert response.status_code == 500
 
-        assert "restart" in response.json()["detail"].lower()
+        assert "reiniciar" in response.json()["detail"].lower()
 
 
 class TestCors:

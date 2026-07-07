@@ -66,7 +66,6 @@ from core.services.binance_trading_client import (
     BinanceTradingError,
     MainnetNotConfirmedError,
     _fmt_price,
-    _fmt_qty,
 )
 
 from core.services.position_lifecycle_service import (

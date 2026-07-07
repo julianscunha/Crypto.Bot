@@ -146,7 +146,7 @@ if __name__ == "__main__":
         f"{Fore.GREEN}[BOOT]{Style.RESET_ALL} "
         f"Initializing API..."
     )
-    
+
     bootstrap_environment()
 
     api_process = multiprocessing.Process(

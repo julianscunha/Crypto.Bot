@@ -16,7 +16,7 @@ import asyncio
 
 import pytest
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 from data.ingestion.binance_ws import BinanceWS
 

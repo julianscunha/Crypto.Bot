@@ -18,8 +18,6 @@ sessions), so every HTTP call here is mocked. Real connectivity can
 only be validated in the user's own environment.
 """
 
-import asyncio
-
 import pytest
 
 from unittest.mock import patch

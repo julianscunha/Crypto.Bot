@@ -517,7 +517,7 @@ class OptimizerEngine:
             # =================================================
             # RESULT
             # =================================================
-            
+
             log(
                 "RESULT",
                 (
@@ -528,29 +528,29 @@ class OptimizerEngine:
                 ),
                 "SUCCESS"
             )
-            
+
             # =================================================
             # FILTER INVALID CONFIGS
             # =================================================
-            
+
             if metrics["profit_factor"] <= 1.0:
                 continue
-            
+
             if metrics["pnl"] <= 0:
                 continue
-            
+
             if metrics["expectancy"] <= 0:
                 continue
-            
+
             results.append({
-            
+
                 "params": dict(params),
-            
+
                 "metrics": dict(metrics),
-            
+
                 "score": score
             })
-            
+
             restore_config(
                 snapshot
             )
@@ -558,69 +558,69 @@ class OptimizerEngine:
         # =====================================================
         # NO VALID RESULTS
         # =====================================================
-        
+
         if not results:
-        
+
             ReportRenderer.print_header(
                 "OPTIMIZER VALIDATION REPORT"
             )
-        
+
             ReportRenderer.print_section(
                 "RESULT"
             )
-        
+
             ReportRenderer.print_metric(
                 "Configurations Tested",
                 len(combinations)
             )
-        
+
             ReportRenderer.print_metric(
                 "Valid Configurations",
                 0
             )
-        
+
             ReportRenderer.print_metric(
                 "Status",
                 "NO_EDGE_FOUND"
             )
-        
+
             print()
-        
+
             print(
                 "No configuration passed the "
                 "minimum quantitative filters."
             )
-        
+
             print()
-        
+
             print(
                 "Possible causes:"
             )
-        
+
             print(
                 "- Strategy lacks statistical edge"
             )
-        
+
             print(
                 "- Dataset too adverse"
             )
-        
+
             print(
                 "- Risk parameters too restrictive"
             )
-        
+
             print(
                 "- Insufficient trade sample"
             )
-        
+
             print()
-        
+
             print("=" * 60)
-        
+
             restore_config(
                 snapshot
             )
-        
+
             return
 
         # =====================================================

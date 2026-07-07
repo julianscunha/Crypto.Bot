@@ -497,13 +497,6 @@ async def runner_stop():
             )
         )
 
-    balance_report = await build_startup_balance_report()
-    if not balance_report["allowed"]:
-        raise HTTPException(
-            status_code=409,
-            detail=balance_report["reason"] or "Saldo insuficiente para iniciar o bot."
-        )
-
     try:
 
         stop_runner()
@@ -537,6 +530,13 @@ async def runner_start():
         raise HTTPException(
             status_code=409,
             detail="O bot já está em execução."
+        )
+
+    balance_report = await build_startup_balance_report()
+    if not balance_report["allowed"]:
+        raise HTTPException(
+            status_code=409,
+            detail=balance_report["reason"] or "Saldo insuficiente para iniciar o bot."
         )
 
     try:
@@ -987,8 +987,7 @@ async def account_live_balance():
     try:
 
         from core.services.binance_trading_client import (
-            BinanceTradingClient,
-            MainnetNotConfirmedError
+            BinanceTradingClient
         )
 
         # Lê credenciais do .env atualizado, não do objeto settings em memória
@@ -1064,6 +1063,10 @@ async def jobs_apply_best_config():
 
 
 
+@app.get(
+    "/runtime",
+    response_model=RuntimeResponse
+)
 async def runtime():
 
     return build_runtime_response()

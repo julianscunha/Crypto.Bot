@@ -149,15 +149,6 @@ def init_db():
         # cai no create_all abaixo que cria tudo do zero
         pass
 
-    from data.storage.models import (
-
-        Trade,
-
-        EquityCurve,
-
-        PortfolioSnapshot
-    )
-
     Base.metadata.create_all(
         bind=engine
     )

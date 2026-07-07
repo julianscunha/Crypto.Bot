@@ -11,8 +11,7 @@ actual dependency error.
 """
 
 from scripts.bootstrap.bootstrap import (
-    write_bootstrap_log,
-    BOOTSTRAP_LOG
+    write_bootstrap_log
 )
 
 

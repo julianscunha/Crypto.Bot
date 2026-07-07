@@ -33,11 +33,11 @@ class TradeResponse(BaseModel):
     created_at: Optional[datetime] = None
 
     closed_at: Optional[datetime] = None
-    
+
     stop_loss: Optional[float] = None
 
     take_profit: Optional[float] = None
-    
+
     trailing_stop: Optional[float] = None
-    
+
     highest_price: Optional[float] = None

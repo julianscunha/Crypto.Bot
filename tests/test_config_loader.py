@@ -16,8 +16,6 @@ Bugs fixed:
 
 import json
 
-import os
-
 import pytest
 
 from core.config import config_loader
