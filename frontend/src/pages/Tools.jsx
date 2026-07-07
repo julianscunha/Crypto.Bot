@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
+import { usePolling } from "../hooks/usePolling";
 import { api, ApiError } from "../api/client";
 import { Panel } from "../components/Panel";
 import { Badge } from "../components/Badge";
 
-function useEstimate(type, days) {
+function useEstimate(type, days, symbolsKey = "", intervalKey = "") {
   const [estimate, setEstimate] = useState(null);
+
   useEffect(() => {
     api.getJobEstimate(type, days)
-      .then(r => setEstimate(r.estimate_seconds))
+      .then(r => setEstimate(r))
       .catch(() => setEstimate(null));
-  }, [type, days]);
+  }, [type, days, symbolsKey, intervalKey]);
+
   return estimate;
 }
 
@@ -18,6 +21,7 @@ function useEstimate(type, days) {
 // =====================================================
 
 export function Tools() {
+  const { data: settings, refresh: refreshSettings } = usePolling(api.getSettings, 15000);
   const [job, setJob] = useState(null);
   const [progress, setProgress] = useState(null);
   const [runnerRunning, setRunnerRunning] = useState(false);
@@ -27,20 +31,41 @@ export function Tools() {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [applyPreview, setApplyPreview] = useState(null);
   const [applyResult, setApplyResult] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [historyPage, setHistoryPage] = useState(1);
-  const [historyMeta, setHistoryMeta] = useState({ total: 0, pages: 1 });
+  const [optimizerHistory, setOptimizerHistory] = useState([]);
+  const [optimizerHistoryPage, setOptimizerHistoryPage] = useState(1);
+  const [optimizerHistoryMeta, setOptimizerHistoryMeta] = useState({ total: 0, pages: 1 });
+  const [backtestHistory, setBacktestHistory] = useState([]);
+  const [backtestHistoryPage, setBacktestHistoryPage] = useState(1);
+  const [backtestHistoryMeta, setBacktestHistoryMeta] = useState({ total: 0, pages: 1 });
 
-  const estOptimizer30 = useEstimate("optimizer", 30);
-  const estOptimizer60 = useEstimate("optimizer", 60);
-  const estOptimizer90 = useEstimate("optimizer", 90);
-  const estBacktest    = useEstimate("backtest", null);
+  const settingsSignature = settings?.symbols ?? "";
+  const intervalSignature = settings?.kline_interval ?? "";
 
-  const optimizerEst = { 30: estOptimizer30, 60: estOptimizer60, 90: estOptimizer90 };
+  const estOptimizer30 = useEstimate("optimizer", 30, settingsSignature, intervalSignature);
+  const estOptimizer60 = useEstimate("optimizer", 60, settingsSignature, intervalSignature);
+  const estOptimizer90 = useEstimate("optimizer", 90, settingsSignature, intervalSignature);
+  const estOptimizerSelected = useEstimate("optimizer", optimizerDays, settingsSignature, intervalSignature);
+  const estBacktest = useEstimate("backtest", null, settingsSignature, intervalSignature);
+
+  useEffect(() => {
+    function handleSettingsUpdated() {
+      refreshSettings();
+    }
+
+    window.addEventListener("crypto-bot-settings-updated", handleSettingsUpdated);
+    return () => window.removeEventListener("crypto-bot-settings-updated", handleSettingsUpdated);
+  }, [refreshSettings]);
+
+  const optimizerEst = {
+    30: estOptimizer30,
+    60: estOptimizer60,
+    90: estOptimizer90,
+  };
 
   useEffect(() => {
     let interval;
     const isRunningJob = job?.status === "running";
+
     async function poll() {
       try {
         const [jobData, runnerData] = await Promise.all([
@@ -50,35 +75,49 @@ export function Tools() {
         setJob(jobData);
         setRunnerRunning(runnerData.running);
         if (jobData.status === "running") {
-          try { setProgress(await api.getJobProgress()); } catch {}
+          try {
+            setProgress(await api.getJobProgress());
+          } catch {}
         } else {
           setProgress(null);
         }
       } catch {}
     }
+
     poll();
     interval = setInterval(poll, isRunningJob ? 1500 : 5000);
     return () => clearInterval(interval);
-  }, [job?.status]);
+  }, [job?.status, job?.type]);
 
-  // Recarrega histórico quando job termina
-  useEffect(() => {
-    if (job?.status === "done" || job?.status === "error") {
-      loadHistory(1);
-    }
-  }, [job?.status]);
-
-  // Carrega histórico inicial
-  useEffect(() => { loadHistory(1); }, []);
-
-  async function loadHistory(page) {
+  async function loadHistory(type, page) {
     try {
-      const r = await api.getJobHistory(page);
-      setHistory(r.items);
-      setHistoryMeta({ total: r.total, pages: r.pages });
-      setHistoryPage(page);
+      const r = await api.getJobHistory(page, type);
+      if (type === "optimizer") {
+        setOptimizerHistory(r.items);
+        setOptimizerHistoryMeta({ total: r.total, pages: r.pages });
+        setOptimizerHistoryPage(page);
+      } else {
+        setBacktestHistory(r.items);
+        setBacktestHistoryMeta({ total: r.total, pages: r.pages });
+        setBacktestHistoryPage(page);
+      }
     } catch {}
   }
+
+  useEffect(() => {
+    if (job?.status === "done" || job?.status === "error") {
+      if (job.type === "optimizer") {
+        loadHistory("optimizer", 1);
+      } else if (job.type === "backtest") {
+        loadHistory("backtest", 1);
+      }
+    }
+  }, [job?.status, job?.type]);
+
+  useEffect(() => {
+    loadHistory("optimizer", 1);
+    loadHistory("backtest", 1);
+  }, []);
 
   function showToast(msg) {
     setToast(msg);
@@ -86,17 +125,26 @@ export function Tools() {
   }
 
   async function handleRun(type) {
-    if (runnerRunning) { showToast("Pare o bot antes de rodar o optimizer ou backtest."); return; }
+    if (runnerRunning) {
+      showToast("Pare o bot antes de rodar o optimizer ou backtest.");
+      return;
+    }
+
     setActionError(null);
     setApplyResult(null);
     setProgress(null);
+
     try {
-      if (type === "optimizer") await api.runOptimizer(optimizerDays);
-      else await api.runBacktest();
+      if (type === "optimizer") {
+        await api.runOptimizer(optimizerDays);
+      } else {
+        await api.runBacktest();
+      }
       setJob(await api.getJobStatus());
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Falha ao iniciar.");
-    }  }
+    }
+  }
 
   async function handleApplyClick() {
     try {
@@ -119,7 +167,8 @@ export function Tools() {
   }
 
   const isRunningJob = job?.status === "running";
-  const lastHistory = history[0];
+  const lastOptimizerHistory = optimizerHistory[0];
+  const lastBacktestHistory = backtestHistory[0];
 
   return (
     <div className="settings">
@@ -133,8 +182,6 @@ export function Tools() {
       {toast && <div className="tools-toast">{toast}</div>}
 
       <div className="settings__grid">
-
-        {/* AVISO RUNNER RODANDO */}
         {runnerRunning && !isRunningJob && (
           <div className="dashboard__span-2">
             <div className="tools-warning-bar">
@@ -143,7 +190,6 @@ export function Tools() {
           </div>
         )}
 
-        {/* OPTIMIZER */}
         <Panel eyebrow="Calibração automática" title="Optimizer">
           <p className="settings__intro">
             Baixa dados reais da Binance, testa 24 combinações de TP/SL/trailing
@@ -158,19 +204,31 @@ export function Tools() {
                 className={`days-btn ${optimizerDays === d ? "days-btn--active" : ""}`}
                 onClick={() => setOptimizerDays(d)}
                 disabled={isRunningJob}
-                title={optimizerEst[d] ? formatElapsed(optimizerEst[d]) : "Sem histórico"}
+                title={optimizerEst[d]?.estimate_seconds ? formatElapsed(optimizerEst[d].estimate_seconds) : "Sem histórico"}
               >
                 {d} dias
-                {optimizerEst[d] && (
-                  <span className="days-btn__est">~{formatElapsed(optimizerEst[d])}</span>
+                {optimizerEst[d]?.estimate_seconds && (
+                  <span className="days-btn__est">~{formatElapsed(optimizerEst[d].estimate_seconds)}</span>
                 )}
               </button>
             ))}
           </div>
 
-          {lastHistory?.type === "optimizer" && (
+          {estOptimizerSelected?.estimate_seconds != null && (
+            <p className="tool-est-time">
+              Estimativa dinâmica: ~{formatElapsed(estOptimizerSelected.estimate_seconds)}
+            </p>
+          )}
+
+          {estOptimizerSelected && (
+            <p className="tool-est-meta">
+              {estimateDescription(estOptimizerSelected)}
+            </p>
+          )}
+
+          {lastOptimizerHistory && (
             <p className="tool-last-run">
-              Última execução: {formatDate(lastHistory.started_at)} — {formatElapsed(lastHistory.elapsed_seconds)}
+              Última execução: {formatDate(lastOptimizerHistory.started_at)} — {formatElapsed(lastOptimizerHistory.elapsed_seconds)}
             </p>
           )}
 
@@ -183,20 +241,37 @@ export function Tools() {
               {isRunningJob && job?.type === "optimizer" ? "Rodando…" : "▶ Executar Optimizer"}
             </button>
           </div>
+
+          <JobHistoryBlock
+            title="Histórico do optimizer"
+            items={optimizerHistory}
+            meta={optimizerHistoryMeta}
+            page={optimizerHistoryPage}
+            onPrev={() => loadHistory("optimizer", optimizerHistoryPage - 1)}
+            onNext={() => loadHistory("optimizer", optimizerHistoryPage + 1)}
+          />
         </Panel>
 
-        {/* BACKTEST */}
         <Panel eyebrow="Validação histórica" title="Backtest">
           <p className="settings__intro">
             Roda a estratégia atual sobre os datasets históricos e exibe métricas de desempenho.
           </p>
-          {estBacktest && (
-            <p className="tool-est-time">Estimativa baseada em histórico: ~{formatElapsed(estBacktest)}</p>
+
+          {estBacktest?.estimate_seconds != null && (
+            <p className="tool-est-time">
+              Estimativa dinâmica: ~{formatElapsed(estBacktest.estimate_seconds)}
+            </p>
           )}
 
-          {lastHistory?.type === "backtest" && (
+          {estBacktest && (
+            <p className="tool-est-meta">
+              {estimateDescription(estBacktest)}
+            </p>
+          )}
+
+          {lastBacktestHistory && (
             <p className="tool-last-run">
-              Última execução: {formatDate(lastHistory.started_at)} — {formatElapsed(lastHistory.elapsed_seconds)}
+              Última execução: {formatDate(lastBacktestHistory.started_at)} — {formatElapsed(lastBacktestHistory.elapsed_seconds)}
             </p>
           )}
 
@@ -209,16 +284,24 @@ export function Tools() {
               {isRunningJob && job?.type === "backtest" ? "Rodando…" : "▶ Executar Backtest"}
             </button>
           </div>
+
+          <JobHistoryBlock
+            title="Histórico do backtest"
+            items={backtestHistory}
+            meta={backtestHistoryMeta}
+            page={backtestHistoryPage}
+            onPrev={() => loadHistory("backtest", backtestHistoryPage - 1)}
+            onNext={() => loadHistory("backtest", backtestHistoryPage + 1)}
+          />
         </Panel>
 
-        {/* STATUS DO JOB ATUAL */}
         {job && job.status !== "idle" && (
           <div className="dashboard__span-2">
             <Panel eyebrow="Execução atual" title={job.type === "optimizer" ? "Optimizer" : "Backtest"}>
               <JobStatus job={job} progress={progress} />
 
               {job.status === "done" && job.type === "optimizer" && !applyResult && (
-                <div className="form-actions" style={{marginTop:"1rem"}}>
+                <div className="form-actions" style={{ marginTop: "1rem" }}>
                   <button className="button button--primary" onClick={handleApplyClick}>
                     Ver e aplicar melhores configurações
                   </button>
@@ -226,7 +309,7 @@ export function Tools() {
               )}
 
               {applyResult && (
-                <div className="form-message form-message--success" style={{marginTop:"1rem"}}>
+                <div className="form-message form-message--success" style={{ marginTop: "1rem" }}>
                   ✓ Aplicado: TP×{applyResult.config.atr_take_profit_multiplier} SL×{applyResult.config.atr_stop_multiplier} Trailing×{applyResult.config.atr_trailing_multiplier}
                 </div>
               )}
@@ -236,48 +319,26 @@ export function Tools() {
 
         {actionError && (
           <div className="dashboard__span-2">
-            <div className="form-message form-message--error" style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div className="form-message form-message--error" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span>{actionError}</span>
               {actionError.includes("job em execução") && (
-                <button className="button button--ghost" style={{fontSize:"0.75rem",padding:"2px 8px"}}
-                  onClick={async () => { try { await api.resetJob(); setActionError(null); setJob(await api.getJobStatus()); } catch {} }}>
+                <button
+                  className="button button--ghost"
+                  style={{ fontSize: "0.75rem", padding: "2px 8px" }}
+                  onClick={async () => {
+                    try {
+                      await api.resetJob();
+                      setActionError(null);
+                      setJob(await api.getJobStatus());
+                    } catch {}
+                  }}
+                >
                   Forçar reset
                 </button>
               )}
             </div>
           </div>
         )}
-
-        {/* HISTÓRICO */}
-        {history.length > 0 && (
-          <div className="dashboard__span-2">
-            <Panel eyebrow="Execuções anteriores" title="Histórico">
-              <div className="job-history">
-                {history.map((item, i) => (
-                  <HistoryItem key={i} item={item} />
-                ))}
-              </div>
-              {historyMeta.pages > 1 && (
-                <div className="job-history__pagination">
-                  <button
-                    className="button button--ghost"
-                    disabled={historyPage <= 1}
-                    onClick={() => loadHistory(historyPage - 1)}
-                  >← Anterior</button>
-                  <span className="job-history__page">
-                    {historyPage} / {historyMeta.pages}
-                  </span>
-                  <button
-                    className="button button--ghost"
-                    disabled={historyPage >= historyMeta.pages}
-                    onClick={() => loadHistory(historyPage + 1)}
-                  >Próximo →</button>
-                </div>
-              )}
-            </Panel>
-          </div>
-        )}
-
       </div>
 
       {showApplyModal && applyPreview && (
@@ -286,6 +347,40 @@ export function Tools() {
           onConfirm={handleApplyConfirm}
           onCancel={() => setShowApplyModal(false)}
         />
+      )}
+    </div>
+  );
+}
+
+// =====================================================
+// BLOCO DE HISTÓRICO
+// =====================================================
+
+function JobHistoryBlock({ title, items, meta, page, onPrev, onNext }) {
+  if (!items || items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div style={{ marginTop: "1rem" }}>
+      <p className="tool-last-run">{title}</p>
+      <div className="job-history">
+        {items.map((item, i) => (
+          <HistoryItem key={i} item={item} />
+        ))}
+      </div>
+      {meta.pages > 1 && (
+        <div className="job-history__pagination">
+          <button className="button button--ghost" disabled={page <= 1} onClick={onPrev}>
+            ← Anterior
+          </button>
+          <span className="job-history__page">
+            {page} / {meta.pages}
+          </span>
+          <button className="button button--ghost" disabled={page >= meta.pages} onClick={onNext}>
+            Próximo →
+          </button>
+        </div>
       )}
     </div>
   );
@@ -355,14 +450,18 @@ function ApplyPreviewModal({ preview, onConfirm, onCancel }) {
 
         <div className="apply-preview">
           {["atr_take_profit_multiplier", "atr_stop_multiplier", "atr_trailing_multiplier"].map(k => {
-            const label = { atr_take_profit_multiplier: "Take Profit ×", atr_stop_multiplier: "Stop Loss ×", atr_trailing_multiplier: "Trailing ×" }[k];
+            const label = {
+              atr_take_profit_multiplier: "Take Profit ×",
+              atr_stop_multiplier: "Stop Loss ×",
+              atr_trailing_multiplier: "Trailing ×",
+            }[k];
             const isChanged = current[k] !== next[k];
             return (
               <div key={k} className={`apply-preview__row ${isChanged ? "apply-preview__row--changed" : ""}`}>
                 <span className="apply-preview__label">{label}</span>
                 <span className="apply-preview__from">{current[k]}</span>
                 <span className="apply-preview__arrow">{isChanged ? "→" : "="}</span>
-                <span className="apply-preview__to" style={{color: isChanged ? "var(--signal-positive)" : "var(--text-muted)"}}>{next[k]}</span>
+                <span className="apply-preview__to" style={{ color: isChanged ? "var(--signal-positive)" : "var(--text-muted)" }}>{next[k]}</span>
               </div>
             );
           })}
@@ -436,8 +535,8 @@ function ResultTable({ job }) {
       <div className="result-table">
         <p className="result-table__title">Melhor combinação</p>
         <div className="result-table__grid">
-          {[["Take Profit ×", p.atr_take_profit_multiplier], ["Stop Loss ×", p.atr_stop_multiplier], ["Trailing ×", p.atr_trailing_multiplier], ["Score", best.score?.toFixed(2)], ["Win Rate", `${((m.winrate||0)*100).toFixed(1)}%`], ["PnL", m.pnl?.toFixed(2)], ["Profit Factor", m.profit_factor?.toFixed(2)], ["Trades", m.total_trades]].map(([l, v]) => (
-            <><span key={l+"l"} className="result-table__label">{l}</span><span key={l+"v"} className="result-table__value">{v ?? "—"}</span></>
+          {[["Take Profit ×", p.atr_take_profit_multiplier], ["Stop Loss ×", p.atr_stop_multiplier], ["Trailing ×", p.atr_trailing_multiplier], ["Score", best.score?.toFixed(2)], ["Win Rate", `${((m.winrate || 0) * 100).toFixed(1)}%`], ["PnL", m.pnl?.toFixed(2)], ["Profit Factor", m.profit_factor?.toFixed(2)], ["Trades", m.total_trades]].map(([l, v]) => (
+            <><span key={l + "l"} className="result-table__label">{l}</span><span key={l + "v"} className="result-table__value">{v ?? "—"}</span></>
           ))}
         </div>
       </div>
@@ -448,8 +547,8 @@ function ResultTable({ job }) {
       <div className="result-table">
         <p className="result-table__title">Resultado do backtest</p>
         <div className="result-table__grid">
-          {[["Total trades", r.total_trades], ["Win Rate", `${((r.winrate||0)*100).toFixed(1)}%`], ["PnL", r.pnl?.toFixed(2)], ["Profit Factor", r.profit_factor?.toFixed(2)], ["Max Drawdown", r.max_drawdown?.toFixed(2)], ["Expectancy", r.expectancy?.toFixed(2)], ["Risco/Retorno", r.risk_reward?.toFixed(2)], ["Sharpe", r.sharpe_ratio?.toFixed(2)]].map(([l, v]) => (
-            <><span key={l+"l"} className="result-table__label">{l}</span><span key={l+"v"} className="result-table__value">{v ?? "—"}</span></>
+          {[["Total trades", r.total_trades], ["Win Rate", `${((r.winrate || 0) * 100).toFixed(1)}%`], ["PnL", r.pnl?.toFixed(2)], ["Profit Factor", r.profit_factor?.toFixed(2)], ["Max Drawdown", r.max_drawdown?.toFixed(2)], ["Expectancy", r.expectancy?.toFixed(2)], ["Risco/Retorno", r.risk_reward?.toFixed(2)], ["Sharpe", r.sharpe_ratio?.toFixed(2)]].map(([l, v]) => (
+            <><span key={l + "l"} className="result-table__label">{l}</span><span key={l + "v"} className="result-table__value">{v ?? "—"}</span></>
           ))}
         </div>
       </div>
@@ -462,6 +561,18 @@ function ResultTable({ job }) {
 // HELPERS
 // =====================================================
 
+function estimateDescription(estimate) {
+  if (!estimate?.profile || !estimate?.hardware) {
+    return "";
+  }
+
+  const { profile, hardware, basis } = estimate;
+  const source = basis === "history" ? "baseada em histórico" : "heurística";
+  const memory = Number(hardware.memory_gb || 0).toFixed(1);
+
+  return `${source} · ${profile.symbol_count} pares · ${profile.candles_per_symbol} candles/pare · ${profile.combination_count} combinações · ${hardware.cpu_count} CPUs · ${memory} GB RAM`;
+}
+
 function formatElapsed(seconds) {
   if (!seconds && seconds !== 0) return "—";
   if (seconds < 60) return `${seconds}s`;
@@ -473,7 +584,10 @@ function formatElapsed(seconds) {
 function formatDate(ts) {
   if (!ts) return "—";
   return new Date(ts * 1000).toLocaleString("pt-BR", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit"
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
   });
 }

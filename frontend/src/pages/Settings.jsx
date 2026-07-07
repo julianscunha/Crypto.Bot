@@ -268,6 +268,10 @@ const GROUPS = [
 
 export function Settings() {
   const { data: settings, error, isLoading, refresh } = usePolling(api.getSettings, 15000);
+  const handleSaved = () => {
+    refresh();
+    window.dispatchEvent(new Event("crypto-bot-settings-updated"));
+  };
 
   return (
     <div className="settings">
@@ -289,10 +293,10 @@ export function Settings() {
 
       {settings && (
         <div className="settings__grid">
-          <ModePanel settings={settings} onSaved={refresh} />
-          <CredentialsPanel settings={settings} onSaved={refresh} />
-          <PairsPanel settings={settings} onSaved={refresh} />
-          <AllParamsForm settings={settings} onSaved={refresh} />
+          <ModePanel settings={settings} onSaved={handleSaved} />
+          <CredentialsPanel settings={settings} onSaved={handleSaved} />
+          <PairsPanel settings={settings} onSaved={handleSaved} />
+          <AllParamsForm settings={settings} onSaved={handleSaved} />
         </div>
       )}
     </div>
@@ -473,17 +477,19 @@ function CredentialsPanel({ settings, onSaved }) {
   const [saveError, setSaveError] = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [liveBalance, setLiveBalance] = useState(null);
+  const [liveBalanceSource, setLiveBalanceSource] = useState(null);
   const [liveBalanceError, setLiveBalanceError] = useState(null);
 
   const isLive = settings.mode === "live";
 
   // Busca saldo real da Binance quando em LIVE
   useEffect(() => {
-    if (!isLive) { setLiveBalance(null); setLiveBalanceError(null); return; }
+    if (!isLive) { setLiveBalance(null); setLiveBalanceSource(null); setLiveBalanceError(null); return; }
     async function fetchLive() {
       try {
         const r = await api.getLiveBalance();
         setLiveBalance(r.balance);
+        setLiveBalanceSource(r.source);
         setLiveBalanceError(r.error);
       } catch {
         setLiveBalanceError("Erro ao buscar saldo.");
@@ -589,7 +595,13 @@ function CredentialsPanel({ settings, onSaved }) {
               <div className="balance-auto-info__item">
                 <span className="balance-auto-info__label">Fonte</span>
                 <span className="balance-auto-info__value">
-                  {isLive ? "Binance API" : "Configuração manual"}
+                  {isLive
+                    ? liveBalanceSource === "binance_testnet"
+                      ? "Binance Testnet"
+                      : liveBalanceSource === "binance_mainnet"
+                        ? "Binance Mainnet"
+                        : "Binance API"
+                    : "Configuração manual"}
                 </span>
               </div>
               <div className="balance-auto-info__item">

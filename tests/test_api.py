@@ -6,11 +6,14 @@ Tests for the FastAPI app in apps/api/main.py
 
 import pytest
 
-from unittest.mock import patch
+import json
+
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
 from apps.api.main import app, DEFAULT_USER_ID
+import apps.api.main as api_main
 
 from data.storage.repositories.trades_repository import (
     trades_repository
@@ -848,3 +851,168 @@ class TestCors:
             )
             == "http://localhost:5173"
         )
+
+
+class TestJobHistoryAndEstimate:
+
+    def test_history_can_be_filtered_by_job_type(self, client, tmp_path, monkeypatch):
+
+        history_file = tmp_path / "jobs_history.json"
+        history_file.write_text(
+            json.dumps([
+                {
+                    "type": "optimizer",
+                    "status": "done",
+                    "started_at": 10,
+                    "elapsed_seconds": 100,
+                },
+                {
+                    "type": "backtest",
+                    "status": "done",
+                    "started_at": 20,
+                    "elapsed_seconds": 80,
+                },
+            ]),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(api_main, "_HISTORY_FILE", history_file)
+
+        response = client.get("/jobs/history?jtype=optimizer&page=1")
+
+        assert response.status_code == 200
+        body = response.json()
+
+        assert body["total"] == 1
+        assert len(body["items"]) == 1
+        assert body["items"][0]["type"] == "optimizer"
+
+    def test_estimate_returns_resource_snapshot(self, client):
+
+        response = client.get("/jobs/estimate?jtype=backtest")
+
+        assert response.status_code == 200
+        body = response.json()
+
+        assert "estimate_seconds" in body
+        assert "profile" in body
+        assert "hardware" in body
+
+
+class TestLiveBalance:
+
+    def test_returns_paper_when_mode_is_not_live(self, client):
+
+        with patch("apps.api.main.settings_repository.get_settings", return_value={"mode": "paper"}):
+            response = client.get("/account/live-balance")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "balance": None,
+            "source": "paper",
+            "error": None,
+        }
+
+    def test_uses_testnet_credentials_when_testnet_is_enabled(self, client):
+
+        fake_client = AsyncMock()
+        fake_client.get_account_info.return_value = {
+            "balances": [
+                {"asset": "USDT", "free": "123.45"},
+                {"asset": "BTC", "free": "0.1"},
+            ]
+        }
+
+        with patch("apps.api.main.settings_repository.get_settings", return_value={"mode": "live"}):
+            with patch("core.config.settings_repository._read_raw_lines", return_value=[]):
+                with patch(
+                    "core.config.settings_repository._parse_current_values",
+                    return_value={
+                        "BINANCE_API_KEY": "key",
+                        "BINANCE_SECRET_KEY": "secret",
+                        "BINANCE_TESTNET": "true",
+                        "LIVE_TRADING_CONFIRMED": "false",
+                    },
+                ):
+                    with patch("core.services.binance_trading_client.BinanceTradingClient", return_value=fake_client) as mock_client:
+                        response = client.get("/account/live-balance")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["balance"] == 123.45
+        assert body["source"] == "binance_testnet"
+        assert body["error"] is None
+        mock_client.assert_called_once()
+        assert mock_client.call_args.kwargs["testnet"] is True
+        assert mock_client.call_args.kwargs["live_trading_confirmed"] is False
+
+    def test_uses_mainnet_credentials_when_testnet_is_disabled(self, client):
+
+        fake_client = AsyncMock()
+        fake_client.get_account_info.return_value = {
+            "balances": [
+                {"asset": "USDT", "free": "50.00"},
+            ]
+        }
+
+        with patch("apps.api.main.settings_repository.get_settings", return_value={"mode": "live"}):
+            with patch("core.config.settings_repository._read_raw_lines", return_value=[]):
+                with patch(
+                    "core.config.settings_repository._parse_current_values",
+                    return_value={
+                        "BINANCE_API_KEY": "key",
+                        "BINANCE_SECRET_KEY": "secret",
+                        "BINANCE_TESTNET": "false",
+                        "LIVE_TRADING_CONFIRMED": "true",
+                    },
+                ):
+                    with patch("core.services.binance_trading_client.BinanceTradingClient", return_value=fake_client) as mock_client:
+                        response = client.get("/account/live-balance")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["balance"] == 50.0
+        assert body["source"] == "binance_mainnet"
+        assert body["error"] is None
+        mock_client.assert_called_once()
+        assert mock_client.call_args.kwargs["testnet"] is False
+        assert mock_client.call_args.kwargs["live_trading_confirmed"] is True
+
+
+class TestRunnerStartBalanceValidation:
+
+    def test_runner_start_blocks_when_balance_is_insufficient(self, client):
+
+        with patch(
+            "apps.api.main.build_startup_balance_report",
+            return_value={
+                "allowed": False,
+                "reason": "Saldo insuficiente",
+            }
+        ):
+            response = client.post("/runner/start")
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Saldo insuficiente"
+
+    def test_runner_start_check_returns_report(self, client):
+
+        with patch(
+            "apps.api.main.build_startup_balance_report",
+            return_value={
+                "allowed": True,
+                "current_balance": 100.0,
+                "required_balance_single_trade": 42.0,
+                "required_balance_max_positions": 84.0,
+                "shortfall": 0.0,
+                "source": "paper",
+                "symbols": [],
+                "reason": None,
+            }
+        ):
+            response = client.get("/runner/start-check")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["allowed"] is True
+        assert body["required_balance_single_trade"] == 42.0

@@ -497,6 +497,13 @@ async def runner_stop():
             )
         )
 
+    balance_report = await build_startup_balance_report()
+    if not balance_report["allowed"]:
+        raise HTTPException(
+            status_code=409,
+            detail=balance_report["reason"] or "Saldo insuficiente para iniciar o bot."
+        )
+
     try:
 
         stop_runner()
@@ -546,6 +553,11 @@ async def runner_start():
     return {"started": True, "pid": process.pid}
 
 
+@app.get("/runner/start-check")
+async def runner_start_check():
+    return await build_startup_balance_report()
+
+
 # =====================================================
 # OPTIMIZER & BACKTEST JOBS
 # =====================================================
@@ -558,6 +570,16 @@ import subprocess as _subprocess
 import threading as _threading
 import json as _json
 import time as _time
+
+from core.services.job_estimation_service import (
+    estimate_job_duration_seconds,
+    build_job_profile,
+    get_system_profile,
+    parse_days_from_extra_args,
+)
+from core.services.startup_balance_service import (
+    build_startup_balance_report
+)
 
 _job_lock = _threading.Lock()
 
@@ -605,6 +627,18 @@ def _save_history(entry: dict):
         pass
 
 
+def _build_history_workload(job_type: str, extra_args: list | None = None) -> dict:
+    days = parse_days_from_extra_args(extra_args) if job_type == "optimizer" else 90
+
+    return build_job_profile(
+        job_type=job_type,
+        days=days,
+        symbols=settings.SYMBOLS,
+        interval=settings.KLINE_INTERVAL,
+        minimum_rr=settings.MINIMUM_RISK_REWARD_RATIO,
+    )
+
+
 def _run_job_subprocess(job_type: str, module: str, extra_args: list = None):
 
     global _current_job
@@ -631,9 +665,14 @@ def _run_job_subprocess(job_type: str, module: str, extra_args: list = None):
 
 def _run_job_subprocess_inner(job_type: str, module: str, extra_args: list = None):
 
+    workload = None
+    hardware = None
+
     try:
 
         cmd = [sys.executable, "-m", module] + (extra_args or [])
+        workload = _build_history_workload(job_type, extra_args)
+        hardware = get_system_profile()
 
         progress_file = (
             Path(PROJECT_ROOT_STR) / "backtest" / "reports" / "progress.json"
@@ -687,6 +726,8 @@ def _run_job_subprocess_inner(job_type: str, module: str, extra_args: list = Non
             "finished_at": _current_job["finished_at"],
             "elapsed_seconds": elapsed,
             "extra_args": extra_args or [],
+            "workload": workload,
+            "hardware": hardware,
             "result_summary": _extract_summary(result, job_type),
         })
 
@@ -704,6 +745,8 @@ def _run_job_subprocess_inner(job_type: str, module: str, extra_args: list = Non
             "finished_at": _current_job["finished_at"],
             "elapsed_seconds": round(_time.time() - (_current_job["started_at"] or _time.time())),
             "extra_args": extra_args or [],
+            "workload": workload,
+            "hardware": hardware,
             "error": str(exc)[:200],
         })
 
@@ -797,47 +840,40 @@ async def jobs_estimate(jtype: str = "optimizer", days: int = 90):
     Extrapola proporcionalmente: se 90d levou Xs, 30d leva ~X/3.
     """
     history = _load_history()
-    matches = [
-        h for h in history
-        if h.get("type") == jtype
-        and h.get("status") == "done"
-        and h.get("elapsed_seconds")
-    ]
 
-    if not matches:
-        return {"estimate_seconds": None, "based_on": None}
-
-    if jtype == "optimizer":
-        # Encontrar execução com mesmo número de dias para referência
-        same_days = [
-            h for h in matches
-            if "--days" in (h.get("extra_args") or [])
-            and str(days) in (h.get("extra_args") or [])
-        ]
-        if same_days:
-            ref = same_days[0]
-            estimate = ref["elapsed_seconds"]
-            ref_days = days
-        else:
-            # Extrapolar de outra execução proporcional
-            ref = matches[0]
-            ref_args = ref.get("extra_args") or []
-            ref_days = int(ref_args[ref_args.index("--days") + 1]) if "--days" in ref_args else 90
-            estimate = round(ref["elapsed_seconds"] * days / ref_days)
-            ref_days = days
-    else:
-        estimate = matches[0]["elapsed_seconds"]
-        ref_days = None
+    estimate = estimate_job_duration_seconds(
+        job_type=jtype,
+        days=days,
+        symbols=settings.SYMBOLS,
+        interval=settings.KLINE_INTERVAL,
+        minimum_rr=settings.MINIMUM_RISK_REWARD_RATIO,
+        history=history,
+    )
 
     return {
-        "estimate_seconds": estimate,
-        "based_on": matches[0].get("started_at"),
+        **estimate,
+        "based_on": next(
+            (
+                h.get("started_at")
+                for h in history
+                if h.get("type") == jtype
+                and h.get("status") == "done"
+            ),
+            None
+        ),
     }
 
 
 @app.get("/jobs/history")
-async def jobs_history(page: int = 1):
+async def jobs_history(page: int = 1, jtype: str = "all"):
     history = _load_history()
+
+    if jtype in ("optimizer", "backtest"):
+        history = [
+            item for item in history
+            if item.get("type") == jtype
+        ]
+
     per_page = MAX_HISTORY
     total = len(history)
     start = (page - 1) * per_page
@@ -974,6 +1010,7 @@ async def account_live_balance():
         )
 
         account = await client.get_account_info()
+        source = "binance_testnet" if testnet else "binance_mainnet"
 
         usdt = next(
             (float(b["free"]) for b in account.get("balances", []) if b["asset"] == "USDT"),
@@ -982,7 +1019,7 @@ async def account_live_balance():
 
         return {
             "balance": round(usdt, 2) if usdt is not None else None,
-            "source": "binance",
+            "source": source,
             "error": None
         }
 

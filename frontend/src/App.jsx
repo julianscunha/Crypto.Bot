@@ -34,6 +34,7 @@ export default function App() {
   const [isTogglingRunner, setIsTogglingRunner] = useState(false);
   const [runnerError, setRunnerError] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
+  const { data: startupCheck, refresh: refreshStartupCheck } = usePolling(api.getRunnerStartCheck, 30000);
 
   useEffect(() => {
     async function pollJob() {
@@ -43,6 +44,15 @@ export default function App() {
     const i = setInterval(pollJob, 5000);
     return () => clearInterval(i);
   }, []);
+
+  useEffect(() => {
+    function handleSettingsUpdated() {
+      refreshStartupCheck();
+    }
+
+    window.addEventListener("crypto-bot-settings-updated", handleSettingsUpdated);
+    return () => window.removeEventListener("crypto-bot-settings-updated", handleSettingsUpdated);
+  }, [refreshStartupCheck]);
 
   const jobRunning = jobStatus === "running";
 
@@ -86,6 +96,7 @@ export default function App() {
         await api.startRunner();
       }
       setTimeout(() => refreshRunner(), 1500);
+      refreshStartupCheck();
     } catch (err) {
       setRunnerError(err instanceof ApiError ? err.message : "Falha ao alterar estado do bot.");
     } finally {
@@ -145,6 +156,26 @@ export default function App() {
 
           {runnerError && (
             <div className="runner-error">{runnerError}</div>
+          )}
+
+          {!isRunning && startupCheck && (
+            <div className={`runner-startup-check ${startupCheck.allowed ? "runner-startup-check--ok" : "runner-startup-check--warn"}`}>
+              <div className="runner-startup-check__row">
+                <span className="runner-startup-check__label">Saldo mínimo estimado</span>
+                <span className="runner-startup-check__value">
+                  ${startupCheck.required_balance_single_trade?.toFixed?.(2) ?? startupCheck.required_balance_single_trade}
+                </span>
+              </div>
+              <div className="runner-startup-check__row">
+                <span className="runner-startup-check__label">Saldo atual</span>
+                <span className="runner-startup-check__value">
+                  ${startupCheck.current_balance?.toFixed?.(2) ?? startupCheck.current_balance}
+                </span>
+              </div>
+              {startupCheck.reason && (
+                <div className="runner-startup-check__reason">{startupCheck.reason}</div>
+              )}
+            </div>
           )}
 
           {/* Status badge */}

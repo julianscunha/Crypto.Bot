@@ -519,6 +519,18 @@ class BinanceTradingClient:
 
         return filters
 
+    async def get_symbol_price(
+        self,
+        symbol: str
+    ):
+
+        return await self._request(
+            "GET",
+            "/api/v3/ticker/price",
+            {"symbol": symbol},
+            signed=False
+        )
+
     async def get_open_orders(
         self,
         symbol: str | None = None

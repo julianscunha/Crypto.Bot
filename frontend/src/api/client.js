@@ -20,7 +20,7 @@ async function request(path, options = {}) {
       },
       ...options,
     });
-  } catch (_networkError) {
+  } catch {
     throw new ApiError(
       "Could not reach the API. Is it running?",
       0,
@@ -58,18 +58,32 @@ export const api = {
   getClosedTrades: () => request("/trades/closed"),
   getHealth: () => request("/health"),
   getSettings: () => request("/settings"),
+  getJobStatus: () => request("/jobs/status"),
   updateSettings: (payload) =>
     request("/settings", {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
   getRunnerStatus: () => request("/runner/status"),
+  getRunnerStartCheck: () => request("/runner/start-check"),
   stopRunner: () => request("/runner/stop", { method: "POST" }),
   startRunner: () => request("/runner/start", { method: "POST" }),
   getLiveBalance: () => request("/account/live-balance"),
   getJobProgress: () => request("/jobs/progress"),
-  getJobHistory: (page = 1) => request(`/jobs/history?page=${page}`),
-  getJobEstimate: (job_type, days) => request(`/jobs/estimate?jtype=${job_type}&days=${days ?? ""}`),
+  getJobHistory: (page = 1, jobType = "all") => {
+    const query = new URLSearchParams({ page: String(page) });
+    if (jobType && jobType !== "all") {
+      query.set("jtype", jobType);
+    }
+    return request(`/jobs/history?${query.toString()}`);
+  },
+  getJobEstimate: (job_type, days) => {
+    const query = new URLSearchParams({ jtype: job_type });
+    if (days != null) {
+      query.set("days", String(days));
+    }
+    return request(`/jobs/estimate?${query.toString()}`);
+  },
   previewApply: () => request("/jobs/preview-apply"),
   resetJob: () => request("/jobs/reset", { method: "POST" }),
   runOptimizer: (days = 90) => request(`/jobs/optimizer?days=${days}`, { method: "POST" }),

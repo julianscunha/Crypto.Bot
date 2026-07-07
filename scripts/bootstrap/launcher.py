@@ -3,6 +3,7 @@
 import subprocess
 import sys
 import shutil
+import os
 
 from pathlib import Path
 
@@ -102,11 +103,31 @@ def terminate_process(
 
     try:
 
-        process.terminate()
+        if os.name == "nt":
 
-        process.wait(
-            timeout=5
-        )
+            subprocess.run(
+                [
+                    "taskkill",
+                    "/F",
+                    "/T",
+                    "/PID",
+                    str(process.pid)
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            process.wait(
+                timeout=5
+            )
+
+        else:
+
+            process.terminate()
+
+            process.wait(
+                timeout=5
+            )
 
     except Exception:
 

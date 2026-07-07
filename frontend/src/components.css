@@ -1189,6 +1189,13 @@ select.input {
   margin: 0.25rem 0 0.75rem;
 }
 
+.tool-est-meta {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin: -0.45rem 0 0.75rem;
+  opacity: 0.9;
+}
+
 .days-btn__est {
   display: block;
   font-size: 0.62rem;
@@ -1261,6 +1268,51 @@ select.input {
 .job-history__page {
   color: var(--text-muted);
   font-family: var(--font-mono);
+}
+
+/* =====================================================
+   STARTUP BALANCE CHECK
+   ===================================================== */
+
+.runner-startup-check {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.runner-startup-check--ok {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--signal-positive) 18%, transparent);
+}
+
+.runner-startup-check--warn {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--signal-negative) 18%, transparent);
+}
+
+.runner-startup-check__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.74rem;
+}
+
+.runner-startup-check__label {
+  color: var(--text-muted);
+}
+
+.runner-startup-check__value {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.runner-startup-check__reason {
+  color: var(--signal-negative);
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
 /* =====================================================

@@ -38,6 +38,8 @@ particular checkout happens to have a real frontend/ directory.
 
 import pytest
 
+import subprocess
+
 from unittest.mock import MagicMock, patch
 
 from scripts.bootstrap.launcher import (
@@ -45,6 +47,7 @@ from scripts.bootstrap.launcher import (
     frontend_dependencies_installed,
     install_frontend_dependencies,
     resolve_npm_command,
+    terminate_process,
     start_frontend,
     start_fullstack
 )
@@ -96,6 +99,35 @@ class TestFrontendAvailable:
     ):
 
         assert frontend_available() is True
+
+
+class TestTerminateProcess:
+
+    def test_windows_uses_taskkill_tree_for_full_shutdown(
+        self
+    ):
+
+        proc = MagicMock()
+        proc.pid = 1234
+
+        with patch("scripts.bootstrap.launcher.os.name", "nt"):
+            with patch("scripts.bootstrap.launcher.subprocess.run") as mock_run:
+                terminate_process(proc)
+
+        mock_run.assert_called_once()
+        args, kwargs = mock_run.call_args
+
+        assert args[0] == [
+            "taskkill",
+            "/F",
+            "/T",
+            "/PID",
+            "1234"
+        ]
+        assert kwargs["stdout"] is subprocess.DEVNULL
+        assert kwargs["stderr"] is subprocess.DEVNULL
+        proc.wait.assert_called_once_with(timeout=5)
+        proc.terminate.assert_not_called()
 
 
 class TestResolveNpmCommand:
