@@ -781,6 +781,73 @@ bloqueio duro, não um aviso; a pessoa precisa fechar a posição
 primeiro. Atualizações que não tocam em `mode` nunca são bloqueadas
 por essa verificação, mesmo com uma posição aberta.
 
+### Reconciliação de startup (`core/services/startup_reconciler.py`)
+
+Antes do Runner começar a operar em `MODE=live`
+(`apps/trader/runner.py`, chamado logo depois de carregar os filtros
+de símbolo), o estado real da Binance é comparado com o banco local.
+Três cenários são cobertos:
+
+1. **Trade `OPEN` no banco, OCO já `ALL_DONE` na Binance.** A posição
+   fechou enquanto o bot estava offline — marcada como `CLOSED` com
+   `exit_reason=RECONCILED_CLOSED`.
+2. **Trade `OPEN` no banco, mas a Binance confirma que a OCO não
+   existe** (código `-2013`, "Order does not exist"). Só nesse caso —
+   erro específico, não qualquer exceção — é seguro assumir que a
+   posição ficou desprotegida: um market SELL de emergência é
+   disparado e o trade é fechado com
+   `exit_reason=RECONCILED_EMERGENCY_CLOSE`. Qualquer outro erro
+   (rede, timeout, auth) só loga `CRITICAL` — o estado real é
+   desconhecido, e fechar automaticamente nesse caso arrisca cancelar
+   uma proteção que na verdade ainda existe.
+3. **Ordem/OCO aberta na Binance sem nenhum trade `OPEN`
+   correspondente no banco local** (posição aberta fora do bot, ou
+   banco apagado/perdido). Loga `CRITICAL` por símbolo configurado —
+   nunca cancela nem fecha nada automaticamente, já que agir sobre um
+   estado desconhecido é mais arriscado que alertar o operador.
+
+Trades sem `order_list_id` (criados antes do rastreamento de ordens
+existir) não podem ser verificados contra a Binance e também logam
+`CRITICAL`. Todo ponto `CRITICAL` aqui é o gancho para o alerta
+externo via webhook (`WEBHOOK_ALERT_URL`, roadmap da Fase 2) — por
+ora, esses pontos só logam localmente em `logs/errors.log`.
+
+Coberto por `tests/test_startup_reconciler.py` com mocks (sem acesso
+de rede real neste ambiente de dev — confirmado em
+`tests/test_binance_trading_client.py`).
+
+#### Checklist de validação manual contra a Binance Testnet
+
+A suíte de testes só cobre respostas mockadas. Antes de confiar nessa
+reconciliação com dinheiro real, valide manualmente contra a Testnet
+(`BINANCE_TESTNET=true`, chaves de API da própria Testnet, nunca de
+mainnet):
+
+1. **Cenário 1 (OCO já resolvida).** Abra uma posição pelo Runner em
+   `MODE=live` + testnet, deixe a OCO ser preenchida manualmente pela
+   UI da Testnet (ou aguarde o preço cruzar o take profit/stop loss),
+   pare o Runner, reinicie-o e confirme no console/`logs/runtime.log`
+   a mensagem `OCO já resolvida — marcando como fechada` e que o
+   trade aparece `CLOSED` com `RECONCILED_CLOSED` no banco.
+2. **Cenário 2 (OCO sumiu).** Abra uma posição, pare o Runner, cancele
+   manualmente a OCO pela UI/API da Testnet, reinicie o Runner e
+   confirme a mensagem de fechamento de emergência e que uma ordem
+   MARKET SELL real aparece no histórico da Testnet.
+3. **Cenário 2 — erro genérico.** Repita o passo anterior mas, antes
+   de reiniciar o Runner, derrube a conectividade de rede
+   momentaneamente (ou use uma API key temporariamente inválida) para
+   forçar um erro diferente de `-2013` na consulta — confirme que o
+   log mostra `CRITICAL`/"estado real desconhecido" e que **nenhuma**
+   ordem de venda é disparada.
+4. **Cenário 3 (ordem órfã).** Com o Runner parado e sem nenhum trade
+   `OPEN` no banco, abra uma ordem/OCO manualmente pela UI da Testnet
+   para um dos símbolos configurados em `SYMBOLS`, inicie o Runner e
+   confirme a mensagem `CRITICAL` de ordem órfã no log, e que nenhuma
+   ordem foi cancelada.
+5. Em todos os casos, confirme que o Runner segue operando
+   normalmente depois da reconciliação (nenhuma exceção não tratada
+   interrompe o startup).
+
 ### O bug do processo zumbi (encontrado e corrigido durante a construção disso)
 
 Confirmado empiricamente: quando o processo da API inicia o Runner

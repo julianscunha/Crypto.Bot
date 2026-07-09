@@ -162,6 +162,9 @@ LOG_COLORS = {
     "ERROR":
         Fore.RED,
 
+    "CRITICAL":
+        Fore.MAGENTA,
+
     "DEBUG":
         Fore.LIGHTBLACK_EX
 }
@@ -368,7 +371,10 @@ def log(
         log_line
     )
 
-    if level == "ERROR":
+    if level in (
+        "ERROR",
+        "CRITICAL"
+    ):
 
         error_logger.error(
             log_line

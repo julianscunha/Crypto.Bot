@@ -513,7 +513,7 @@ async def main():
             # Reconciliar estado da exchange com banco local
             from core.services.startup_reconciler import reconcile_on_startup
 
-            await reconcile_on_startup(client)
+            await reconcile_on_startup(client, symbols=settings.SYMBOLS)
 
         except Exception as error:
 

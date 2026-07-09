@@ -11,23 +11,42 @@ Cenários cobertos:
    com reason=RECONCILED_CLOSED.
 
 2. Posição OPEN no banco, sem nenhuma ordem aberta na Binance
-   (OCO sumiu ou nunca existiu)
+   (a Binance confirma explicitamente que a OCO não existe — código
+   -2013 "Order does not exist")
    → Emergência: tenta colocar market sell imediatamente, depois
-   marca como fechada.
+   marca como fechada. Qualquer outro erro (rede, auth, timeout) NÃO
+   aciona esse fechamento automático — o estado real é desconhecido,
+   e agir às cegas é mais arriscado que alertar o operador.
 
 3. Nenhuma posição OPEN no banco, mas há ordens abertas na Binance
-   → Posição foi aberta fora do bot ou banco foi apagado. Loga como
-   WARNING — não cria registro para não distorcer as métricas.
+   → Posição foi aberta fora do bot ou o banco foi apagado/perdido.
+   Loga CRITICAL — não cria registro para não distorcer as métricas,
+   mas não fecha/cancela nada automaticamente (estado desconhecido).
+
+Trades sem `order_list_id` (criados antes do rastreamento de ordens
+existir) não podem ser verificados contra a Binance — também logam
+CRITICAL, já que representam uma posição real potencialmente sem
+proteção que a reconciliação não consegue confirmar.
+
+Todo ponto CRITICAL aqui é um gancho para o alerta externo (webhook)
+que a Fase 2 do roadmap adiciona em core/services/alert_service.py —
+por ora, esses pontos só logam localmente.
 """
 
+from core.services.binance_trading_client import BinanceTradingError
 from core.utils.console_logger import log
 from data.storage.repositories.trades_repository import trades_repository
 
 
 DEFAULT_USER_ID = 0
 
+# Binance error code for "Order does not exist" -- the only case where
+# we can be confident the OCO is genuinely gone rather than the
+# request itself having failed for an unrelated reason.
+ORDER_NOT_FOUND_CODE = -2013
 
-async def reconcile_on_startup(client) -> None:
+
+async def reconcile_on_startup(client, symbols: list[str] | None = None) -> None:
 
     log("SYSTEM", "RECONCILIAÇÃO iniciando…")
 
@@ -37,16 +56,19 @@ async def reconcile_on_startup(client) -> None:
 
     if not open_trades:
         log("SYSTEM", "RECONCILIAÇÃO OK — sem posições abertas no banco")
-        return
 
-    log(
-        "SYSTEM",
-        f"RECONCILIAÇÃO verificando {len(open_trades)} posição(ões) abertas"
-    )
+    else:
 
-    for trade in open_trades:
+        log(
+            "SYSTEM",
+            f"RECONCILIAÇÃO verificando {len(open_trades)} posição(ões) abertas"
+        )
 
-        await _reconcile_trade(client, trade)
+        for trade in open_trades:
+
+            await _reconcile_trade(client, trade)
+
+    await _reconcile_orphan_orders(client, open_trades, symbols)
 
     log("SYSTEM", "RECONCILIAÇÃO concluída")
 
@@ -67,9 +89,10 @@ async def _reconcile_trade(client, trade) -> None:
             "SYSTEM",
             (
                 f"RECONCILIAÇÃO {symbol} id={trade_id}: "
-                "sem order_list_id — verificação manual necessária"
+                "sem order_list_id — posição real sem verificação "
+                "possível contra a Binance — INTERVENÇÃO MANUAL NECESSÁRIA"
             ),
-            "WARNING"
+            "CRITICAL"
         )
         return
 
@@ -124,22 +147,42 @@ async def _reconcile_trade(client, trade) -> None:
                 "WARNING"
             )
 
-    except Exception as error:
+    except BinanceTradingError as error:
 
-        # OCO não encontrada — pode ter sido cancelada externamente
-        # Tenta fechar a posição real com market sell de emergência
+        if error.binance_code == ORDER_NOT_FOUND_CODE:
+
+            # A Binance confirma explicitamente que a OCO não existe
+            # mais — só nesse caso é seguro assumir que a posição
+            # ficou desprotegida e tentar o fechamento de emergência.
+
+            log(
+                "SYSTEM",
+                (
+                    f"RECONCILIAÇÃO {symbol} id={trade_id}: "
+                    f"OCO não encontrada ({error}) — "
+                    "tentando fechar posição com market sell"
+                ),
+                "ERROR"
+            )
+
+            await _emergency_close(client, trade)
+
+            return
+
+        # Qualquer outro erro (rede, auth, timeout, erro inesperado da
+        # Binance) não permite concluir que a OCO sumiu -- o estado
+        # real é desconhecido. Fechar automaticamente aqui poderia
+        # duplicar/cancelar uma proteção que na verdade ainda existe.
 
         log(
             "SYSTEM",
             (
                 f"RECONCILIAÇÃO {symbol} id={trade_id}: "
-                f"OCO não encontrada ({error}) — "
-                "tentando fechar posição com market sell"
+                f"falha ao consultar OCO ({error}) — estado real "
+                "desconhecido — INTERVENÇÃO MANUAL NECESSÁRIA"
             ),
-            "ERROR"
+            "CRITICAL"
         )
-
-        await _emergency_close(client, trade)
 
 
 async def _emergency_close(client, trade) -> None:
@@ -181,3 +224,77 @@ async def _emergency_close(client, trade) -> None:
             ),
             "ERROR"
         )
+
+
+async def _reconcile_orphan_orders(client, open_trades, symbols) -> None:
+
+    # =========================================================
+    # Ordens/OCOs abertas na Binance que não têm nenhum trade OPEN
+    # correspondente no banco local -- posição aberta fora do bot,
+    # ou banco local apagado/perdido. Não sabemos o histórico dessa
+    # posição, então só alertamos: nunca cancelamos ou fechamos nada
+    # aqui.
+    # =========================================================
+
+    if symbols is None:
+
+        from core.config.settings import settings
+        symbols = settings.SYMBOLS
+
+    known_order_list_ids = {
+        int(trade.order_list_id)
+        for trade in open_trades
+        if trade.order_list_id
+    }
+
+    for symbol in symbols:
+
+        try:
+            orders = await client.get_open_orders(symbol=symbol)
+
+        except Exception as error:
+
+            log(
+                "SYSTEM",
+                (
+                    f"RECONCILIAÇÃO {symbol}: falha ao consultar ordens "
+                    f"abertas na Binance ({error}) — verificação de "
+                    "ordens órfãs pulada para este símbolo"
+                ),
+                "WARNING"
+            )
+            continue
+
+        seen_order_list_ids = set()
+
+        for order in orders:
+
+            order_list_id = order.get("orderListId", -1)
+
+            # Já reportada (as duas pernas de uma OCO aparecem como
+            # entradas separadas em /api/v3/openOrders)
+            if order_list_id in seen_order_list_ids:
+                continue
+
+            is_orphan = (
+                order_list_id == -1
+                or order_list_id not in known_order_list_ids
+            )
+
+            if not is_orphan:
+                continue
+
+            seen_order_list_ids.add(order_list_id)
+
+            log(
+                "SYSTEM",
+                (
+                    f"RECONCILIAÇÃO {symbol}: ordem órfã na Binance sem "
+                    f"trade correspondente no banco local "
+                    f"(orderId={order.get('orderId')}, "
+                    f"orderListId={order_list_id}) — posição real "
+                    "possivelmente sem rastreamento — "
+                    "INTERVENÇÃO MANUAL NECESSÁRIA"
+                ),
+                "CRITICAL"
+            )
