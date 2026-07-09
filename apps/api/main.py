@@ -261,6 +261,15 @@ async def unhandled_exception_handler(
 # (settings.CORS_ALLOWED_ORIGINS) -- override via CORS_ALLOWED_ORIGINS
 # in .env for other setups (e.g. the Docker-built frontend served by
 # nginx on a different origin, see docker-compose.yml).
+#
+# allow_credentials is deliberately False: auth here is a custom
+# X-API-Token header (see require_api_token above), never cookies --
+# frontend/src/api/client.js's fetch() calls never set
+# `credentials: "include"`. Turning this on would do nothing for this
+# app's actual auth flow while widening the blast radius of a
+# misconfigured CORS_ALLOWED_ORIGINS (e.g. an operator accidentally
+# trusting an untrusted origin) to include cookie/credentialed
+# requests that were never needed in the first place.
 
 app.add_middleware(
 
@@ -268,7 +277,7 @@ app.add_middleware(
 
     allow_origins=settings.CORS_ALLOWED_ORIGINS,
 
-    allow_credentials=True,
+    allow_credentials=False,
 
     allow_methods=["*"],
 

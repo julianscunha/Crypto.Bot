@@ -8,7 +8,18 @@ services:
     env_file:
       - .env
     ports:
-      - "8000:8000"
+      # Bound to 127.0.0.1 by default -- Compose's own default is to
+      # publish on 0.0.0.0 (every interface), which would make this
+      # reachable from the network the moment the host has a public
+      # IP, regardless of API_ACCESS_TOKEN being set. Combined with
+      # the read-write .env bind mount below (Binance keys,
+      # LIVE_TRADING_CONFIRMED) and API_ACCESS_TOKEN defaulting to
+      # empty, an unauthenticated network-reachable API here is a
+      # real path to a stranger enabling live trading or exfiltrating
+      # credentials. Override PUBLISH_HOST (below) deliberately, not
+      # by accident, and only after setting API_ACCESS_TOKEN -- see
+      # docs/DEPLOYMENT.md's "Segurança" section.
+      - "${PUBLISH_HOST:-127.0.0.1}:8000:8000"
     volumes:
       - trades_db:/app/data/storage
       - runner_logs:/app/logs
@@ -20,7 +31,13 @@ services:
       # host's real .env makes that persist exactly like it already
       # does outside Docker, and keeps the env_file injection above
       # (read once at container start) and this file (read/written
-      # live by the Settings page) in sync.
+      # live by the Settings page) in sync. Read-write is required
+      # here (unlike the runner's mount below) specifically because
+      # this container is the one that serves PUT /settings -- this
+      # is real, deliberate write access to a host file containing
+      # secrets, which is exactly why the port above defaults to
+      # localhost-only and why API_ACCESS_TOKEN matters before ever
+      # exposing this beyond the host.
       - ./.env:/app/.env
     restart: unless-stopped
 
@@ -36,11 +53,14 @@ services:
       - trades_db:/app/data/storage
       - runner_logs:/app/logs
       - runner_state:/app/runtime
-      # see the api service's identical mount above -- the Runner
-      # also reads .env directly at points (apps/trader/runner.py's
+      # Read-only (:ro) -- unlike the api service, the Runner only
+      # ever reads .env directly (apps/trader/runner.py's
       # _get_env_mode()), independent of the env vars already
-      # injected via env_file at container start.
-      - ./.env:/app/.env
+      # injected via env_file at container start. It never serves
+      # PUT /settings, so it has no legitimate reason to write here;
+      # :ro keeps that true at the container level too, not just by
+      # convention.
+      - ./.env:/app/.env:ro
     restart: unless-stopped
     # The Runner only trades in MODE=live (see apps/trader/runner.py);
     # in MODE=paper (the default) it's still useful to run for the
@@ -64,7 +84,9 @@ services:
         # on a different host/port than localhost:8000.
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
     ports:
-      - "8080:80"
+      # Same reasoning as the api service's port above -- localhost
+      # only by default, override PUBLISH_HOST deliberately.
+      - "${PUBLISH_HOST:-127.0.0.1}:8080:80"
     depends_on:
       - api
     restart: unless-stopped
