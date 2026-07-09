@@ -1146,12 +1146,86 @@ asyncio).
 
 ---
 
+# PRODUCTION HARDENING (`apps/api/main.py`, `apps/trader/runner.py`)
+
+## Autenticação de API (`X-API-Token`)
+
+`PUT /settings`, `POST /runner/start` e `POST /runner/stop` — os
+únicos endpoints capazes de mudar configuração ou controlar o ciclo
+de vida do bot — exigem o header `X-API-Token` batendo com
+`API_ACCESS_TOKEN` (`.env`) quando essa variável está definida.
+Vazia/não definida (o padrão, coerente com o design original
+localhost-only desta API) desabilita a autenticação inteiramente.
+`GET /health` e os demais endpoints de leitura permanecem sem
+autenticação — são consultados com frequência pelo frontend e não
+mudam estado algum. Um `WARNING` é logado no startup da API se
+`API_HOST` não for localhost e `API_ACCESS_TOKEN` estiver vazio.
+
+Implementado via `Depends(require_api_token)` (dependency do
+FastAPI) nos três endpoints — ver `apps/api/main.py`. Coberto por
+`tests/test_api.py::TestApiTokenAuth`.
+
+## Rate limiting (`slowapi`)
+
+Os mesmos três endpoints sensíveis têm limite de requisições
+configurável via `API_RATE_LIMIT` (`.env`, padrão `10/minute`) —
+protege contra flood acidental (ex. um script client com bug em
+loop) mesmo com autenticação habilitada. Endpoints de leitura, que o
+frontend consulta a cada poucos segundos, não têm limite.
+
+## Handler global de exceção não tratada
+
+Um `@app.exception_handler(Exception)` em `apps/api/main.py` garante
+que qualquer erro não tratado dentro de uma rota vira um `500`
+genérico para o cliente (sem vazar stack trace) e, antes disso, é
+logado em nível `CRITICAL` com o método/path da requisição — sem
+esse handler, o FastAPI já devolve 500 por padrão, mas de forma
+totalmente silenciosa nos logs.
+
+## Graceful shutdown (`SIGTERM` / `SIGINT`)
+
+`apps/trader/runner.py` instala handlers explícitos para `SIGTERM` e
+`SIGINT` (além do `KeyboardInterrupt` que `asyncio.run()` já convertia
+automaticamente a partir de um `Ctrl+C`) que cancelam a task principal
+de forma cooperativa, passando pelo mesmo `finally` que cancela a
+flush task de runtime state e grava um flush final
+(`websocket_connected=False`) antes de sair — sem isso, o `/runtime`
+da API podia continuar reportando `websocket_connected=True` por até
+`RUNTIME_STATE_FLUSH_INTERVAL_SECONDS` depois do processo já ter
+parado. `loop.add_signal_handler` é usado quando disponível
+(POSIX); no Windows (`NotImplementedError`), cai para
+`signal.signal()` como fallback.
+
+## Alerta externo via webhook (`core/services/alert_service.py`)
+
+`WEBHOOK_ALERT_URL` (`.env`) configura um endpoint genérico que
+recebe um `POST` (JSON: `level`, `message`, `context`, `timestamp`)
+toda vez que um evento `CRITICAL` acontece — hoje isso cobre a
+posição desprotegida sem fechamento de emergência bem-sucedido
+(`core/services/execution_router.py`,
+`LIVE_POSITION_UNPROTECTED_MANUAL_ACTION_REQUIRED`) e os três pontos
+`CRITICAL` da reconciliação de startup (ver `LIVE TRADING` acima).
+Vazio/não definido desabilita o webhook — o evento continua sendo
+logado localmente (`logs/errors.log`) de qualquer forma. Chamada é
+best-effort e nunca lança: uma falha ao entregar o webhook (rede,
+DNS, URL inválida) nunca interfere no fluxo que já tratou o evento
+CRITICAL em si.
+
+## Código morto removido
+
+`core/orchestrator/orchestrator.py` — um stub de scaffolding inicial,
+já documentado no próprio código como não usado em lugar nenhum e
+superado pelo pipeline multi-agent baseado em `EventBus` — foi
+removido nesta fase, junto com um bloco de código morto e inalcançável
+dentro de `apps/api/main.py` (`jobs_preview_apply`, sobra de uma
+duplicação de `jobs_status`).
+
+---
+
 # ROADMAP ATUAL
 
 ## Próximos módulos
 
-- Alerta externo para o caminho de falha de posição desprotegida (ver
-  LIVE TRADING acima — hoje é só console-log)
 - PostgreSQL
 - Redis streams
 - distributed locking

@@ -13,16 +13,40 @@ from typing import (
 )
 
 from fastapi import (
+    Depends,
     FastAPI,
-    HTTPException
+    Header,
+    HTTPException,
+    Request
 )
 
 from fastapi.middleware.cors import (
     CORSMiddleware
 )
 
+from fastapi.responses import (
+    JSONResponse
+)
+
+from slowapi import (
+    Limiter,
+    _rate_limit_exceeded_handler
+)
+
+from slowapi.errors import (
+    RateLimitExceeded
+)
+
+from slowapi.util import (
+    get_remote_address
+)
+
 from core.config.settings import (
     settings
+)
+
+from core.utils.console_logger import (
+    log
 )
 
 from core.config import (
@@ -114,6 +138,56 @@ app = FastAPI(
     version="2.1.0"
 )
 
+# =====================================================
+# RATE LIMITING
+# =====================================================
+#
+# Applied only to the sensitive/mutating endpoints (settings, runner
+# start/stop) -- see the `dependencies=[Depends(rate_limit)]`
+# argument on each of those routes below. Read-only endpoints
+# (dashboard, metrics, etc.) are polled frequently by the frontend
+# and are not a meaningful attack surface on their own.
+
+limiter = Limiter(
+    key_func=get_remote_address
+)
+
+app.state.limiter = limiter
+
+app.add_exception_handler(
+    RateLimitExceeded,
+    _rate_limit_exceeded_handler
+)
+
+SENSITIVE_ENDPOINT_RATE_LIMIT = settings.API_RATE_LIMIT
+
+# =====================================================
+# API TOKEN AUTH
+# =====================================================
+#
+# Simple shared-secret auth via the X-API-Token header, applied to
+# the same sensitive endpoints as the rate limiter above (PUT
+# /settings, POST /runner/start, POST /runner/stop). API_ACCESS_TOKEN
+# empty/unset (the default, matching this API's original
+# localhost-only design) disables auth entirely -- see the startup
+# warning below for the case where that's actually risky.
+
+async def require_api_token(
+    x_api_token: str | None = Header(default=None)
+):
+
+    token = settings.API_ACCESS_TOKEN
+
+    if not token:
+        return
+
+    if x_api_token != token:
+
+        raise HTTPException(
+            status_code=401,
+            detail="Token de API inválido ou ausente."
+        )
+
 
 @app.on_event("startup")
 async def _startup():
@@ -124,6 +198,57 @@ async def _startup():
     # nada se já existirem.
     init_db()
 
+    is_localhost_only = settings.API_HOST in (
+        "127.0.0.1",
+        "localhost"
+    )
+
+    if not is_localhost_only and not settings.API_ACCESS_TOKEN:
+
+        log(
+            "SYSTEM",
+            (
+                f"API_HOST={settings.API_HOST} não é localhost e "
+                "API_ACCESS_TOKEN não está configurado -- os "
+                "endpoints de settings/runner ficam acessíveis sem "
+                "autenticação para qualquer host que alcance esta "
+                "porta. Configure API_ACCESS_TOKEN no .env antes de "
+                "expor esta API além de localhost."
+            ),
+            "WARNING"
+        )
+
+
+# =====================================================
+# UNHANDLED EXCEPTIONS
+# =====================================================
+#
+# Without this, an unhandled exception inside a route handler still
+# returns a 500 (FastAPI's default), but as an opaque, unlogged
+# response -- nothing in logs/errors.log ties it back to what
+# actually failed. This mirrors the EventBus's own per-subscriber
+# isolation (core/bus/event_bus.py) at the API boundary: one route
+# failing loudly must never look identical to a silent crash.
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(
+    request: Request,
+    exc: Exception
+):
+
+    log(
+        "SYSTEM",
+        (
+            f"Erro não tratado em {request.method} "
+            f"{request.url.path}: {exc}"
+        ),
+        "CRITICAL"
+    )
+
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
 
 
 # =====================================================
@@ -480,8 +605,12 @@ async def runner_status():
     }
 
 
-@app.post("/runner/stop")
-async def runner_stop():
+@app.post(
+    "/runner/stop",
+    dependencies=[Depends(require_api_token)]
+)
+@limiter.limit(SENSITIVE_ENDPOINT_RATE_LIMIT)
+async def runner_stop(request: Request):
 
     open_trades = trades_repository.get_open_trades(
         user_id=DEFAULT_USER_ID
@@ -511,8 +640,12 @@ async def runner_stop():
     return {"stopped": True}
 
 
-@app.post("/runner/start")
-async def runner_start():
+@app.post(
+    "/runner/start",
+    dependencies=[Depends(require_api_token)]
+)
+@limiter.limit(SENSITIVE_ENDPOINT_RATE_LIMIT)
+async def runner_start(request: Request):
 
     from core.utils.runner_pid import read_runner_pid
     from core.services.process_manager_service import _is_process_alive
@@ -913,18 +1046,6 @@ async def jobs_preview_apply():
     }
 
 
-
-    with _job_lock:
-        job = dict(_current_job)
-
-    elapsed = None
-    if job["started_at"]:
-        end = job["finished_at"] or _time.time()
-        elapsed = round(end - job["started_at"])
-
-    return {**job, "elapsed_seconds": elapsed}
-
-
 @app.get("/jobs/progress")
 async def jobs_progress():
     progress_file = (
@@ -1317,9 +1438,12 @@ async def get_settings():
 
 @app.put(
     "/settings",
-    response_model=SettingsResponse
+    response_model=SettingsResponse,
+    dependencies=[Depends(require_api_token)]
 )
+@limiter.limit(SENSITIVE_ENDPOINT_RATE_LIMIT)
 async def update_settings(
+    request: Request,
     payload: SettingsUpdateRequest
 ):
 

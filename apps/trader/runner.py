@@ -4,6 +4,8 @@ import asyncio
 
 import atexit
 
+import signal
+
 from core.utils.runner_pid import (
     write_runner_pid,
     clear_runner_pid
@@ -573,6 +575,109 @@ async def main():
 
         flush_task.cancel()
 
+        # Final, best-effort flush -- the periodic task above only
+        # persists every RUNTIME_STATE_FLUSH_INTERVAL_SECONDS, so
+        # without this the API can keep reporting a stale
+        # websocket_connected=True (or stale counters) for up to
+        # that long after the process has actually stopped.
+        try:
+
+            market_state.set_websocket_connected(
+                False
+            )
+
+            runtime_state_repository.upsert(
+                market_state.snapshot()
+            )
+
+        except Exception as error:
+
+            log(
+                "SYSTEM",
+                f"RUNTIME STATE FINAL FLUSH FAILED {error}",
+                "WARNING"
+            )
+
+# =========================================================
+# GRACEFUL SHUTDOWN (SIGINT / SIGTERM)
+# =========================================================
+#
+# asyncio.run() already turns Ctrl+C into KeyboardInterrupt, which
+# main()'s own `finally` (above) and the except block below already
+# handle -- but that path never reaches an `await`-based cleanup, it
+# just unwinds. SIGTERM (sent by `docker stop`, `kill`, a process
+# manager, or Task Manager's "End task") has no such built-in
+# handling in asyncio at all -- left alone, it kills the process
+# immediately, skipping flush_task.cancel() and the final runtime
+# state flush entirely. Installing an explicit handler for both
+# signals routes them through the exact same coroutine-level
+# cancellation, so shutdown behaves identically regardless of which
+# signal triggered it.
+#
+# loop.add_signal_handler is POSIX-only (NotImplementedError on
+# Windows, including with the Selector event loop this project
+# already requires for aiohttp -- see core/utils/event_loop.py).
+# signal.signal() works on Windows for SIGTERM specifically (unlike
+# SIGTERM's not-quite-equivalent-signals story on some other
+# platforms), so it's used as the fallback there.
+
+async def _run_with_graceful_shutdown():
+
+    loop = asyncio.get_running_loop()
+
+    main_task = asyncio.ensure_future(
+        main()
+    )
+
+    def _request_shutdown(sig_name):
+
+        log(
+            "SYSTEM",
+            f"Sinal {sig_name} recebido — iniciando shutdown gracioso...",
+            "WARNING"
+        )
+
+        main_task.cancel()
+
+    for sig_name in ("SIGTERM", "SIGINT"):
+
+        sig = getattr(
+            signal,
+            sig_name,
+            None
+        )
+
+        if sig is None:
+            continue
+
+        try:
+
+            loop.add_signal_handler(
+                sig,
+                _request_shutdown,
+                sig_name
+            )
+
+        except NotImplementedError:
+
+            signal.signal(
+                sig,
+                lambda signum, frame, name=sig_name: (
+                    loop.call_soon_threadsafe(
+                        _request_shutdown,
+                        name
+                    )
+                )
+            )
+
+    try:
+
+        await main_task
+
+    except asyncio.CancelledError:
+
+        pass
+
 # =========================================================
 # ENTRYPOINT
 # =========================================================
@@ -594,8 +699,16 @@ if __name__ == "__main__":
         configure_event_loop()
 
         asyncio.run(
-            main()
+            _run_with_graceful_shutdown()
         )
+
+        log(
+            "SYSTEM",
+            "Shutdown...................... OK",
+            "WARNING"
+        )
+
+        print_session_report()
 
     except KeyboardInterrupt:
 

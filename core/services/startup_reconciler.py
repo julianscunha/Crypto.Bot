@@ -28,11 +28,13 @@ existir) não podem ser verificados contra a Binance — também logam
 CRITICAL, já que representam uma posição real potencialmente sem
 proteção que a reconciliação não consegue confirmar.
 
-Todo ponto CRITICAL aqui é um gancho para o alerta externo (webhook)
-que a Fase 2 do roadmap adiciona em core/services/alert_service.py —
-por ora, esses pontos só logam localmente.
+Todo ponto CRITICAL aqui também dispara um alerta externo via webhook
+(core/services/alert_service.py, configurado por WEBHOOK_ALERT_URL) —
+best-effort, nunca bloqueia nem falha a reconciliação caso o webhook
+esteja indisponível ou desconfigurado.
 """
 
+from core.services.alert_service import send_alert
 from core.services.binance_trading_client import BinanceTradingError
 from core.utils.console_logger import log
 from data.storage.repositories.trades_repository import trades_repository
@@ -85,15 +87,21 @@ async def _reconcile_trade(client, trade) -> None:
 
     if not trade.order_list_id:
 
-        log(
-            "SYSTEM",
-            (
-                f"RECONCILIAÇÃO {symbol} id={trade_id}: "
-                "sem order_list_id — posição real sem verificação "
-                "possível contra a Binance — INTERVENÇÃO MANUAL NECESSÁRIA"
-            ),
-            "CRITICAL"
+        message = (
+            f"RECONCILIAÇÃO {symbol} id={trade_id}: "
+            "sem order_list_id — posição real sem verificação "
+            "possível contra a Binance — INTERVENÇÃO MANUAL NECESSÁRIA"
         )
+
+        log("SYSTEM", message, "CRITICAL")
+
+        await send_alert(
+            "CRITICAL",
+            message,
+            symbol=symbol,
+            trade_id=trade_id
+        )
+
         return
 
     # =========================================================
@@ -174,14 +182,19 @@ async def _reconcile_trade(client, trade) -> None:
         # real é desconhecido. Fechar automaticamente aqui poderia
         # duplicar/cancelar uma proteção que na verdade ainda existe.
 
-        log(
-            "SYSTEM",
-            (
-                f"RECONCILIAÇÃO {symbol} id={trade_id}: "
-                f"falha ao consultar OCO ({error}) — estado real "
-                "desconhecido — INTERVENÇÃO MANUAL NECESSÁRIA"
-            ),
-            "CRITICAL"
+        message = (
+            f"RECONCILIAÇÃO {symbol} id={trade_id}: "
+            f"falha ao consultar OCO ({error}) — estado real "
+            "desconhecido — INTERVENÇÃO MANUAL NECESSÁRIA"
+        )
+
+        log("SYSTEM", message, "CRITICAL")
+
+        await send_alert(
+            "CRITICAL",
+            message,
+            symbol=symbol,
+            trade_id=trade_id
         )
 
 
@@ -286,15 +299,21 @@ async def _reconcile_orphan_orders(client, open_trades, symbols) -> None:
 
             seen_order_list_ids.add(order_list_id)
 
-            log(
-                "SYSTEM",
-                (
-                    f"RECONCILIAÇÃO {symbol}: ordem órfã na Binance sem "
-                    f"trade correspondente no banco local "
-                    f"(orderId={order.get('orderId')}, "
-                    f"orderListId={order_list_id}) — posição real "
-                    "possivelmente sem rastreamento — "
-                    "INTERVENÇÃO MANUAL NECESSÁRIA"
-                ),
-                "CRITICAL"
+            message = (
+                f"RECONCILIAÇÃO {symbol}: ordem órfã na Binance sem "
+                f"trade correspondente no banco local "
+                f"(orderId={order.get('orderId')}, "
+                f"orderListId={order_list_id}) — posição real "
+                "possivelmente sem rastreamento — "
+                "INTERVENÇÃO MANUAL NECESSÁRIA"
+            )
+
+            log("SYSTEM", message, "CRITICAL")
+
+            await send_alert(
+                "CRITICAL",
+                message,
+                symbol=symbol,
+                order_id=order.get("orderId"),
+                order_list_id=order_list_id
             )

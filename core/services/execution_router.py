@@ -61,6 +61,10 @@ loudly (ERROR-level log, rejected signal with a distinct reason),
 never as a reason to guess and proceed.
 """
 
+from core.services.alert_service import (
+    send_alert
+)
+
 from core.services.binance_trading_client import (
     BinanceTradingClient,
     BinanceTradingError,
@@ -578,18 +582,28 @@ class ExecutionRouter:
             # the exchange and this code has no further automated
             # recourse -- this must be loud enough that a human
             # intervenes immediately.
+            alert_message = (
+                "EMERGENCY CLOSE FAILED -- "
+                "REAL UNPROTECTED POSITION IS OPEN "
+                f"symbol={payload.symbol} "
+                f"qty={executed_quantity} "
+                f"entry={average_fill_price} "
+                f"close_error={close_error} -- "
+                "MANUAL INTERVENTION REQUIRED IMMEDIATELY"
+            )
+
             log(
                 "EXECUTION",
-                (
-                    "EMERGENCY CLOSE FAILED -- "
-                    "REAL UNPROTECTED POSITION IS OPEN "
-                    f"symbol={payload.symbol} "
-                    f"qty={executed_quantity} "
-                    f"entry={average_fill_price} "
-                    f"close_error={close_error} -- "
-                    "MANUAL INTERVENTION REQUIRED IMMEDIATELY"
-                ),
-                "ERROR"
+                alert_message,
+                "CRITICAL"
+            )
+
+            await send_alert(
+                "CRITICAL",
+                alert_message,
+                symbol=payload.symbol,
+                quantity=executed_quantity,
+                entry_price=average_fill_price
             )
 
             return ExecutionResult(

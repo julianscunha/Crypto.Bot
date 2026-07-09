@@ -31,6 +31,15 @@ os.environ.setdefault("LIVE_TRADING_CONFIRMED", "false")
 os.environ.setdefault("BINANCE_API_KEY", "")
 os.environ.setdefault("BINANCE_SECRET_KEY", "")
 
+# apps/api/main.py rate-limits sensitive endpoints (PUT /settings,
+# POST /runner/start, POST /runner/stop) at settings.API_RATE_LIMIT
+# (default "10/minute") -- several test modules call PUT /settings
+# many times per session via the same TestClient, which shares the
+# slowapi in-memory limiter across the whole process. Raise the limit
+# for the test session so that's exercising business logic, not
+# tripping over rate limiting meant for real remote clients.
+os.environ.setdefault("API_RATE_LIMIT", "100000/minute")
+
 import tempfile
 
 from pathlib import Path

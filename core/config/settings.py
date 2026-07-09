@@ -221,6 +221,39 @@ class Settings:
         maximum=65535
     )
 
+    # Simple shared-secret auth (X-API-Token header) for mutating/
+    # sensitive endpoints (PUT /settings, POST /runner/start,
+    # POST /runner/stop) -- see apps/api/main.py's require_api_token
+    # dependency. Empty/unset disables auth entirely, matching this
+    # API's original localhost-only design (a warning is logged at
+    # startup if the API is bound beyond localhost with no token set).
+    API_ACCESS_TOKEN = env_str(
+        "API_ACCESS_TOKEN",
+        ""
+    )
+
+    # slowapi rate-limit spec (e.g. "10/minute") applied to the same
+    # sensitive endpoints as API_ACCESS_TOKEN above. Configurable
+    # mainly so the test suite can raise it well above what dozens of
+    # sequential test requests would otherwise trip -- see
+    # tests/conftest.py.
+    API_RATE_LIMIT = env_str(
+        "API_RATE_LIMIT",
+        "10/minute"
+    )
+
+    # =================================================
+    # ALERTING
+    # =================================================
+    #
+    # Generic webhook (POST, JSON body) for CRITICAL-severity events
+    # -- see core/services/alert_service.py. Empty/unset disables
+    # alerting; events still get logged locally regardless.
+    WEBHOOK_ALERT_URL = env_str(
+        "WEBHOOK_ALERT_URL",
+        ""
+    )
+
     # =================================================
     # DATABASE
     # =================================================

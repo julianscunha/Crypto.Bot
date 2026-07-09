@@ -850,6 +850,147 @@ class TestSettingsEndpoint:
         assert "reiniciar" in response.json()["detail"].lower()
 
 
+class TestApiTokenAuth:
+
+    """
+    apps/api/main.py's require_api_token dependency, applied to
+    PUT /settings, POST /runner/start and POST /runner/stop.
+    settings.API_ACCESS_TOKEN defaults to "" (auth disabled) --
+    these tests explicitly patch it to exercise the enabled path.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _reset_settings_env(self):
+
+        from core.config import settings_repository
+
+        settings_repository.ENV_PATH.write_text(
+            "MODE=paper\n"
+            "BINANCE_TESTNET=true\n"
+            "BINANCE_API_KEY=\n"
+            "BINANCE_SECRET_KEY=\n"
+        )
+
+        yield
+
+    def test_put_settings_without_token_is_rejected(self, client):
+
+        with patch.object(
+            api_main.settings,
+            "API_ACCESS_TOKEN",
+            "secret-token"
+        ):
+
+            response = client.put(
+                "/settings",
+                json={"account_balance": 200.0}
+            )
+
+        assert response.status_code == 401
+
+    def test_put_settings_with_wrong_token_is_rejected(self, client):
+
+        with patch.object(
+            api_main.settings,
+            "API_ACCESS_TOKEN",
+            "secret-token"
+        ):
+
+            response = client.put(
+                "/settings",
+                json={"account_balance": 200.0},
+                headers={"X-API-Token": "wrong-token"}
+            )
+
+        assert response.status_code == 401
+
+    def test_put_settings_with_correct_token_succeeds(self, client):
+
+        with patch.object(
+            api_main.settings,
+            "API_ACCESS_TOKEN",
+            "secret-token"
+        ):
+
+            response = client.put(
+                "/settings",
+                json={"account_balance": 200.0},
+                headers={"X-API-Token": "secret-token"}
+            )
+
+        assert response.status_code == 200
+
+    def test_runner_start_without_token_is_rejected(self, client):
+
+        with patch.object(
+            api_main.settings,
+            "API_ACCESS_TOKEN",
+            "secret-token"
+        ):
+
+            response = client.post("/runner/start")
+
+        assert response.status_code == 401
+
+    def test_runner_stop_without_token_is_rejected(self, client):
+
+        with patch.object(
+            api_main.settings,
+            "API_ACCESS_TOKEN",
+            "secret-token"
+        ):
+
+            response = client.post("/runner/stop")
+
+        assert response.status_code == 401
+
+    def test_health_stays_open_even_with_token_configured(self, client):
+
+        with patch.object(
+            api_main.settings,
+            "API_ACCESS_TOKEN",
+            "secret-token"
+        ):
+
+            response = client.get("/health")
+
+        assert response.status_code == 200
+
+    def test_get_settings_stays_open_even_with_token_configured(
+        self,
+        client
+    ):
+
+        with patch.object(
+            api_main.settings,
+            "API_ACCESS_TOKEN",
+            "secret-token"
+        ):
+
+            response = client.get("/settings")
+
+        assert response.status_code == 200
+
+    def test_no_token_configured_disables_auth(self, client):
+
+        with patch.object(
+            api_main.settings,
+            "API_ACCESS_TOKEN",
+            ""
+        ):
+
+            response = client.put(
+                "/settings",
+                json={"account_balance": 200.0}
+            )
+
+        assert response.status_code == 200
+
+    def test_rate_limiter_is_wired_on_the_app(self):
+
+        assert hasattr(app.state, "limiter")
+
+
 class TestCors:
 
     def test_allows_vite_dev_origin(self, client):
