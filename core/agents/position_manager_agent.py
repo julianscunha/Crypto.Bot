@@ -120,7 +120,7 @@ class PositionManagerAgent:
     # constructed fresh per call rather than cached, same as there,
     # since BinanceTradingClient is cheap to build and settings can
     # change between calls (e.g. mode switched via the Settings
-    # panel, which restarts the Runner -- see README_FULL.md's "Why
+    # panel, which restarts the Runner -- see docs/README_FULL.md's "Why
     # a restart is needed to change modes at all"). Returns None for
     # PAPER, since none of the LIVE-only exit logic below should
     # ever run against a simulated position.

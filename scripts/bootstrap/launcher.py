@@ -254,7 +254,7 @@ def start_backtest():
 # =====================================================
 #
 # There is no frontend/ directory in this project yet -- per
-# README_FULL.md's roadmap, "frontend operational dashboard" is
+# docs/README_FULL.md's roadmap, "frontend operational dashboard" is
 # listed under upcoming modules, not something already built.
 # Calling `npm run dev` with cwd=frontend/ before it exists raises
 # FileNotFoundError. Guard for it explicitly with a clear message
@@ -283,7 +283,7 @@ def warn_frontend_unavailable():
         (
             "No frontend/ directory found. "
             "The dashboard frontend is on the roadmap "
-            "(see README_FULL.md) but not built yet. "
+            "(see docs/README_FULL.md) but not built yet. "
             "Use the API at http://127.0.0.1:8000 "
             "directly, or run option [1] Runner."
         ),

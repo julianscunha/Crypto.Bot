@@ -1,0 +1,1158 @@
+# CRYPTO.BOT — DOCUMENTAÇÃO COMPLETA
+
+Última atualização: 2026-06-27 18:25
+
+---
+
+# VISÃO GERAL
+
+Crypto.Bot é uma plataforma modular de trading algorítmico baseada em:
+
+- arquitetura event-driven
+- processamento async
+- isolamento multi-tenant
+- agentes desacoplados
+- pipelines operacionais
+- engines independentes
+
+---
+
+# FLUXO DO SISTEMA
+
+```text
+BinanceWS
+    ↓
+EventBus
+    ↓
+AnalystAgent
+    ↓
+StrategyAgent
+    ↓
+RiskAgent
+    ↓
+ExecutionAgent
+    ↓
+PositionManagerAgent
+    ↓
+Portfolio Analytics
+```
+
+---
+
+# MÓDULOS PRINCIPAIS
+
+## AnalystAgent
+
+Responsável por:
+- ingestão analítica
+- atualização estrutural
+- atualização de ATR
+- geração de análise inicial
+
+---
+
+## StrategyAgent
+
+Responsável por:
+- geração de sinal BUY
+- validação de ATR
+- validação de EMA trend
+- SignalQualityService
+- market structure validation
+
+---
+
+## RiskAgent
+
+Responsável por:
+- cálculo de ATR risk
+- stop loss
+- take profit
+- trailing stop
+- risk/reward
+- bloqueios operacionais
+
+---
+
+## ExecutionAgent
+
+Responsável por:
+- abertura de trades
+- persistência operacional
+- registro de portfolio
+- métricas
+
+---
+
+## PositionManagerAgent
+
+Responsável por:
+- trailing stop
+- stop loss
+- take profit
+- unrealized pnl
+- lifecycle da posição
+
+---
+
+# REGRAS DO EVENT BUS
+
+Todos os agentes devem implementar:
+
+```python
+async def on_message(self, message)
+```
+
+Toda publicação deve utilizar:
+
+```python
+await bus.publish(message)
+```
+
+---
+
+# PAYLOAD CONTRACTS
+
+## MarketDataPayload
+
+```python
+open
+high
+low
+close
+volume
+```
+
+---
+
+## StrategySignalPayload
+
+```python
+entry_price
+signal_strength
+atr
+```
+
+---
+
+## RiskDecisionPayload
+
+```python
+entry_price
+stop_loss
+take_profit
+trailing_stop
+risk_reward
+```
+
+---
+
+# ATR ENGINE
+
+Features:
+- Wilder ATR
+- True Range
+- volatility filter
+- ATR percentage
+- suporte a OHLC real
+
+Arquivo:
+```text
+core/services/atr_service.py
+```
+
+---
+
+# MARKET STRUCTURE ENGINE
+
+Features:
+- swing detection
+- structure validation
+- trend strength
+- consolidation filter
+- fake breakout protection
+
+Arquivos:
+```text
+core/services/market_structure_service.py
+core/config/market_structure_config.py
+```
+
+## Configurando o período de warmup
+
+`minimum_structure_candles` (padrão 20) trava todo sinal até que essa
+quantidade de candles tenha se acumulado para um símbolo. Num timeframe
+de 5m com o padrão, isso equivale a ~1h40 de warmup por símbolo antes
+de qualquer sinal poder ser gerado — se o dashboard mostrar zero sinais
+gerados com toda rejeição sendo `ATR_NOT_READY` / `NO_STRUCTURE` /
+`INSUFFICIENT_DATA` / `WEAK_STRUCTURE`, verifique se esse warmup já
+decorreu antes de assumir que algo está quebrado.
+
+Esse valor é lido do `.env` sob qualquer um destes nomes (o primeiro
+que estiver definido vence, via `core.config.settings.env_int_aliased`):
+
+```text
+MINIMUM_STRUCTURE_CANDLES
+STRUCTURE_MIN_CANDLES
+MIN_STRUCTURE_CANDLES
+```
+
+Os três existem porque `core/config/trading_config.py` e
+`core/config/market_structure_config.py` historicamente liam esse
+mesmo conceito a partir de dois nomes de variável de ambiente
+diferentes e não sobrepostos (`MINIMUM_STRUCTURE_CANDLES` e
+`STRUCTURE_MIN_CANDLES`, respectivamente) — quem configurasse uma
+terceira variante, igualmente razoável, tinha o valor silenciosamente
+ignorado, com o sistema caindo de volta ao padrão de 20 candles e
+todo sinal ficando travado por muito mais tempo do que o pretendido,
+sem nenhum erro ou aviso em lugar nenhum. Ambas as configs agora
+aceitam os três nomes de forma consistente.
+
+---
+
+# SIGNAL QUALITY ENGINE
+
+Valida:
+- cooldown
+- confidence threshold
+- EMA trend
+- drawdown protection (com escopo de sessão, ver DRAWDOWN: ESCOPO DE SESSÃO)
+- max positions
+- ATR volatility
+- daily loss limit (ver PROTEÇÃO DE RISCO DIÁRIA abaixo)
+- daily trade limit (ver PROTEÇÃO DE RISCO DIÁRIA abaixo)
+
+Arquivo:
+```text
+core/services/signal_quality_service.py
+```
+
+---
+
+# PROTEÇÃO DE RISCO DIÁRIA
+
+`max_daily_loss_percent` e `max_daily_trades` existiam em
+`core/config/trading_config.py` com padrões sensatos (e no `.env`)
+desde cedo, mas nenhum código em lugar nenhum de fato os lia ou
+aplicava — eram config apenas no nome. `core/services/
+risk_protection_service.py` é o que os torna reais, como as duas
+últimas verificações no pipeline de `SignalQualityService.validate()`.
+
+```text
+core/services/risk_protection_service.py
+core/config/trading_config.py    -- max_daily_loss_percent, max_daily_trades
+core/config/signal_quality_config.py
+                                  -- enable_daily_loss_limit,
+                                     enable_daily_trade_limit
+```
+
+## O que verifica
+
+- **Daily loss limit** — soma `Trade.realized_pnl` de todo trade
+  fechado desde 00:00 UTC. Se a perda (nunca um lucro, independente
+  do tamanho) atingir `max_daily_loss_percent` do `account_balance`
+  configurado, nenhuma posição nova abre pelo resto do dia UTC.
+- **Daily trade limit** — conta todo trade *aberto* desde 00:00 UTC
+  (aberto ou fechado, ganho ou perda). Atingir `max_daily_trades`
+  bloqueia novos sinais mesmo numa sequência de vitórias ativa — a
+  frequência de trading em si é o risco sendo gerenciado aqui,
+  independente de os trades até então terem sido lucrativos.
+
+Ambos resetam automaticamente na próxima virada de dia UTC (não há um
+passo explícito de "reset" — as queries subjacentes simplesmente já
+são escopadas para `closed_at >= today_start` / `created_at >= today_start`).
+
+## Por que isso é separado de `_validate_drawdown_protection`
+
+Aquela verificação existente (também em `SignalQualityService`) mede
+o drawdown **desde o início da sessão atual** via
+`PortfolioSnapshot.drawdown` — ela responde "a conta está atualmente
+no negativo em relação ao pico da sessão". Esse serviço responde uma
+pergunta mais estreita, escopada por dia: "o dia de hoje especificamente
+ficou ruim o suficiente para parar por hoje", o que precisa do seu
+próprio limite de dia UTC e do seu próprio comportamento de reset
+automático, que a verificação escopada por sessão nunca foi construída
+para expressar.
+
+## API / Frontend
+
+`GET /risk-status` (`apps/api/schemas/risk_schema.py`) expõe
+`RiskProtectionService.get_status()` para o `RiskStatusBanner` do
+dashboard — um banner verde com a contagem de trades de hoje quando
+tudo está liberado, um banner vermelho nomeando o limite exato
+violado quando pausado.
+
+Coberto em `tests/test_risk_protection_service.py`,
+`tests/test_signal_quality_service.py`
+(`TestValidateDailyLossLimit`, `TestValidateDailyTradeLimit`,
+`TestValidatePipelineDailyLimits`) e `tests/test_api.py`
+(`TestRiskStatusEndpoint`).
+
+---
+
+# MULTI-TENANT
+
+`user_id` é obrigatório em:
+- payloads
+- repositories
+- metrics
+- positions
+- analytics
+
+Nunca realizar queries sem `user_id`.
+
+## `reset()` / `reset_all()`
+
+`TradesRepository.reset(user_id)` e `PortfolioRepository.reset(user_id)`
+exigem `user_id` e deletam apenas as linhas daquele usuário. Existe um
+`reset_all()` separado em cada um, deliberadamente nomeado diferente,
+destinado **apenas** ao banco de dados isolado de testes (a fixture
+autouse de truncagem de tabelas em `tests/conftest.py`) — nunca para
+nenhum caminho de código real.
+
+**Incidente real que essa regra existe para prevenir:** ambos os
+métodos `reset()` originalmente não tinham nenhum parâmetro `user_id`
+e deletavam toda linha de todo usuário. `backtest/runner.py` e
+`backtest/optimizer/optimizer_engine.py` chamam `trades_repository.reset()`
+uma vez por passada de backtest para limpar seus próprios trades de
+sandbox (`USER_ID = 999`) antes de cada execução — mas sem filtro,
+isso apagava o histórico real de paper trading (`user_id=0`) junto,
+silenciosamente, toda vez que qualquer um dos dois era executado. Isso
+só foi detectado (duas vezes, em duas sessões separadas) inspecionando
+manualmente contagens de linhas antes/depois — não havia teste que
+pegaria isso, porque nenhum teste exercitava `reset()` contra mais de
+um `user_id` ao mesmo tempo. `tests/test_trades_repository.py::TestReset::
+test_reset_does_not_touch_other_users_trades` é o teste de regressão
+para exatamente esse caso.
+
+---
+
+# RUNTIME STATE (TELEMETRIA CROSS-PROCESS)
+
+`core/state/market_state.py`'s `MarketState` é um singleton em memória:
+`websocket_connected`, `active_symbols` e todo contador de
+sinal/execução vivem como atributos Python simples em um único objeto,
+mutados diretamente por `data/ingestion/binance_ws.py` e
+`core/agents/*`.
+
+Isso funciona bem enquanto tudo roda em um único processo. Não é o
+caso no Full Stack: `apps/api/main.py` (uvicorn) e
+`apps/trader/runner.py` (o pipeline de WebSocket + agentes) são
+iniciados como **subprocessos de SO separados** (ver
+`scripts/bootstrap/launcher.py`'s `start_fullstack()`). Cada um recebe
+seu próprio interpretador Python e sua própria instância de
+`MarketState`, completamente independente. Escritas feitas no
+processo Runner são invisíveis à cópia do processo da API, para
+sempre.
+
+**Sintoma que isso causava:** o `/runtime` do dashboard (e, portanto,
+o badge "FEED DOWN" da página Monitor e o painel de pipeline de
+sinais) ficava travado no estado zerado inicial, não importa há
+quanto tempo o bot estivesse de fato rodando. `websocket_connected`
+sempre ficava `false` mesmo com um feed conectado e ao vivo;
+`active_symbols`, contagens de sinal e ratios nunca se moviam. Podia
+parecer que o dashboard inteiro tinha parado de atualizar, quando na
+verdade só essa telemetria cross-process específica estava travada —
+dados de portfolio/trade (já apoiados em SQLite) atualizavam
+normalmente.
+
+**Correção:** uma tabela `runtime_state` compartilhada
+(`data/storage/repositories/runtime_state_repository.py`), escrita
+pelo Runner e lida pela API:
+
+```text
+Processo Runner                         Processo API
+────────────────                        ────────────
+market_state (em memória)               market_state (em memória,
+     │                                   sempre vazio no Full Stack)
+     │ a cada 2s
+     ▼
+flush_runtime_state_periodically()
+     │
+     ▼
+runtime_state_repository.upsert(...)  ──▶  tabela runtime_state  ──▶  runtime_state_repository.get()
+   (data/storage/trades.db)                                              │
+                                                                          ▼
+                                                          MarketState.from_persisted(...)
+                                                                          │
+                                                                          ▼
+                                                                   build_runtime_response()
+```
+
+- **Lado de escrita** — `flush_runtime_state_periodically()` do
+  `apps/trader/runner.py` roda como uma task `asyncio` em background
+  ao lado do loop de WebSocket, persistindo `market_state.snapshot()`
+  no banco a cada `RUNTIME_STATE_FLUSH_INTERVAL_SECONDS` (2s). Um
+  flush que falha é logado como `WARNING` e nunca derruba o Runner —
+  o pipeline de WebSocket/agentes importa muito mais do que a
+  telemetria estar perfeitamente atualizada a cada flush.
+- **Lado de leitura** — `build_runtime_response()` do
+  `apps/api/main.py` chama `runtime_state_repository.get()` primeiro.
+  Se o Runner já deu flush pelo menos uma vez, ele reconstrói um
+  `MarketState` funcional via `MarketState.from_persisted(...)` (que
+  recalcula `uptime_seconds`/ratios a partir dos contadores
+  persistidos, reaproveitando a lógica já existente do `snapshot()`
+  em vez de duplicá-la) e monta a resposta a partir disso. Se o
+  Runner nunca deu flush (ex.: a API foi iniciada isolada, sem
+  nenhum Runner), ele recai no seu próprio `market_state` local para
+  que o endpoint ainda retorne padrões zerados sensatos em vez de dar
+  erro.
+
+Isso é sempre uma única linha sobrescrita (`id=1`), não um histórico
+crescente — é telemetria ao vivo, não um audit trail. `EquityCurve`/
+`PortfolioSnapshot` já cumprem o papel de "histórico ao longo do
+tempo" para dados de portfolio.
+
+Coberto em `tests/test_market_state.py` (`TestFromPersisted`),
+`tests/test_runtime_state_repository.py`, `tests/test_trader_runner.py`
+(`TestFlushRuntimeStatePeriodically`) e `tests/test_api.py`
+(os testes de simulação cross-process do `TestRuntimeEndpoint`) —
+cada um exercitando uma instância de `MarketState` genuinamente
+separada para simular o cenário real de dois processos, não apenas
+fazendo assert contra o mesmo objeto que escreveu os dados.
+
+---
+
+# DRAWDOWN: ESCOPO DE SESSÃO
+
+`PortfolioService.build_snapshot()` calcula o % de drawdown contra o
+verdadeiro pico histórico de equity já alcançado
+(`PortfolioRepository.get_max_equity()`), não apenas contra o
+saldo/equity atual — do contrário o drawdown seria subestimado sempre
+que o equity caísse a partir de um ponto mais alto alcançado num
+snapshot anterior.
+
+Essa busca de pico é escopada por `PortfolioSnapshot.initial_balance`:
+apenas snapshots registrados sob o mesmo `account_balance` configurado
+(`core/config/trading_config.py`) contam para o pico no cálculo atual.
+
+**Por que isso importa:** sem esse escopo, resetar deliberadamente a
+conta de paper trading — por exemplo, baixando `account_balance` de
+100 para 10 — deixava snapshots antigos, de equity muito mais alto,
+na tabela. O próprio próximo snapshot construído após o reset
+calcularia algo como `(100 - 10) / 100 = 90%` de drawdown, mesmo que a
+conta nunca tivesse de fato perdido nada; ela só tinha sido
+reconfigurada de propósito para um saldo menor. `get_max_equity(user_id,
+initial_balance=None)` (o padrão) ainda retorna o máximo histórico
+sem escopo para qualquer chamador existente que não passe
+`initial_balance` — só a própria chamada interna de
+`PortfolioService.build_snapshot()` passa esse parâmetro, já que é o
+único lugar onde essa distinção realmente importa.
+
+Uma perda real *dentro* da mesma sessão (mesmo `initial_balance` do
+início ao fim) não é afetada e continua contando normalmente.
+
+Coberto em `tests/test_portfolio_service.py`
+(`TestPeakEquitySessionScoping`).
+
+---
+
+# CONSOLE ENGINE
+
+Padronização visual:
+
+## Branco
+Eventos neutros:
+- MARKET
+- STRATEGY
+- SYSTEM
+
+## Verde
+Eventos positivos:
+- SIGNAL BUY
+- RISK APPROVED
+- EXECUTION OPEN
+- TAKE PROFIT
+
+## Vermelho
+Eventos negativos:
+- BLOCKED
+- ERROR
+- STOP LOSS
+
+## Amarelo
+Eventos intermediários:
+- TRAILING STOP
+- WARNING
+
+---
+
+# STARTUP PANEL
+
+```text
+[SYSTEM] MODE           PAPER
+[SYSTEM] SYMBOLS        BTCUSDT ETHUSDT SOLUSDT
+[SYSTEM] TIMEFRAME      1m
+[SYSTEM] DATABASE       CONNECTED
+[SYSTEM] EVENT BUS      READY
+[SYSTEM] AGENTS         READY
+[SYSTEM] BINANCE        CONNECTED
+```
+
+---
+
+# STARTUP / LAUNCHER
+
+Os entrypoints (`scripts/start.ps1` no Windows, `scripts/start.sh` no
+Linux/macOS) delegam ambos para o mesmo launcher interativo:
+
+```text
+scripts/bootstrap/launcher.py
+```
+
+Sequência de boot:
+
+```text
+cleanup_old_processes()      -- scripts/bootstrap/process_manager.py
+        ↓
+validate_environment()       -- scripts/bootstrap/validate.py
+        ↓
+install_requirements()       -- scripts/bootstrap/bootstrap.py
+        ↓
+show_menu() / runtime loop
+```
+
+## validate_environment()
+
+Verificações realizadas:
+
+| Check       | Bloqueante? | O que verifica                                        |
+|-------------|-------------|--------------------------------------------------------|
+| Python      | Sim         | Python >= 3.11                                         |
+| Structure   | Sim         | `apps/`, `core/`, `data/`, `scripts/` existem           |
+| Files       | Sim         | `.env` e `scripts/bootstrap/requirements.txt` existem   |
+| VirtualEnv  | Não (warn)  | `.venv/` existe                                         |
+| Frontend    | Não (warn)  | `frontend/` existe                                      |
+
+`Frontend` e `VirtualEnv` são apenas informativos — sua ausência
+loga um `WARNING` mas nunca falha `validate_environment()` nem
+bloqueia o startup. Isso importa independentemente do estado do
+frontend num checkout específico: `start_fullstack()` nunca pode
+depender obrigatoriamente da existência de `frontend/`.
+
+## Menu de runtime
+
+```text
+[1] Runner       -> python -m apps.trader.runner
+[2] Optimizer    -> python -m backtest.optimizer.optimizer_engine
+[3] Backtest     -> python -m backtest.runner
+[4] Frontend     -> npm run dev (cwd=frontend/), somente se frontend/ existir
+[5] Full Stack   -> API + Runner, mais Frontend se frontend/ existir
+[0] Exit
+```
+
+## Full Stack (`[5]`)
+
+Inicia, como processos de SO separados:
+
+1. **API** — `uvicorn apps.api.main:app` em `http://127.0.0.1:8000`
+2. **Runner** — `apps.trader.runner` (paper trading ao vivo contra o
+   WebSocket de market-data da Binance)
+3. **Frontend** — apenas se `frontend/` existir *e* as dependências
+   npm puderem ser resolvidas/instaladas; caso contrário um warning é
+   logado e o Full Stack continua rodando só com API + Runner.
+
+`Ctrl+C` encerra todos os processos iniciados de forma limpa
+(`terminate_process()` envia `SIGTERM`/terminate gracioso, depois
+força kill após um timeout de 5s se um processo não sair).
+
+### Startup do frontend, passo a passo
+
+`start_frontend()`/`start_fullstack()` passam por três verificações
+antes de subir o dev server, cada uma com seu próprio fallback que
+não derruba o processo:
+
+1. **`frontend_available()`** — `frontend/` existe? Se não:
+   `warn_frontend_unavailable()`, roda só com API + Runner.
+2. **`resolve_npm_command()`** — `shutil.which("npm")`. No Windows
+   isso resolve para `npm.cmd` (o executável real; `npm` em si não é
+   invocável diretamente via `CreateProcess` sem `shell=True`). Se o
+   npm não for encontrado: `warn_npm_not_found()`, roda só com
+   API + Runner.
+3. **`frontend_dependencies_installed()`** — `frontend/node_modules/`
+   existe? Nunca é versionado (grande, reprodutível). Se estiver
+   ausente, `install_frontend_dependencies()` roda `npm install` em
+   `frontend/` automaticamente, da mesma forma que
+   `install_requirements()` faz no lado Python. Se essa instalação
+   falhar (exit code não-zero): roda só com API + Runner.
+
+Só depois que as três passam é que o dev server é de fato aberto via
+`Popen`.
+
+**Histórico de bugs**, para contexto sobre por que as três
+verificações existem de forma independente:
+
+- `start_fullstack()` originalmente iniciava o frontend
+  incondicionalmente e quebrava com `FileNotFoundError` quando
+  `frontend/` ainda não existia (check #1).
+- Depois que `frontend/` foi construído,
+  `subprocess.Popen(["npm", ...])` (sem `shell=True`) ainda quebrava
+  no Windows especificamente com `FileNotFoundError ([WinError 2])`,
+  porque o `npm` lá é `npm.cmd`, e `CreateProcess` não faz a
+  resolução de `PATHEXT` que o shell faz (check #2).
+- Depois desse fix, um checkout novo ainda tinha `frontend/` sem
+  `node_modules/`, então `npm run dev` (que na prática é só `vite`)
+  falhava com `'vite' is not recognized...` (Windows) /
+  `vite: not found` (Linux) (check #3).
+
+As três são cobertas em `tests/test_launcher.py`, cada uma isolando
+`ROOT` para um diretório temporário e mockando `shutil.which`/
+`subprocess.run`/`subprocess.Popen` em vez de depender de um dado
+checkout/máquina de CI ter `frontend/`, `npm` ou `node_modules/` em
+algum estado específico.
+
+---
+
+# FRONTEND
+
+```text
+frontend/
+├── src/
+│   ├── api/client.js          -- fetch wrapper para a API
+│   ├── hooks/usePolling.js    -- polling hook usado pelas duas páginas
+│   ├── lib/format.js          -- formatação de currency/percent/date
+│   ├── components/            -- Panel, StatCard, Badge, TradesTable,
+│   │                             PnlChart, EventLog
+│   └── pages/
+│       ├── Dashboard.jsx      -- página Monitor
+│       └── Settings.jsx       -- página Settings
+└── vite.config.js             -- fixado na porta 5173 (bate com o CORS da API)
+```
+
+React + Vite. O estado é buscado via polling (`usePolling`, intervalo
+de 3s no dashboard, 15s nas settings) em vez de WebSocket — mais
+simples, e a API já é uma superfície REST simples.
+
+## Monitor (`pages/Dashboard.jsx`)
+
+Renderiza `GET /dashboard` (runtime + metrics + portfolio + trades
+abertos/fechados em uma única chamada). Equity, PnL total, drawdown,
+win rate, contagem de posições abertas e expectancy como stat cards;
+trades abertos e recém-fechados como tabelas; um gráfico de barras
+de PnL por trade; e um detalhamento do pipeline de sinais (executado
+vs. motivos de bloqueio de sinal, a partir de
+`runtime.execution_reasons` / `runtime.blocked_signal_reasons`).
+
+Mais dois painéis fazem polling dos seus próprios endpoints
+separadamente (intervalo de 5s, contra 3s da chamada principal do
+dashboard — mudam com menos frequência):
+
+- **`RiskStatusBanner`** (`GET /risk-status`) — verde com a contagem
+  de trades de hoje quando tudo liberado; vermelho nomeando o limite
+  exato violado (`DAILY_LOSS_LIMIT_REACHED` /
+  `DAILY_TRADE_LIMIT_REACHED`) quando o bot pausou por hoje. Ver
+  PROTEÇÃO DE RISCO DIÁRIA.
+- **`AdvancedMetricsPanel`** (`GET /metrics/advanced`) — Sharpe,
+  Sortino, max drawdown histórico, profit factor e sequências de
+  vitórias/derrotas atual/melhor. Ver ANÁLISE AVANÇADA DE TRADES.
+
+## Settings (`pages/Settings.jsx`)
+
+Dois painéis:
+
+- **Modo de execução** — mostra Paper como ativo, Live como
+  "Em breve" com `settings.live_trading_unavailable_reason` vindo da
+  API (mantido em sincronia com a real existência da execução ao
+  vivo, em vez de uma string fixa no frontend).
+- **Credenciais de API da carteira** — campos de key/secret da
+  **Testnet** da Binance. Credenciais já configuradas são exibidas
+  como uma máscara de tamanho fixo (`binance_api_key_masked`); o
+  valor real nunca é reenviado pela API depois de salvo. Salvar
+  envia apenas os campos que mudaram (`PUT /settings` com campos
+  opcionais), para que um campo vazio/intocado nunca limpe
+  acidentalmente uma chave já salva. Um botão explícito de "Clear"
+  por campo é a única forma de remover uma chave salva.
+
+## Settings API (`core/config/settings_repository.py`)
+
+Lê/escreve diretamente no `.env` real, preservando comentários,
+linhas em branco e ordem das chaves (um dump ingênuo de `os.environ`
+destruiria tudo isso). Pontos-chave:
+
+- `mode` aceita `"paper"` ou `"live"`. Trocar para `"live"` aqui
+  **não**, por si só, habilita ordens reais na mainnet — ver LIVE
+  TRADING abaixo para a trava separada e deliberada que faz isso.
+- API key/secret precisam ter exatamente 64 caracteres (formato da
+  Binance) ou string vazia para limpar.
+- `GET /settings` nunca retorna os valores reais de key/secret, só
+  `*_set: bool` e uma máscara fixa `••••••••`.
+- `live_trading_available` é `true` apenas quando AMBAS as
+  credenciais da Binance estão definidas E `LIVE_TRADING_CONFIRMED=true`
+  está setado no `.env` — nenhuma das duas sozinha é suficiente,
+  espelhando a própria trava do `BinanceTradingClient`.
+
+## LIVE TRADING
+
+Execução real de ordens contra a Binance, de ponta a ponta: uma
+entrada MARKET BUY, uma OCO protetora (stop loss + take profit)
+colocada imediatamente depois, e um restart automático do Runner ao
+trocar de modo pelo painel Settings.
+
+```text
+core/services/binance_trading_client.py    -- cliente REST autenticado
+core/services/execution_router.py          -- ponto de decisão paper vs. live
+core/services/process_manager_service.py    -- reinicia o processo Runner
+core/utils/runner_pid.py                    -- ponte de PID file API <-> Runner
+apps/api/main.py                            -- PUT /settings: bloqueio + restart
+frontend/src/pages/Settings.jsx             -- seletor de modo + modal de confirmação
+```
+
+### Por que um restart é necessário para trocar de modo
+
+`MODE` / `BINANCE_TESTNET` / `LIVE_TRADING_CONFIRMED` de
+`core/config/settings.py` são lidos uma única vez, no momento do
+import do Python. Um processo Runner em execução mantém os valores
+com que iniciou, independente do que for escrito no `.env` depois —
+não existe mecanismo in-process para fazê-lo captar um `MODE`
+alterado. Reiniciar o processo é o que recarrega `settings.py` a
+partir do `.env` atualizado. `PUT /settings` dispara isso
+automaticamente (só quando `mode` está de fato presente no request —
+atualizar apenas credenciais ou `binance_testnet` não reinicia nada,
+já que `execution_router.py` relê as settings do zero a cada chamada
+de `execute()` em vez de fazer cache delas).
+
+### A trava de segurança da mainnet
+
+Chegar à mainnet (fundos reais) exige **ambos**:
+1. `BINANCE_TESTNET=false`
+2. `LIVE_TRADING_CONFIRMED=true`
+
+Essas condições são deliberadamente separadas entre si e do `MODE`.
+Uma pessoa poderia setar `MODE=live` e `BINANCE_TESTNET=false` numa
+única edição do `.env` achando que estava configurando outra coisa —
+essa única edição nunca pode ser suficiente para habilitar colocação
+de ordens com dinheiro real. `LIVE_TRADING_CONFIRMED` precisa ser
+setado como seu próprio passo explícito. `BinanceTradingClient.__init__`
+lança `MainnetNotConfirmedError` se solicitado a mirar a mainnet sem
+isso — aplicado de novo no momento da construção, não só por quem
+quer que o tenha chamado, caso um bug futuro na própria verificação
+de `execution_router.py` seja algum dia introduzido.
+
+### Sequência de execução ao vivo
+
+1. **Entrada MARKET BUY.** Se falhar, nada aconteceu ainda — o sinal
+   é rejeitado exatamente como uma falha de validação.
+2. O **preço médio de fill real** é calculado a partir da resposta da
+   ordem (`cummulativeQuoteQty / executedQty`), nunca o preço que o
+   sinal pediu — uma ordem MARKET preenche pelo que o order book
+   oferecer. Todo preço downstream (stop loss, take profit) é
+   recalculado em relação a esse fill real, preservando a
+   *distância de risco original* que o RiskAgent calculou no momento
+   do sinal.
+3. A **OCO protetora** (take profit + stop loss juntos, via
+   `POST /api/v3/orderList/oco` — o endpoint atual, não deprecated)
+   é colocada usando esse preço de fill real.
+4. Só depois que **ambas** as ordens têm sucesso é que algo é escrito
+   na tabela local `trades`.
+
+### O modo de falha mais perigoso, e como é tratado
+
+Se a entrada tem sucesso mas a OCO falha, a conta agora detém uma
+**posição real e desprotegida** — sem stop loss, sem take profit,
+exposição total ao que o mercado fizer a seguir. Isso é tratado como
+pior que qualquer outra falha que esse código possa produzir,
+incluindo uma entrada totalmente falha, porque dinheiro real já está
+na mesa sem rede de segurança.
+
+A resposta é um **market SELL** imediato pela mesma quantidade,
+aceitando qualquer slippage que isso custe — uma perda pequena e
+conhecida, imediata, é um resultado muito melhor do que uma posição
+desprotegida ficar aberta até um humano perceber. Se esse fechamento
+de emergência *também* falhar, isso é logado em nível `ERROR` com
+uma mensagem inequívoca ("MANUAL INTERVENTION REQUIRED IMMEDIATELY")
+e um `ExecutionResult.reason` distinto
+(`LIVE_POSITION_UNPROTECTED_MANUAL_ACTION_REQUIRED`) — não há mais
+nenhum recurso automatizado a partir desse ponto, e a falha nunca
+pode ficar silenciosamente indistinguível de uma que foi tratada com
+sucesso.
+
+Coberto em `tests/test_execution_router.py`
+(`TestUnprotectedPositionHandling`, incluindo o cenário de pior caso
+de falha dupla) e `tests/test_binance_trading_client.py`.
+
+### Bloqueio de troca de modo com posição aberta
+
+`PUT /settings` retorna `409` se existir qualquer posição real
+(`Trade.status == "OPEN"`) quando `mode` está no payload do request —
+reiniciar o Runner com uma posição aberta deixaria o lifecycle dessa
+posição sem gerenciamento (nenhum agente observando seu stop
+loss/take profit) por todo o tempo que o restart levar. Isso é um
+bloqueio duro, não um aviso; a pessoa precisa fechar a posição
+primeiro. Atualizações que não tocam em `mode` nunca são bloqueadas
+por essa verificação, mesmo com uma posição aberta.
+
+### O bug do processo zumbi (encontrado e corrigido durante a construção disso)
+
+Confirmado empiricamente: quando o processo da API inicia o Runner
+via `subprocess.Popen` e manda `SIGTERM`, o filho vira um zumbi até
+que algo chame `Popen.wait()`/`.poll()` nele — `os.kill(pid, 0)` e
+`ps -p <pid>` **ambos** continuam reportando o zumbi como "vivo"
+indefinidamente, já que nada mais está posicionado para dar reap num
+filho daquele processo específico. `Popen.poll()` retornou `-15`
+(terminado, confirmado) no exato mesmo momento real em que `ps -p`
+ainda listava o processo como rodando.
+
+`process_manager_service.py` mantém um handle em memória
+(`_managed_process`) de qualquer Runner que ele mesmo tenha iniciado,
+e prefere `Popen.wait()`/`.poll()` para liveness/terminação sempre
+que esse handle existe — caindo de volta em
+`os.kill(pid, 0)`/`tasklist` só quando não existe (ex.: um Runner
+iniciado pelo terminal original do launcher, não pela API). Antes
+desse fix, reiniciar levava 10-15+ segundos (a cadeia completa de
+timeout graceful-depois-force-kill, toda vez) porque o zumbi nunca
+era detectado como morto; depois do fix completa em bem menos de um
+segundo.
+
+Coberto em `tests/test_process_manager_service.py`
+(`TestZombieProcessHandling`), usando um subprocesso real em vez de
+um mock, já que o bug é especificamente sobre semântica de
+processo/signal em nível de SO que um mock encobriria.
+
+### O que ainda é manual
+
+Nada em termos de *alertar* existe ainda além do log de console — o
+caso `MANUAL INTERVENTION REQUIRED` acima é tão alto quanto quem
+estiver olhando o terminal/arquivo de log naquele momento. Um alerta
+externo (email, SMS, webhook) para esse caminho de falha específico
+é uma próxima adição razoável, ainda não construída.
+
+---
+
+# TESTES
+
+```bash
+pip install -r scripts/bootstrap/requirements.txt pytest pytest-asyncio pytest-cov
+python -m pytest tests/
+```
+
+Relatório de coverage:
+
+```bash
+python -m pytest tests/ --cov=core --cov=data --cov=backtest --cov=apps --cov-report=term-missing
+```
+
+`tests/conftest.py` fornece duas fixtures autouse, com escopo de
+sessão:
+
+- **Banco isolado** — redireciona o engine e o `SessionLocal` de
+  `data.storage.database` para um arquivo SQLite temporário durante
+  toda a sessão de testes, e trunca tabelas entre testes. O
+  `data/storage/trades.db` real nunca é lido nem escrito pela suíte.
+- **Logs isolados** — redireciona os file handlers de
+  `runtime_logger`/`error_logger` para um diretório temporário. Os
+  `logs/runtime.log` e `logs/errors.log` reais nunca são escritos
+  pela suíte.
+
+A cobertura abrange: EventBus, todos os repositories, todos os
+serviços analíticos (ATR, EMA trend, market structure, market regime,
+signal quality), o pipeline completo de agentes (sinal → risco →
+execução → saída), o backtest engine e o optimizer, o validation
+interpreter, o dashboard FastAPI, as migrations do alembic contra um
+banco novo, e os scripts de bootstrap/launcher.
+
+---
+
+# ESTRUTURA DO PROJETO
+
+```text
+apps/
+core/
+data/
+backtest/
+frontend/
+scripts/
+alembic/
+logs/
+```
+
+---
+
+# BACKTEST ENGINE
+
+Fluxo:
+
+```text
+CSV
+ ↓
+ReplayEngine
+ ↓
+EventBus
+ ↓
+Agents
+ ↓
+Metrics
+```
+
+Arquivos:
+- backtest/engine/replay_engine.py
+- backtest/engine/metrics_engine.py
+- backtest/engine/report_engine.py
+
+---
+
+# ANÁLISE AVANÇADA DE TRADES
+
+`core/services/trade_analytics.py` contém funções puras, sem I/O,
+sobre uma lista de PnLs de trades (equity curve, max drawdown,
+sequências de vitórias/derrotas, profit factor, risk/reward, recovery
+factor, Sharpe, Sortino). Extraído de
+`backtest/engine/metrics_engine.py`, que originalmente calculava isso
+só para backtests, para que live trading e backtesting compartilhem
+uma única implementação em vez de duas que poderiam divergir
+silenciosamente.
+
+```text
+core/services/trade_analytics.py        -- funções puras
+core/services/trade_metrics_service.py  -- get_advanced_metrics() (live)
+backtest/engine/metrics_engine.py       -- generate() (backtest)
+```
+
+**Bug corrigido durante a extração:** a implementação original do
+backtest iterava `trades_repository.get_closed_trades()` diretamente,
+que ordena os resultados `DESC` por `closed_at` (mais recente
+primeiro). O loop de equity-curve/streak precisa de ordem cronológica
+(mais antigo primeiro) — `metrics_engine.py` agora inverte
+explicitamente a lista de trades antes de passá-la para
+`compute_equity_curve_stats()`.
+
+## Convenção de Sharpe / Sortino
+
+Ambos tratam o PnL de cada trade como uma observação de "retorno".
+Não existe uma taxa livre de risco natural por trade para um bot
+paper intraday, então ambos usam a forma simplificada, sem taxa
+livre de risco, comum na avaliação de estratégias de varejo:
+retorno médio ÷ desvio (downside) dos retornos. Isso serve para
+comparar a consistência trade a trade do próprio bot ao longo do
+tempo, não como substituto de um benchmark de risco livre em nível de
+instrumento. Sortino só penaliza o desvio de downside — uma sequência
+com um grande outlier de alta pontua significativamente mais alto do
+que uma com um outlier de baixa igualmente grande, mesmo com médias
+idênticas (ver `tests/test_trade_analytics.py::TestComputeSortinoRatio::
+test_only_penalizes_downside_not_upside_volatility`).
+
+## `max_drawdown` aqui vs. `PortfolioResponse.drawdown`
+
+Esses são números deliberadamente diferentes:
+
+- `trade_analytics.compute_equity_curve_stats()["max_drawdown"]` — a
+  verdadeira queda histórica de pico a vale em **todo trade fechado
+  já existente**, em dólares. Usado por `GET /metrics/advanced` e o
+  relatório de backtest.
+- Drawdown escopado por sessão do `PortfolioService` (ver DRAWDOWN:
+  ESCOPO DE SESSÃO) — um percentual medido contra o pico de equity
+  alcançado sob a **configuração atual de account-balance**. Usado
+  para o stat principal de drawdown do dashboard ao vivo e os circuit
+  breakers diário/de sessão.
+
+## API / Frontend
+
+`GET /metrics/advanced`
+(`apps/api/schemas/advanced_metrics_schema.py`) expõe
+`TradeMetricsService.get_advanced_metrics()` para o
+`AdvancedMetricsPanel` do dashboard (Sharpe, Sortino, max drawdown,
+profit factor, sequências de vitórias/derrotas atual/melhor).
+
+Coberto em `tests/test_trade_analytics.py`,
+`tests/test_backtest_engine.py` (cobertura de regressão do refactor)
+e `tests/test_api.py` (`TestAdvancedMetricsEndpoint`).
+
+---
+
+# OPTIMIZER & BACKTEST: DADOS HISTÓRICOS REAIS
+
+O `OptimizerEngine` de `backtest/optimizer/optimizer_engine.py`
+costumava ajustar parâmetros contra os mesmos CSVs sintéticos,
+pequenos e fixos, em `backtest/datasets/` a cada execução,
+independentemente de como o mercado real havia se movido desde então
+(esses arquivos: ~20 candles cada, última modificação em 2026-05-07,
+mais um `validation.csv` de 500 linhas). Agora ele busca histórico
+real da Binance pelo endpoint público de klines antes de cada
+execução.
+
+```text
+data/ingestion/binance_history.py   -- fetch/paginate/split/write
+backtest/optimizer/optimizer_engine.py
+                                     -- __init__/_prepare_datasets,
+                                        BLOCKING_VERDICTS gate
+```
+
+## Fetch
+
+`OptimizerEngine.HISTORY_DAYS` (90) dias de candles no intervalo de
+`KLINE_INTERVAL` por `SYMBOLS` configurado, via o endpoint *público*
+e não autenticado `/api/v3/klines` — dados de mercado somente
+leitura, do mesmo tipo de informação pública que o feed de WebSocket
+de `data/ingestion/binance_ws.py` já lê, não um endpoint autenticado
+de trading. Pagina (a Binance retorna no máximo 1000 candles/chamada),
+tenta de novo em caso de `429` respeitando o `Retry-After`, e tenta
+de novo erros de rede transitórios com backoff exponencial.
+
+**Recai nos datasets sintéticos** (com um `WARNING` claro no log,
+nunca um crash) se o fetch falhar por qualquer motivo — um soluço de
+rede nunca pode bloquear a execução de uma otimização por completo,
+deve só usar dados mais fracos de forma visível.
+
+## Split de treino/validação
+
+`OptimizerEngine.VALIDATION_DAYS` (15) dos candles **mais recentes**
+são reservados para validação; tudo mais antigo é dado de treino.
+Isso é um **split temporal, não aleatório**
+(`data.ingestion.binance_history.split_train_validation`) — embaralhar
+candles antes de dividir permitiria que o optimizer "validasse"
+contra dados cronologicamente intercalados com o que treinou, o que é
+data leakage: faria um conjunto de parâmetros overfit parecer
+validado quando nunca foi de fato testado contra dados não vistos.
+
+## Gate de validação
+
+**Bug corrigido:** `core/config/best_config.json` era escrito
+**incondicionalmente**, *antes* mesmo da validação walk-forward
+rodar. Um conjunto de parâmetros que o próprio relatório de validação
+do optimizer marcava como overfit (`PROMISING_BUT_SUSPICIOUS`) ou
+baseado em dados insuficientes (`INSUFFICIENT_DATA`) ainda era
+captado por `core/config/config_loader.py` no próximo start do
+Runner, exatamente como se tivesse passado na validação de forma
+limpa.
+
+Corrigido: o save agora acontece *depois* que o veredito walk-forward
+é conhecido, e é pulado por completo
+(`OptimizerEngine.BLOCKING_VERDICTS`) para `PROMISING_BUT_SUSPICIOUS`
+e `INSUFFICIENT_DATA`. `ROBUST` e `MODERATE` ainda salvam normalmente.
+Um save bloqueado deixa qualquer `best_config.json` já existente
+completamente intocado, logando um `WARNING` explicando o motivo.
+
+Coberto em `tests/test_binance_history.py` e
+`tests/test_optimizer_engine.py` (`TestPrepareDatasetsFallback`,
+`TestPrepareDatasetsSuccess`, `TestValidationGate`).
+
+## Backtest (`backtest/runner.py`)
+
+`backtest/runner.py` (opção de menu `[3]`) é um entrypoint
+**separado** do optimizer — ele avalia a estratégia atualmente
+configurada contra o histórico, em vez de ajustar parâmetros, então
+originalmente tinha sua própria lista `DATASETS` hardcoded apontando
+para os mesmos CSVs sintéticos, completamente desconectada do fetch
+de dados reais do optimizer.
+
+**Bug corrigido:** rodar o optimizer primeiro captava o histórico
+real da Binance (como projetado), mas rodar o Backtest depois ainda
+usava silenciosamente os datasets sintéticos antigos — os dois
+entrypoints nunca estiveram de fato conectados, então corrigir um não
+corrigia o outro.
+
+O Backtest agora chama seu próprio `prepare_datasets()` (espelhando
+`OptimizerEngine._prepare_datasets()`), buscando `HISTORY_DAYS` (90)
+dias de histórico real por símbolo com o mesmo comportamento de
+fallback para sintético em caso de falha. Sem split de
+treino/validação aqui, ao contrário do optimizer — o Backtest está
+avaliando a estratégia atual contra o histórico real, não
+selecionando parâmetros, então não há o risco de "validar contra os
+mesmos dados que treinou" a se prevenir.
+
+**Segundo bug corrigido durante essa integração:** a primeira versão
+de `prepare_datasets()` chamava `asyncio.run()` internamente, mas é
+invocada de dentro de `main()` — que já é uma função `async` rodando
+dentro do seu próprio `asyncio.run(main())` no entrypoint real
+(`if __name__ == "__main__": asyncio.run(main())`). Chamar
+`asyncio.run()` de novo a partir de um event loop já em execução
+lança `RuntimeError: asyncio.run() cannot be called from a running
+event loop` — que o próprio `except Exception` de `prepare_datasets()`
+capturava e engolia silenciosamente. O efeito prático: toda execução
+real caía de volta nos datasets sintéticos incondicionalmente,
+independente da disponibilidade de rede, porque o fetch real nunca
+conseguia de fato *rodar*, não porque falhava. Corrigido tornando
+`prepare_datasets()` em si `async` e dando `await` nela diretamente a
+partir de `main()`, sem nenhum `asyncio.run()` aninhado em nenhum
+ponto da cadeia de chamadas.
+
+Os arquivos de saída usam um sufixo `_backtest.csv`
+(`backtest/datasets/live_history/{symbol}_backtest.csv`), distinto
+dos `_train.csv`/`_validation.csv` do optimizer no mesmo diretório
+compartilhado — sem colisão de nome de arquivo entre os fetches dos
+dois entrypoints.
+
+Coberto em `tests/test_backtest_runner.py`
+(`TestPrepareDatasets`, incluindo
+`test_does_not_raise_runtime_error_when_called_from_a_running_loop`,
+o teste de regressão especificamente para o bug de aninhamento do
+asyncio).
+
+---
+
+# ROADMAP ATUAL
+
+## Próximos módulos
+
+- Alerta externo para o caminho de falha de posição desprotegida (ver
+  LIVE TRADING acima — hoje é só console-log)
+- PostgreSQL
+- Redis streams
+- distributed locking
+- retry engine
+- AI signal optimization
+
+---
+
+# REGRAS IMPORTANTES
+
+- Não quebrar state machine
+- Não remover validações
+- Não ignorar `user_id`
+- Não misturar payload contracts
+- Não criar session global
+- Não manter transaction aberta
+- Manter arquitetura async consistente
+
+---
+
+# CURRENT STATUS
+
+```text
+Core Infrastructure .......... 96%
+Trading Engine ............... 93%
+Lifecycle Engine ............. 94%
+Portfolio Engine ............. 90%
+Persistence Layer ............ 84%
+Exchange Integration ......... 50%
+Risk & Analytics ............. 85%
+Production Hardening ......... 75%
+
+TOTAL: ~85%
+```
+
+`Exchange Integration` em 50% (corrigido de uma estimativa anterior
+de 70%, não auditada — esses percentuais foram calculados de olho
+durante o desenvolvimento em vez de medidos contra algum critério
+real, e esse em particular não se sustentou): a sequência de
+entrada/OCO/fechamento de emergência existe e é testada com testes
+unitários contra respostas mockadas da Binance, mas três lacunas
+concretas a mantêm bem distante de "pronta":
+
+1. **Zero validação contra a API real da Binance**, nem mesmo
+   testnet — este ambiente de desenvolvimento não tem acesso de rede
+   a `api.binance.com` nem a `testnet.binance.vision`. Todo teste até
+   agora mocka a camada HTTP.
+2. **Sem rate-limit handling em `binance_trading_client.py`** — ao
+   contrário de `binance_history.py` (que tenta de novo em `429` com
+   backoff), o client de colocação de ordens não tem nenhum. Um rate
+   limit atingido durante um movimento rápido de mercado —
+   exatamente quando a execução em tempo hábil mais importa —
+   atualmente só falha de forma direta.
+3. **Sem reconciliação de startup** — o design original previa
+   verificar as ordens/posições abertas reais na exchange contra o
+   banco local quando o Runner inicia em modo live, e isso nunca foi
+   construído. Se o bot reinicia com uma posição real já aberta na
+   exchange, nada atualmente verifica isso antes de retomar a
+   operação normal.
+
+**Nota sobre estes percentuais:** os números acima são uma
+autoavaliação qualitativa feita durante o desenvolvimento, não uma
+métrica calculada por uma metodologia formal (cobertura de linhas,
+requisitos fechados, etc.) — trate-os como uma indicação aproximada
+de maturidade relativa entre módulos, não como um placar preciso. O
+que falta para os 15% restantes está descrito, item a item, acima e
+na seção "Roadmap Atual": validação contra a API real da Binance
+(incluindo testnet), rate-limiting no client de ordens, reconciliação
+de startup, alerta externo para posição desprotegida, e o
+fechamento das lacunas de Production Hardening/Persistence Layer que
+ainda não têm um item dedicado nesta lista.

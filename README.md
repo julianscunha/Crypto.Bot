@@ -1,17 +1,49 @@
-# CRYPTO.BOT
+# 🤖 CRYPTO.BOT
 
-Motor de trading algorítmico orientado a eventos com arquitetura multi-agent async.
+<p>
+  <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white">
+  <img alt="Node.js" src="https://img.shields.io/badge/node-20%2B-339933?logo=node.js&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
+  <img alt="Status" src="https://img.shields.io/badge/status-em%20desenvolvimento-yellow">
+  <img alt="Trading Mode" src="https://img.shields.io/badge/live%20trading-experimental-orange">
+</p>
+
+Motor de trading algorítmico orientado a eventos, com arquitetura
+**multi-agent** e **async**, construído em Python. Ingestão de mercado via
+WebSocket da Binance, pipeline de agentes desacoplados (análise → estratégia
+→ risco → execução → lifecycle de posição), backtesting/optimizer com dados
+históricos reais e um dashboard React para acompanhar tudo em tempo real.
 
 > ⚠️ **Aviso de risco.** Este projeto é oferecido apenas para fins educacionais
 > e de pesquisa. Trading de criptoativos envolve risco real de perda de
 > capital. O modo `live` (ordens reais na Binance) é experimental e possui
-> lacunas conhecidas — veja [Current Status](#current-status). Use `paper`
+> lacunas conhecidas — veja [Status Atual](#status-atual). Use `paper`
 > ou testnet até entender completamente o código e assumir o risco por sua
 > conta.
 
 ---
 
-## Prerequisites
+## Índice
+
+- [Pré-requisitos](#pré-requisitos)
+- [Instalação / Início Rápido](#instalação--início-rápido)
+- [Configuração](#configuração)
+- [Arquitetura Principal](#arquitetura-principal)
+- [Funcionalidades](#funcionalidades)
+- [Stack de Trading](#stack-de-trading)
+- [Modos de Execução](#modos-de-execução)
+- [Console Engine](#console-engine)
+- [Frontend](#frontend)
+- [Testes](#testes)
+- [Banco de Dados](#banco-de-dados)
+- [Regras Importantes](#regras-importantes)
+- [Status Atual](#status-atual)
+- [Documentação completa](#documentação-completa)
+- [Licença](#licença)
+
+---
+
+## Pré-requisitos
 
 - **Python 3.11+**
 - **Node.js 20+** e **npm** (apenas se for usar o dashboard/frontend)
@@ -22,7 +54,7 @@ Motor de trading algorítmico orientado a eventos com arquitetura multi-agent as
 
 ---
 
-## Installation / Quick Start
+## Instalação / Início Rápido
 
 ```bash
 git clone https://github.com/julianscunha/Crypto.Bot.git
@@ -32,7 +64,7 @@ cd Crypto.Bot
 cp .env.example .env
 ```
 
-Depois de configurar o `.env` (veja [Configuration](#configuration) abaixo),
+Depois de configurar o `.env` (veja [Configuração](#configuração) abaixo),
 suba o sistema com o launcher interativo:
 
 Windows:
@@ -71,7 +103,7 @@ existir.
 
 ---
 
-## Configuration
+## Configuração
 
 Toda a configuração vive no `.env` (nunca commitado — veja `.env.example`
 para o template completo com todos os valores). As variáveis mais
@@ -96,7 +128,7 @@ aba **Settings** do dashboard, em vez de editar o `.env` manualmente.
 
 ---
 
-## Core Architecture
+## Arquitetura Principal
 
 ```text
 BinanceWS
@@ -116,25 +148,25 @@ PositionManagerAgent
 
 ---
 
-## Features
+## Funcionalidades
 
-- Async event-driven engine
-- Multi-symbol trading
-- Multi-tenant isolation (`user_id`)
-- ATR volatility engine
-- EMA trend validation
-- Market structure validation
-- Risk management
-- Trailing stop engine
-- Portfolio analytics
-- Runtime metrics
-- Binance websocket ingestion
-- Backtest replay engine
-- AI-ready architecture
+- Engine orientada a eventos, async
+- Trading multi-symbol
+- Isolamento multi-tenant (`user_id`)
+- Engine de volatilidade ATR
+- Validação de tendência EMA
+- Validação de market structure
+- Gestão de risco
+- Engine de trailing stop
+- Analytics de portfolio
+- Métricas de runtime
+- Ingestão via WebSocket da Binance
+- Engine de replay para backtest
+- Arquitetura pronta para IA
 
 ---
 
-## Trading Stack
+## Stack de Trading
 
 - Python 3.11
 - AsyncIO
@@ -146,10 +178,10 @@ PositionManagerAgent
 
 ---
 
-## Runtime Modes
+## Modos de Execução
 
 - **PAPER** — execuções simuladas, sem conexão de ordens reais. Modo padrão e recomendado para explorar o projeto.
-- **LIVE** — ordens reais na Binance. Experimental, com lacunas conhecidas (veja [Current Status](#current-status)) e travado por design atrás de `LIVE_TRADING_CONFIRMED`.
+- **LIVE** — ordens reais na Binance. Experimental, com lacunas conhecidas (veja [Status Atual](#status-atual)) e travado por design atrás de `LIVE_TRADING_CONFIRMED`.
 - **BACKTEST** — replay de dados históricos via `backtest/runner.py` / Optimizer.
 
 ---
@@ -196,7 +228,7 @@ apenas para a origem do dev server do Vite (`apps/api/main.py`).
 
 ---
 
-## Tests
+## Testes
 
 ```bash
 pip install -r scripts/bootstrap/requirements.txt pytest pytest-asyncio pytest-cov
@@ -209,7 +241,7 @@ temporários (veja `tests/conftest.py`) — rodá-la nunca toca o
 
 ---
 
-## Database
+## Banco de Dados
 
 ```powershell
 alembic upgrade head
@@ -217,7 +249,7 @@ alembic upgrade head
 
 ---
 
-## Important Rules
+## Regras Importantes
 
 Regras de domínio que o código depende para funcionar corretamente — veja
 também `CLAUDE.md`/`AGENTS.md` para o detalhe completo:
@@ -231,7 +263,7 @@ também `CLAUDE.md`/`AGENTS.md` para o detalhe completo:
 
 ---
 
-## Current Status
+## Status Atual
 
 ```text
 Core Infrastructure .......... 96%
@@ -259,4 +291,30 @@ deixam longe de "pronta para produção":
 2. **Sem rate-limiting no client de ordens** (diferente do fetcher de dados históricos, que já trata `429`).
 3. **Sem reconciliação de startup** entre posições/ordens reais na exchange e o banco local.
 
-Veja `LIVE TRADING` em `README_FULL.md` para o detalhe completo.
+> **Sobre o `TOTAL: ~85%`.** Esse número (e o de cada módulo) é uma
+> autoavaliação qualitativa feita durante o desenvolvimento, não uma métrica
+> calculada por alguma metodologia formal (cobertura de linhas, requisitos
+> fechados, etc.) — trate como uma indicação aproximada de maturidade
+> relativa entre módulos, não como um placar preciso. O que falta para os
+> ~15% restantes é essencialmente o que está listado acima em `Exchange
+> Integration`, mais o fechamento das lacunas ainda abertas em `Production
+> Hardening` e `Persistence Layer`. Não há uma lista fixa e definitiva do que
+> soma exatamente até 100% — o roadmap completo (`docs/README_FULL.md`,
+> seção `ROADMAP ATUAL`) é a referência mais precisa do que ainda falta.
+
+Veja `LIVE TRADING` em [`docs/README_FULL.md`](docs/README_FULL.md) para o detalhe completo.
+
+---
+
+## Documentação completa
+
+Este README cobre o essencial para rodar o projeto. Para o detalhamento
+completo de cada engine, payload contracts, bugs históricos e o motivo por
+trás de decisões de design não óbvias, veja
+[`docs/README_FULL.md`](docs/README_FULL.md).
+
+---
+
+## Licença
+
+Distribuído sob a licença [MIT](LICENSE).

@@ -16,7 +16,7 @@ BinanceWS → EventBus → AnalystAgent → StrategyAgent → RiskAgent → Exec
 - `data/storage/` — models SQLAlchemy + `trades.db` (SQLite). `data/ingestion/` — WebSocket da Binance.
 - `backtest/` — engine, optimizer, runner; fixtures em `backtest/datasets/`.
 - `frontend/` — dashboard React + Vite (`Monitor` e `Settings`), fala com a API via `VITE_API_BASE_URL`.
-- Detalhe completo de status/roadmap em `README_FULL.md`.
+- Detalhe completo de status/roadmap em `docs/README_FULL.md`.
 
 ## Regras de domínio (nunca violar)
 

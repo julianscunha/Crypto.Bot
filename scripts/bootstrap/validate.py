@@ -221,7 +221,7 @@ def validate_venv():
 # =====================================================
 #
 # Informational only, like validate_venv(): the frontend is on the
-# roadmap (see README_FULL.md) and not built yet in this project, so
+# roadmap (see docs/README_FULL.md) and not built yet in this project, so
 # its absence must never fail validate_environment() or block
 # startup. This just surfaces the status proactively at boot instead
 # of only discovering it when menu option [4]/[5] is selected.
