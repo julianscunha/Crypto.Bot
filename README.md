@@ -209,7 +209,7 @@ npm install
 npm run dev
 ```
 
-Abra `http://localhost:5173`. Duas páginas:
+Abra `http://localhost:5173`. Três páginas:
 
 - **Monitor** — equity/PnL/drawdown do portfolio em tempo real, win rate,
   trades abertos e recém-fechados, atividade do pipeline de sinais, gráfico
@@ -218,9 +218,16 @@ Abra `http://localhost:5173`. Duas páginas:
   cada 3-5s.
 - **Settings** — Binance API key/secret (Testnet ou mainnet), seletor de
   modo de trading (Paper/Live, com modal de confirmação e reinício
-  automático do bot ao trocar — bloqueado enquanto houver posição aberta).
-  Segredos nunca são reenviados pela API depois de salvos — só se um valor
-  está definido ou não.
+  automático do bot ao trocar — bloqueado enquanto houver posição aberta),
+  saldo real da conta em modo live (atualizado a cada 30s) e o formulário
+  completo de parâmetros de risco/ATR/sinal/estrutura. Segredos nunca são
+  reenviados pela API depois de salvos — só se um valor está definido ou
+  não.
+- **Ferramentas** — roda o Optimizer e o Backtest contra dados reais da
+  Binance direto pela interface (sem precisar do terminal), com progresso
+  em tempo real, estimativa de duração baseada em execuções anteriores,
+  histórico paginado dos últimos jobs e um preview antes de aplicar a
+  melhor configuração encontrada pelo Optimizer.
 
 O frontend fala com a API pela URL definida em `frontend/.env`
 (`VITE_API_BASE_URL`, padrão `http://127.0.0.1:8000`). A API permite CORS
@@ -238,6 +245,13 @@ python -m pytest tests/
 A suíte de testes usa um banco SQLite, `.env` e arquivos de log isolados e
 temporários (veja `tests/conftest.py`) — rodá-la nunca toca o
 `data/storage/trades.db`, o `.env` ou os `logs/` reais.
+
+Frontend (Vitest + Testing Library):
+
+```bash
+cd frontend
+npm test
+```
 
 ---
 

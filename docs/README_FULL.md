@@ -648,20 +648,106 @@ dashboard — mudam com menos frequência):
 
 ## Settings (`pages/Settings.jsx`)
 
-Dois painéis:
+Quatro painéis, todos salvando via `PUT /settings` (campos opcionais
+— só o que mudou é enviado) e disparando `handleSaved` (que dá
+`refresh()` e emite o evento `window` `crypto-bot-settings-updated`,
+escutado por `Tools.jsx` para recarregar seus próprios settings):
 
-- **Modo de execução** — mostra Paper como ativo, Live como
-  "Em breve" com `settings.live_trading_unavailable_reason` vindo da
-  API (mantido em sincronia com a real existência da execução ao
-  vivo, em vez de uma string fixa no frontend).
-- **Credenciais de API da carteira** — campos de key/secret da
-  **Testnet** da Binance. Credenciais já configuradas são exibidas
-  como uma máscara de tamanho fixo (`binance_api_key_masked`); o
-  valor real nunca é reenviado pela API depois de salvo. Salvar
-  envia apenas os campos que mudaram (`PUT /settings` com campos
-  opcionais), para que um campo vazio/intocado nunca limpe
-  acidentalmente uma chave já salva. Um botão explícito de "Clear"
-  por campo é a única forma de remover uma chave salva.
+- **Modo de execução (`ModePanel`)** — três opções: **Paper**
+  (padrão, sem risco), **Live Testnet** e **Live Mainnet** (ordens
+  reais, marcado com badge de perigo). As duas opções Live ficam
+  bloqueadas (`Badge "Bloqueado"`) até `settings.live_trading_available`
+  vir `true` da API — que só acontece com credenciais configuradas
+  E `live_trading_confirmed=true` (ver Settings API abaixo). Trocar
+  de modo abre um modal de confirmação (`ModeConfirmModal`) antes de
+  enviar `PUT /settings`; a API já bloqueia a troca com posição
+  aberta (409 — ver `Bloqueação de troca de modo com posição aberta`
+  no LIVE TRADING abaixo).
+- **Credenciais da carteira (`CredentialsPanel`)** — key/secret da
+  Binance (Testnet ou mainnet, conforme o modo ativo). Credenciais já
+  configuradas são exibidas como uma máscara de tamanho fixo
+  (`binance_api_key_masked`); o valor real nunca é reenviado pela API
+  depois de salvo. Um botão "Limpar" por campo é a única forma de
+  remover uma chave salva. Em modo `live`, mostra o saldo real da
+  conta (`GET /account/live-balance`, atualizado a cada 30s); em modo
+  `paper`, o saldo é editável manualmente.
+- **Pares monitorados e mercado (`PairsPanel` + `MarketFields`)** —
+  grade de pares para ativar/desativar (validada contra a API pública
+  da Binance direto do browser, `GET api.binance.com/.../exchangeInfo`
+  — não passa pelo backend, então não é afetada pelo CORS restrito de
+  `apps/api/main.py`) e o timeframe dos candles. Ambos requerem
+  restart do bot para valer.
+- **Formulário unificado de parâmetros (`AllParamsForm`)** — todos os
+  demais parâmetros (risco, limites diários, ATR, qualidade de sinal,
+  estrutura de mercado, gestão de posição, precisão de exchange,
+  simulação) num único formulário com um único botão salvar, gerado
+  declarativamente a partir do array `GROUPS`. Cada campo tem um
+  tooltip com hint (hover no label, delay de 400ms).
+
+## Ferramentas (`pages/Tools.jsx`)
+
+Terceira página do frontend (não documentada anteriormente no README
+raiz) — roda o **Optimizer** e o **Backtest** direto pela interface,
+sem precisar do terminal:
+
+- Botões para disparar `POST /jobs/optimizer` (com seletor de janela
+  de dias: 30/60/90) ou `POST /jobs/backtest`, bloqueados enquanto o
+  Runner estiver ativo (job e bot nunca rodam ao mesmo tempo).
+- Progresso em tempo real via polling de `GET /jobs/status` +
+  `GET /jobs/progress` (intervalo de 1.5s enquanto um job está
+  rodando, 5s em repouso).
+- Estimativa de duração antes de rodar (`GET /jobs/estimate`) —
+  heurística baseada em execuções anteriores do mesmo tipo/janela,
+  guardadas em `backtest/reports/jobs_history.json`.
+- Histórico paginado dos últimos jobs (`GET /jobs/history`), com
+  resumo de resultado por item (winrate, PnL, profit factor para
+  backtest; melhores parâmetros + score para optimizer).
+- Preview antes de aplicar a melhor configuração encontrada pelo
+  Optimizer (`GET /jobs/preview-apply`, mostra config atual vs. nova
+  lado a lado) e confirmação explícita (`POST /jobs/apply`).
+- Botão "Forçar reset" (`POST /jobs/reset`) que aparece só quando o
+  estado interno do job trava (`_current_job["status"] == "running"`
+  mas a thread já morreu) — usa `get_open_orders`-style auto-detecção
+  no backend antes de expor a opção.
+
+## Testes automatizados do frontend
+
+```bash
+cd frontend
+npm test        # roda uma vez (vitest run)
+npm run test:watch   # modo watch, para desenvolvimento
+```
+
+Vitest + Testing Library (`@testing-library/react`,
+`@testing-library/user-event`, `jsdom`), configurado em
+`vite.config.js` (bloco `test:`) reutilizando o mesmo setup do Vite —
+sem arquivo de config separado. `src/setupTests.js` carrega os
+matchers do `@testing-library/jest-dom`.
+
+Cobertura atual:
+
+- `src/api/client.test.js` — o wrapper `request()` (sucesso, erro de
+  rede vira `ApiError` com `status=0`, erro HTTP usa `detail` do
+  corpo da resposta, fallback para mensagem genérica sem corpo JSON,
+  `204` retorna `null`) e a construção de query string/método/corpo
+  de alguns endpoints representativos.
+- `src/hooks/usePolling.test.js` — estado de loading inicial, dado
+  populado após o primeiro fetch, erro não limpa dado anterior
+  (stale-but-visible), `refresh()` dispara fetch imediato, polling
+  para após unmount.
+- `src/pages/Dashboard.test.jsx` — loading state, render dos dados
+  do portfolio após resolver, error state quando a API está
+  inacessível, badge de feed de mercado conectado/desconectado.
+  `api` é mockado via `vi.mock` — nenhum destes testes faz rede real.
+- `src/pages/Settings.test.jsx` — loading/error state, render dos
+  quatro painéis, bloqueio dos modos Live sem
+  `live_trading_available`, fluxo completo de troca de modo
+  (clique → modal de confirmação → `PUT /settings`), e edição de um
+  parâmetro no formulário unificado até o payload salvo (valores
+  `int`/`float` são convertidos antes do envio, testado
+  explicitamente). `PairsPanel`'s `fetch` direto à Binance é mockado
+  para falhar rápido e cair no fallback local (`DEFAULT_PAIRS`), já
+  que não há rede disponível no ambiente de teste.
 
 ## Settings API (`core/config/settings_repository.py`)
 
