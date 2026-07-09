@@ -62,6 +62,10 @@ class TestSqlitePragmaListener:
 
             foreign_keys = cursor.fetchone()[0]
 
+            cursor.execute("PRAGMA busy_timeout;")
+
+            busy_timeout = cursor.fetchone()[0]
+
             connection.close()
 
             test_engine.dispose()
@@ -69,6 +73,10 @@ class TestSqlitePragmaListener:
             assert journal_mode.lower() == "wal"
 
             assert foreign_keys == 1
+
+            # mitigates "database is locked" under concurrent writes
+            # from the API and Runner processes sharing trades.db
+            assert busy_timeout == 5000
 
 
 class TestInitDb:

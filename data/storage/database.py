@@ -66,6 +66,25 @@ def set_sqlite_pragma(
     )
 
     # =================================================
+    # BUSY TIMEOUT
+    # =================================================
+    #
+    # Without this, a write that finds the SQLite file locked by
+    # another connection fails immediately with "database is
+    # locked" instead of waiting -- a real risk here since the API
+    # and the Runner are two separate OS processes writing to the
+    # same trades.db (see data/storage/database.py's own module
+    # docstring context in docs/README_FULL.md). WAL mode already
+    # allows concurrent readers alongside a single writer, but two
+    # near-simultaneous writers can still collide briefly; this
+    # makes SQLite retry for up to 5s before raising, instead of
+    # failing on the first collision.
+
+    cursor.execute(
+        "PRAGMA busy_timeout=5000;"
+    )
+
+    # =================================================
     # MEMORY TEMP STORE
     # =================================================
 

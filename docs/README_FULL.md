@@ -1146,6 +1146,52 @@ asyncio).
 
 ---
 
+# PERSISTENCE LAYER (`data/storage/database.py`)
+
+## `PRAGMA busy_timeout`
+
+Além dos PRAGMAs já existentes (`journal_mode=WAL`,
+`synchronous=NORMAL`, `temp_store=MEMORY`, `foreign_keys=ON`),
+`busy_timeout=5000` (5s) foi adicionado ao mesmo listener de conexão.
+A API e o Runner são dois processos do SO separados escrevendo no
+mesmo `trades.db` — WAL já permite leitores concorrentes junto com um
+único escritor, mas duas escritas quase simultâneas ainda podem
+colidir por uma fração de segundo. Sem `busy_timeout`, essa colisão
+falha imediatamente com `database is locked`; com ele, SQLite tenta
+de novo por até 5s antes de desistir. Coberto por
+`tests/test_database_init.py::TestSqlitePragmaListener`.
+
+## Backup (`scripts/backup_db.py`)
+
+```bash
+python scripts/backup_db.py [--keep N]
+```
+
+Cria uma cópia timestamped de `data/storage/trades.db` em
+`data/storage/backups/` (ambos ignorados pelo git — mesma regra que
+já cobre `*.db`) e remove os backups mais antigos além do limite
+`--keep` (padrão: 10). Usa a própria API de backup do `sqlite3`
+(`Connection.backup()`) em vez de uma cópia de arquivo simples —
+como o banco roda em modo WAL, copiar só o `.db` pelo sistema de
+arquivos pode perder escritas ainda pendentes no `.db-wal` e gerar um
+snapshot inconsistente; a API de backup fala diretamente com o SQLite
+e sempre produz uma cópia completa e consistente, sem precisar parar
+a API/Runner primeiro.
+
+Não há agendador embutido no projeto — para rodar periodicamente, use
+o agendador do próprio SO (`cron` no Linux/macOS, Agendador de
+Tarefas no Windows) apontando para esse comando. Coberto por
+`tests/test_backup_db.py`.
+
+## PostgreSQL
+
+Permanece fora do escopo do roadmap atual (ver `ROADMAP ATUAL`
+abaixo) — SQLite com WAL + `busy_timeout` é considerado suficiente
+para o volume de escrita atual (um único bot por instância, poucas
+escritas por segundo mesmo em picos de sinal).
+
+---
+
 # PRODUCTION HARDENING (`apps/api/main.py`, `apps/trader/runner.py`)
 
 ## Autenticação de API (`X-API-Token`)
