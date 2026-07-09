@@ -255,22 +255,18 @@ async def unhandled_exception_handler(
 # CORS
 # =====================================================
 #
-# The dashboard frontend (Vite dev server, default
-# http://localhost:5173) runs on a different origin than the API
-# (http://127.0.0.1:8000), so the browser needs CORS headers to be
-# allowed to call it. Restricted to localhost dev origins -- this API
-# isn't meant to be exposed publicly.
+# The dashboard frontend runs on a different origin than the API, so
+# the browser needs CORS headers to be allowed to call it. Defaults
+# to the Vite dev server's two localhost variants
+# (settings.CORS_ALLOWED_ORIGINS) -- override via CORS_ALLOWED_ORIGINS
+# in .env for other setups (e.g. the Docker-built frontend served by
+# nginx on a different origin, see docker-compose.yml).
 
 app.add_middleware(
 
     CORSMiddleware,
 
-    allow_origins=[
-
-        "http://localhost:5173",
-
-        "http://127.0.0.1:5173"
-    ],
+    allow_origins=settings.CORS_ALLOWED_ORIGINS,
 
     allow_credentials=True,
 

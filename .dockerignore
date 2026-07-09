@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+.venv/
+venv/
+env/
+
+# Env / secrets -- never bake these into an image
+.env
+frontend/.env
+
+# Database -- mounted via volume, never baked into the image
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+data/storage/backups/
+
+# Frontend build artifacts (rebuilt inside the image)
+frontend/node_modules/
+frontend/dist/
+frontend/.DS_Store
+
+# Runtime / local execution artifacts
+logs/
+runtime/
+backtest/datasets/live_history/
+backtest/reports/*.json
+structure.txt
+
+# VCS / editor
+.git/
+.github/
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -27,6 +27,7 @@ históricos reais e um dashboard React para acompanhar tudo em tempo real.
 
 - [Pré-requisitos](#pré-requisitos)
 - [Instalação / Início Rápido](#instalação--início-rápido)
+- [Docker](#docker)
 - [Configuração](#configuração)
 - [Arquitetura Principal](#arquitetura-principal)
 - [Funcionalidades](#funcionalidades)
@@ -100,6 +101,24 @@ ausente (um checkout novo nunca tem — não é versionado), o launcher roda
 não existir ou `npm` não for encontrado, ele registra um aviso e continua
 rodando só com API + Runner — o Full Stack nunca depende do frontend
 existir.
+
+---
+
+## Docker
+
+Alternativa ao launcher local: `Dockerfile` (multi-stage) +
+`docker-compose.yml` sobem API, Runner e frontend (nginx) como três
+containers separados.
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Frontend em `http://localhost:8080`, API em `http://localhost:8000`.
+Guia completo (variáveis específicas do Docker, segurança antes de
+expor além de localhost, backup do banco em container) em
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ---
 

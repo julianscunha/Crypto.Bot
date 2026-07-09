@@ -1354,6 +1354,26 @@ duplicação de `jobs_status`).
 
 ---
 
+# DEPLOY (Docker)
+
+`Dockerfile` multi-stage (frontend Node → nginx; backend Python,
+usado tanto pela API quanto pelo Runner via `command:` diferente no
+Compose) + `docker-compose.yml` orquestrando os três serviços. Guia
+completo — variáveis específicas do Docker
+(`VITE_API_BASE_URL`, `CORS_ALLOWED_ORIGINS`), segurança antes de
+expor além de localhost, a divergência entre o Runner gerenciado pelo
+Compose vs. pelo botão ▶ do frontend, e backup do banco dentro de um
+container — em [`docs/DEPLOYMENT.md`](DEPLOYMENT.md).
+
+Testado manualmente de ponta a ponta: build das três imagens, os três
+containers saudáveis, Runner conectando de verdade ao WebSocket da
+Binance, CORS liberando a origem do frontend, e `PUT /settings`
+persistindo no `.env` do host via bind mount (sobrevive a
+`docker compose down && up` — sem esse bind mount, escritas do painel
+Settings cairiam na camada efêmera do container e seriam perdidas).
+
+---
+
 # ROADMAP ATUAL
 
 ## Próximos módulos

@@ -242,6 +242,23 @@ class Settings:
         "10/minute"
     )
 
+    # Comma-separated list of origins allowed by CORS (apps/api/main.py).
+    # Defaults to the Vite dev server's two localhost variants -- the
+    # only origins that mattered before Docker existed. Overriding
+    # this is how the Docker-built frontend (served from nginx on a
+    # different origin/port -- see docker-compose.yml) is allowed to
+    # call this API from the browser. Deliberately NOT using
+    # env_list() above -- it uppercases every value, which is correct
+    # for ticker symbols but would corrupt a URL's scheme/host.
+    CORS_ALLOWED_ORIGINS = [
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ALLOWED_ORIGINS",
+            "http://localhost:5173,http://127.0.0.1:5173"
+        ).split(",")
+        if origin.strip()
+    ]
+
     # =================================================
     # ALERTING
     # =================================================

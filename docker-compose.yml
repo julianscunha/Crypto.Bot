@@ -1,0 +1,75 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    command: ["uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - trades_db:/app/data/storage
+      - runner_logs:/app/logs
+      # core/config/settings_repository.py (backing PUT /settings,
+      # the Settings page) reads and writes .env directly on disk --
+      # without this bind mount, those writes would land on the
+      # container's ephemeral filesystem layer and be silently lost
+      # on the next `docker compose up`/recreate. Bind-mounting the
+      # host's real .env makes that persist exactly like it already
+      # does outside Docker, and keeps the env_file injection above
+      # (read once at container start) and this file (read/written
+      # live by the Settings page) in sync.
+      - ./.env:/app/.env
+    restart: unless-stopped
+
+  runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    command: ["python", "-m", "apps.trader.runner"]
+    env_file:
+      - .env
+    volumes:
+      - trades_db:/app/data/storage
+      - runner_logs:/app/logs
+      - runner_state:/app/runtime
+      # see the api service's identical mount above -- the Runner
+      # also reads .env directly at points (apps/trader/runner.py's
+      # _get_env_mode()), independent of the env vars already
+      # injected via env_file at container start.
+      - ./.env:/app/.env
+    restart: unless-stopped
+    # The Runner only trades in MODE=live (see apps/trader/runner.py);
+    # in MODE=paper (the default) it's still useful to run for the
+    # paper-trading simulation itself. Comment this service out
+    # entirely if you'd rather start/stop the bot from the frontend's
+    # ▶ button (POST /runner/start, via the api container) instead of
+    # having Compose manage its lifecycle.
+    depends_on:
+      - api
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+      args:
+        # Must be reachable from the BROWSER, not from inside the
+        # Docker network -- this is baked into the JS bundle at build
+        # time (see the Dockerfile's frontend-build stage). Override
+        # via .env / a build-time --build-arg if the API is exposed
+        # on a different host/port than localhost:8000.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  trades_db:
+  runner_logs:
+  runner_state:
