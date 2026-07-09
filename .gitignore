@@ -12,12 +12,21 @@ env/
 # Database
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
 
 # Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/.env
 frontend/.DS_Store
+
+# Runtime / local execution artifacts
+logs/
+runtime/
+backtest/datasets/live_history/
+backtest/reports/*.json
+structure.txt
 
 # OS Files
 .DS_Store
