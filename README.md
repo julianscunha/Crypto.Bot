@@ -303,37 +303,55 @@ Core Infrastructure .......... 96%
 Trading Engine ............... 93%
 Lifecycle Engine ............. 94%
 Portfolio Engine ............. 90%
-Persistence Layer ............ 84%
-Exchange Integration ......... 50%
-Risk & Analytics ............. 85%
-Production Hardening ......... 75%
-Frontend ..................... 60%
+Persistence Layer ............. 90%
+Exchange Integration .......... 78%
+Risk & Analytics ............... 85%
+Production Hardening .......... 92%
+Frontend ....................... 75%
+Deploy (Docker) ................ 90%
 
-TOTAL: ~85%
+TOTAL: ~88%
 ```
 
-`Exchange Integration` está em 50% (corrigido de uma estimativa anterior,
-não auditada, de 70% -- esses percentuais foram estimados durante o
-desenvolvimento sem uma metodologia real, e essa em particular não se
-sustentou). A execução real de ordens existe (entrada + OCO protetor +
-fallback de fechamento de emergência) e é testada com testes unitários
-contra respostas mockadas da Binance, mas três lacunas concretas ainda a
-deixam longe de "pronta para produção":
+Depois da limpeza de segurança para tornar o repositório público, um
+roadmap de 6 fases fechou a maior parte das lacunas concretas que
+sustentavam os números anteriores (`Exchange Integration` 50%,
+`Production Hardening` 75%, `Persistence Layer` 84%, `Frontend` 60%) —
+ver `ROADMAP ATUAL` em [`docs/README_FULL.md`](docs/README_FULL.md)
+para o detalhe de cada fase. Resumo do que mudou:
 
-1. **Zero validação contra a API real da Binance** (nem testnet).
-2. **Sem rate-limiting no client de ordens** (diferente do fetcher de dados históricos, que já trata `429`).
-3. **Sem reconciliação de startup** entre posições/ordens reais na exchange e o banco local.
+- **`Exchange Integration`** — reconciliação de startup implementada
+  (posição fechada enquanto offline, OCO sumida, ordens órfãs na
+  Binance sem trade local), com o fechamento de emergência agora
+  restrito ao erro `-2013` confirmado (em vez de qualquer exceção).
+  O rate-limiting no client de ordens já existia (a doc anterior
+  estava desatualizada nesse ponto). **Ainda falta**: validação real
+  contra a API da Binance (nem testnet) — impossível neste ambiente
+  de desenvolvimento sem acesso de rede; há um checklist de validação
+  manual em `docs/README_FULL.md`.
+- **`Production Hardening`** — autenticação por token, rate limiting,
+  handler global de exceção, shutdown gracioso (`SIGTERM`/`SIGINT`)
+  e alerta externo via webhook, todos novos.
+- **`Persistence Layer`** — `PRAGMA busy_timeout` e script de backup
+  com rotação. PostgreSQL segue fora de escopo, por decisão.
+- **`Frontend`** — página `Tools.jsx` documentada; testes
+  automatizados (Vitest + Testing Library) cobrindo o wrapper de API,
+  `usePolling` e as páginas Dashboard/Settings — ainda não cobre
+  `Tools.jsx` nem os componentes visuais menores.
+- **`Deploy (Docker)`** — módulo novo: `Dockerfile` multi-stage +
+  `docker-compose.yml`, testado de ponta a ponta manualmente.
 
-> **Sobre o `TOTAL: ~85%`.** Esse número (e o de cada módulo) é uma
-> autoavaliação qualitativa feita durante o desenvolvimento, não uma métrica
-> calculada por alguma metodologia formal (cobertura de linhas, requisitos
-> fechados, etc.) — trate como uma indicação aproximada de maturidade
-> relativa entre módulos, não como um placar preciso. O que falta para os
-> ~15% restantes é essencialmente o que está listado acima em `Exchange
-> Integration`, mais o fechamento das lacunas ainda abertas em `Production
-> Hardening` e `Persistence Layer`. Não há uma lista fixa e definitiva do que
-> soma exatamente até 100% — o roadmap completo (`docs/README_FULL.md`,
-> seção `ROADMAP ATUAL`) é a referência mais precisa do que ainda falta.
+> **Sobre o `TOTAL: ~88%`.** Esse número (e o de cada módulo) é uma
+> autoavaliação qualitativa, não uma métrica calculada por alguma
+> metodologia formal (cobertura de linhas, requisitos fechados,
+> etc.) — trate como uma indicação aproximada de maturidade relativa
+> entre módulos, não como um placar preciso. O maior gap restante é a
+> falta de validação contra a Binance real (testnet ou mainnet) em
+> qualquer parte do fluxo de execução — algo que só pode ser feito
+> manualmente, fora deste ambiente de desenvolvimento. Não há uma
+> lista fixa e definitiva do que soma exatamente até 100% — o roadmap
+> completo (`docs/README_FULL.md`, seção `ROADMAP ATUAL`) é a
+> referência mais precisa do que ainda falta.
 
 Veja `LIVE TRADING` em [`docs/README_FULL.md`](docs/README_FULL.md) para o detalhe completo.
 

@@ -1376,8 +1376,32 @@ Settings cairiam na camada efêmera do container e seriam perdidas).
 
 # ROADMAP ATUAL
 
+## Fases concluídas
+
+Roadmap de 6 fases para elevar a maturidade do projeto depois da
+limpeza de segurança que o tornou público, da maior para a menor
+exposição a risco financeiro/segurança:
+
+1. **Exchange Integration** — reconciliação de startup (3 cenários),
+   fechamento de emergência restrito ao erro `-2013` confirmado.
+2. **Production Hardening** — auth por token, rate limiting, handler
+   global de exceção, shutdown gracioso, alerta via webhook.
+3. **Persistence Layer** — `PRAGMA busy_timeout`, backup com rotação.
+4. **Frontend** — documentação de `Tools.jsx`, testes automatizados
+   (Vitest + Testing Library).
+5. **Docker / Deploy** — `Dockerfile` multi-stage + `docker-compose.yml`.
+6. **Atualização do `CURRENT STATUS`** — este documento, refletindo o
+   trabalho das 5 fases anteriores.
+
+Detalhe completo de cada uma nas seções correspondentes acima (`LIVE
+TRADING`, `PRODUCTION HARDENING`, `PERSISTENCE LAYER`, `Testes
+automatizados do frontend`, `DEPLOY (Docker)`) e em `CURRENT STATUS`.
+
 ## Próximos módulos
 
+- Validação manual contra a Binance Testnet real (ver checklist em
+  `LIVE TRADING` acima) — o maior gap restante, fora do alcance deste
+  ambiente de desenvolvimento.
 - PostgreSQL
 - Redis streams
 - distributed locking
@@ -1405,47 +1429,76 @@ Core Infrastructure .......... 96%
 Trading Engine ............... 93%
 Lifecycle Engine ............. 94%
 Portfolio Engine ............. 90%
-Persistence Layer ............ 84%
-Exchange Integration ......... 50%
-Risk & Analytics ............. 85%
-Production Hardening ......... 75%
+Persistence Layer ............. 90%
+Exchange Integration .......... 78%
+Risk & Analytics ............... 85%
+Production Hardening .......... 92%
+Frontend ....................... 75%
+Deploy (Docker) ................ 90%
 
-TOTAL: ~85%
+TOTAL: ~88%
 ```
 
-`Exchange Integration` em 50% (corrigido de uma estimativa anterior
-de 70%, não auditada — esses percentuais foram calculados de olho
-durante o desenvolvimento em vez de medidos contra algum critério
-real, e esse em particular não se sustentou): a sequência de
-entrada/OCO/fechamento de emergência existe e é testada com testes
-unitários contra respostas mockadas da Binance, mas três lacunas
-concretas a mantêm bem distante de "pronta":
+Um roadmap de 6 fases (ver `ROADMAP ATUAL` abaixo, seção "Fases
+concluídas") fechou a maior parte das lacunas concretas que sustentavam
+os números anteriores. Por módulo:
 
-1. **Zero validação contra a API real da Binance**, nem mesmo
-   testnet — este ambiente de desenvolvimento não tem acesso de rede
-   a `api.binance.com` nem a `testnet.binance.vision`. Todo teste até
-   agora mocka a camada HTTP.
-2. **Sem rate-limit handling em `binance_trading_client.py`** — ao
-   contrário de `binance_history.py` (que tenta de novo em `429` com
-   backoff), o client de colocação de ordens não tem nenhum. Um rate
-   limit atingido durante um movimento rápido de mercado —
-   exatamente quando a execução em tempo hábil mais importa —
-   atualmente só falha de forma direta.
-3. **Sem reconciliação de startup** — o design original previa
-   verificar as ordens/posições abertas reais na exchange contra o
-   banco local quando o Runner inicia em modo live, e isso nunca foi
-   construído. Se o bot reinicia com uma posição real já aberta na
-   exchange, nada atualmente verifica isso antes de retomar a
-   operação normal.
+**`Exchange Integration`** (50% → 78%) — dos três gaps concretos
+listados na versão anterior deste documento, dois foram fechados:
+
+1. ~~Sem rate-limit handling em `binance_trading_client.py`~~ — na
+   verdade já existia (`_request()`, `MAX_RATE_LIMIT_RETRIES=3`,
+   testado em `TestRateLimitRetry`); esta nota estava desatualizada,
+   não o código.
+2. ~~Sem reconciliação de startup~~ — implementada em
+   `core/services/startup_reconciler.py`: posição fechada enquanto o
+   bot estava offline, OCO confirmadamente sumida (só `-2013`
+   aciona fechamento de emergência automático — qualquer outro erro
+   apenas alerta), ordens órfãs na Binance sem trade local
+   correspondente, e trades legados sem `order_list_id`. Ver `LIVE
+   TRADING` acima para o detalhe completo e `tests/test_startup_reconciler.py`
+   para a cobertura.
+3. **Ainda em aberto: zero validação contra a API real da Binance**,
+   nem mesmo testnet — este ambiente de desenvolvimento não tem
+   acesso de rede a `api.binance.com` nem a `testnet.binance.vision`.
+   Todo teste mocka a camada HTTP. Um checklist de validação manual
+   (testnet, chaves reais de teste) está documentado logo acima, em
+   `LIVE TRADING`. Este é o maior gap restante do projeto como um
+   todo — nenhuma fase consegue fechá-lo sem acesso de rede real.
+
+**`Production Hardening`** (75% → 92%) — autenticação por token
+(`X-API-Token`/`API_ACCESS_TOKEN`), rate limiting (`slowapi`), handler
+global de exceção não tratada, shutdown gracioso via
+`SIGTERM`/`SIGINT` com flush final de runtime state, e alerta externo
+configurável via webhook (`core/services/alert_service.py`) — wireado
+tanto no caminho de posição desprotegida quanto nos três pontos
+`CRITICAL` novos da reconciliação de startup. `core/orchestrator/orchestrator.py`
+(stub morto) removido.
+
+**`Persistence Layer`** (84% → 90%) — `PRAGMA busy_timeout=5000` e
+`scripts/backup_db.py` (backup timestamped com rotação, usando a API
+de backup do `sqlite3` para uma cópia consistente mesmo em WAL).
+PostgreSQL permanece fora de escopo, por decisão explícita, não por
+lacuna.
+
+**`Frontend`** (60% → 75%) — página `Tools.jsx` (optimizer/backtest
+pela interface) documentada, antes ausente do README. Testes
+automatizados (Vitest + Testing Library) cobrindo o wrapper de API
+(`client.js`), `usePolling` e as páginas Dashboard/Settings — ainda
+sem cobertura de `Tools.jsx` nem dos componentes visuais menores
+(`TradesTable`, `PnlChart`, etc.), por isso não é 100%.
+
+**`Deploy (Docker)`** (módulo novo, 90%) — `Dockerfile` multi-stage +
+`docker-compose.yml`, testado manualmente de ponta a ponta (build das
+três imagens, containers saudáveis, Runner conectando de verdade ao
+WebSocket da Binance, `PUT /settings` persistindo via bind mount do
+`.env`). Ver `DEPLOY (Docker)` abaixo e `docs/DEPLOYMENT.md`.
 
 **Nota sobre estes percentuais:** os números acima são uma
-autoavaliação qualitativa feita durante o desenvolvimento, não uma
-métrica calculada por uma metodologia formal (cobertura de linhas,
-requisitos fechados, etc.) — trate-os como uma indicação aproximada
-de maturidade relativa entre módulos, não como um placar preciso. O
-que falta para os 15% restantes está descrito, item a item, acima e
-na seção "Roadmap Atual": validação contra a API real da Binance
-(incluindo testnet), rate-limiting no client de ordens, reconciliação
-de startup, alerta externo para posição desprotegida, e o
-fechamento das lacunas de Production Hardening/Persistence Layer que
-ainda não têm um item dedicado nesta lista.
+autoavaliação qualitativa, não uma métrica calculada por uma
+metodologia formal (cobertura de linhas, requisitos fechados, etc.)
+— trate-os como uma indicação aproximada de maturidade relativa entre
+módulos, não como um placar preciso. O maior gap restante do projeto
+inteiro é a falta de validação contra a Binance real (testnet ou
+mainnet) — item 3 de `Exchange Integration` acima — algo que só pode
+ser fechado manualmente, fora deste ambiente de desenvolvimento.
