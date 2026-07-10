@@ -85,13 +85,20 @@ def print_system_panel():
 
     from core.config.trading_config import TRADING_CONFIG
     from core.config.trade_management_config import TRADE_MANAGEMENT_CONFIG
+    from core.services.runtime_balance import get_balance
 
     mode    = settings.MODE.upper()
     testnet = getattr(settings, 'BINANCE_TESTNET', True)
     mode_label = f"LIVE {'TESTNET' if testnet else 'MAINNET ⚠'}" if mode == 'LIVE' else 'PAPER'
     mode_level = 'SUCCESS' if (mode == 'LIVE' and testnet) else 'WARNING'
 
-    balance    = TRADING_CONFIG.get('account_balance', 0)
+    # Em modo LIVE, main() já chamou set_balance() com o saldo real
+    # da Binance antes de chegar aqui -- ler TRADING_CONFIG direto
+    # mostraria o valor estático do .env (ACCOUNT_BALANCE), que pode
+    # divergir muito do saldo real (ex.: .env com $101 configurado,
+    # conta testnet real com $2.97). get_balance() com fallback para
+    # TRADING_CONFIG cobre o caso PAPER, onde nenhum fetch acontece.
+    balance    = get_balance(TRADING_CONFIG.get('account_balance', 0))
     risk       = TRADING_CONFIG.get('risk_per_trade_percent', 0)
     rr_min     = TRADING_CONFIG.get('minimum_risk_reward_ratio', 0)
     max_pos    = getattr(settings, 'MAX_OPEN_POSITIONS', '?')
@@ -159,6 +166,8 @@ def initialize_agents(
 
 def print_session_report():
 
+    from core.services.runtime_balance import get_balance
+
     portfolio_service = (
         PortfolioService()
     )
@@ -170,7 +179,10 @@ def print_session_report():
 
             user_id=0,
 
-            initial_balance=(
+            # Mesmo raciocínio de print_system_panel(): em LIVE, o
+            # saldo real da Binance (buscado no startup) deve ser a
+            # base do relatório, não o valor estático do .env.
+            initial_balance=get_balance(
                 TRADING_CONFIG[
                     "account_balance"
                 ]
