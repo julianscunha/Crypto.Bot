@@ -18,9 +18,18 @@ const DEFAULT_PAIRS = [
 // PAINEL DE PARES MONITORADOS
 // =====================================================
 
+const KLINE_INTERVAL_FIELD = {
+  key: "kline_interval",
+  label: "Intervalo dos candles",
+  type: "select",
+  options: ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"],
+  hint: "Timeframe de cada candlestick. 5m é o padrão. Requer reinicialização.",
+};
+
 function PairsPanel({ settings, onSaved }) {
   const [validPairs, setValidPairs] = useState(DEFAULT_PAIRS);
   const [selectedPairs, setSelectedPairs] = useState([]);
+  const [klineInterval, setKlineInterval] = useState(settings.kline_interval ?? "5m");
   const [pairsLoaded, setPairsLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -56,10 +65,19 @@ function PairsPanel({ settings, onSaved }) {
     setSelectedPairs(current);
   }, [settings.symbols]);
 
+  useEffect(() => {
+    setKlineInterval(settings.kline_interval ?? "5m");
+  }, [settings.kline_interval]);
+
   function togglePair(pair) {
     setSelectedPairs(prev =>
       prev.includes(pair) ? prev.filter(p => p !== pair) : [...prev, pair]
     );
+    setMsg(null);
+  }
+
+  function handleKlineIntervalChange(value) {
+    setKlineInterval(value);
     setMsg(null);
   }
 
@@ -70,8 +88,11 @@ function PairsPanel({ settings, onSaved }) {
     }
     setSaving(true);
     try {
-      await api.updateSettings({ symbols: selectedPairs.join(",") });
-      setMsg({ type: "success", text: "Pares salvos. Reinicie o bot para aplicar." });
+      await api.updateSettings({
+        symbols: selectedPairs.join(","),
+        kline_interval: klineInterval,
+      });
+      setMsg({ type: "success", text: "Salvo. Reinicie o bot para aplicar." });
       onSaved();
     } catch (err) {
       setMsg({ type: "error", text: err instanceof ApiError ? err.message : "Falha ao salvar." });
@@ -90,66 +111,50 @@ function PairsPanel({ settings, onSaved }) {
           {!pairsLoaded ? (
             <div className="loading-state">Validando pares…</div>
           ) : (
-            <>
-              <div className="pairs-grid">
-                {validPairs.map(pair => (
-                  <button
-                    key={pair}
-                    className={`pair-btn ${selectedPairs.includes(pair) ? "pair-btn--active" : ""}`}
-                    onClick={() => togglePair(pair)}
-                    disabled={saving}
-                  >
-                    {pair.replace("USDT", "")}
-                    <span className="pair-btn__quote">/USDT</span>
-                  </button>
-                ))}
-              </div>
-              <div className="pairs-summary">
-                {selectedPairs.length === 0
-                  ? "Nenhum par selecionado"
-                  : `${selectedPairs.length} par${selectedPairs.length > 1 ? "es" : ""}: ${selectedPairs.join(", ")}`}
-              </div>
-              {msg && <div className={`form-message form-message--${msg.type}`}>{msg.text}</div>}
-              <div className="form-actions">
-                <button className="button button--primary" disabled={selectedPairs.length === 0 || saving} onClick={handleSave}>
-                  {saving ? "Salvando…" : "Salvar pares"}
+            <div className="pairs-grid">
+              {validPairs.map(pair => (
+                <button
+                  key={pair}
+                  className={`pair-btn ${selectedPairs.includes(pair) ? "pair-btn--active" : ""}`}
+                  onClick={() => togglePair(pair)}
+                  disabled={saving}
+                >
+                  {pair.replace("USDT", "")}
+                  <span className="pair-btn__quote">/USDT</span>
                 </button>
-              </div>
-            </>
+              ))}
+            </div>
+          )}
+          {pairsLoaded && (
+            <div className="pairs-summary">
+              {selectedPairs.length === 0
+                ? "Nenhum par selecionado"
+                : `${selectedPairs.length} par${selectedPairs.length > 1 ? "es" : ""}: ${selectedPairs.join(", ")}`}
+            </div>
           )}
         </div>
         <div className="pairs-market-layout__market">
           <p className="pairs-market-layout__market-title">Mercado</p>
-          <MarketFields settings={settings} onSaved={onSaved} />
+          <ParamField
+            field={KLINE_INTERVAL_FIELD}
+            value={klineInterval}
+            onChange={handleKlineIntervalChange}
+            disabled={saving}
+          />
         </div>
       </div>
-    </Panel>
-  );
-}
 
-function MarketFields({ settings, onSaved }) {
-  const field = { key: "kline_interval", label: "Intervalo dos candles", type: "select", options: ["1m","3m","5m","15m","30m","1h","4h","1d"], hint: "Timeframe de cada candlestick. 5m é o padrão. Requer reinicialização." };
-  const [value, setValue] = useState(settings.kline_interval ?? "5m");
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState(null);
-  useEffect(() => { setValue(settings.kline_interval ?? "5m"); }, [settings.kline_interval]);
-  async function handleSave() {
-    setSaving(true);
-    try {
-      await api.updateSettings({ kline_interval: value });
-      setMsg({ type: "success", text: "Salvo. Reinicie o bot." });
-      onSaved();
-    } catch { setMsg({ type: "error", text: "Falha ao salvar." }); }
-    finally { setSaving(false); }
-  }
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:"0.75rem"}}>
-      <ParamField field={field} value={value} onChange={setValue} disabled={saving} />
       {msg && <div className={`form-message form-message--${msg.type}`}>{msg.text}</div>}
-      <button className="button button--primary" onClick={handleSave} disabled={saving}>
-        {saving ? "Salvando…" : "Salvar"}
-      </button>
-    </div>
+      <div className="form-actions">
+        <button
+          className="button button--primary"
+          disabled={selectedPairs.length === 0 || saving || !pairsLoaded}
+          onClick={handleSave}
+        >
+          {saving ? "Salvando…" : "Salvar"}
+        </button>
+      </div>
+    </Panel>
   );
 }
 
@@ -750,7 +755,12 @@ function AllParamsForm({ settings, onSaved }) {
     }));
     try {
       const result = await api.updateSettings(payload);
-      setMsg({ type: "success", text: result.restart_triggered ? "Salvo — bot reiniciado." : "Alterações salvas." });
+      setMsg({
+        type: "success",
+        text: result.restart_triggered
+          ? "Salvo — bot reiniciado."
+          : "Alterações salvas. Reinicie o bot para aplicar.",
+      });
       setDirty({});
       onSaved();
     } catch (err) {
