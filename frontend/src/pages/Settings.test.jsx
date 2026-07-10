@@ -240,5 +240,65 @@ describe("Settings", () => {
     const payload = api.updateSettings.mock.calls.at(-1)[0];
 
     expect(payload.risk_per_trade_percent).toBeCloseTo(2.5);
+
+    await waitFor(() =>
+      expect(
+        within(saveBar).getByText(/reinicie o bot para aplicar/i),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("uses a single save bar for pairs, market fields and parameters together", async () => {
+    const user = userEvent.setup();
+
+    api.getSettings.mockResolvedValue(SETTINGS_FIXTURE);
+    api.updateSettings.mockResolvedValue({
+      ...SETTINGS_FIXTURE,
+      restart_triggered: false,
+    });
+
+    render(<Settings />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Pares monitorados e mercado"),
+      ).toBeInTheDocument(),
+    );
+
+    // only one sticky save bar on the whole page -- pairs/market
+    // fields no longer have their own separate save button
+    expect(
+      document.querySelectorAll(".params-save-bar"),
+    ).toHaveLength(1);
+
+    await waitFor(() =>
+      expect(screen.getByText("BNB")).toBeInTheDocument(),
+    );
+
+    // BNBUSDT isn't in SETTINGS_FIXTURE.symbols -- toggling it adds
+    // a pair rather than removing one already selected
+    await user.click(screen.getByText("BNB").closest("button"));
+
+    const saveBar = document.querySelector(".params-save-bar");
+
+    const saveButton = within(saveBar).getByRole("button", {
+      name: /salvar alterações/i,
+    });
+
+    expect(saveButton).toBeEnabled();
+
+    expect(
+      within(saveBar).getByText(/requer reinicialização do bot/i),
+    ).toBeInTheDocument();
+
+    await user.click(saveButton);
+
+    await waitFor(() =>
+      expect(api.updateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          symbols: expect.stringContaining("BNB"),
+        }),
+      ),
+    );
   });
 });

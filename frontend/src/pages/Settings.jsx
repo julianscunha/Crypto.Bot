@@ -14,10 +14,6 @@ const DEFAULT_PAIRS = [
   "SANDUSDT","MANAUSDT","AAVEUSDT","MKRUSDT","SHIBUSDT",
 ];
 
-// =====================================================
-// PAINEL DE PARES MONITORADOS
-// =====================================================
-
 const KLINE_INTERVAL_FIELD = {
   key: "kline_interval",
   label: "Intervalo dos candles",
@@ -26,148 +22,27 @@ const KLINE_INTERVAL_FIELD = {
   hint: "Timeframe de cada candlestick. 5m é o padrão. Requer reinicialização.",
 };
 
-function PairsPanel({ settings, onSaved }) {
-  const [validPairs, setValidPairs] = useState(DEFAULT_PAIRS);
-  const [selectedPairs, setSelectedPairs] = useState([]);
-  const [klineInterval, setKlineInterval] = useState(settings.kline_interval ?? "5m");
-  const [pairsLoaded, setPairsLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState(null);
-
-  useEffect(() => {
-    async function validatePairs() {
-      try {
-        const res = await fetch("https://api.binance.com/api/v3/exchangeInfo?permissions=SPOT");
-        const data = await res.json();
-        const available = new Set(
-          (data.symbols || [])
-            .filter(s => s.status === "TRADING" && s.quoteAsset === "USDT")
-            .map(s => s.symbol)
-        );
-        const valid = DEFAULT_PAIRS.filter(p => available.has(p));
-        const extras = [...available]
-          .filter(s => !DEFAULT_PAIRS.includes(s)).sort()
-          .slice(0, DEFAULT_PAIRS.length - valid.length);
-        setValidPairs([...valid, ...extras]);
-      } catch {
-        setValidPairs(DEFAULT_PAIRS);
-      } finally {
-        setPairsLoaded(true);
-      }
-    }
-    validatePairs();
-  }, []);
-
-  useEffect(() => {
-    const current = settings.symbols
-      ? settings.symbols.split(",").map(p => p.trim().toUpperCase()).filter(Boolean)
-      : [];
-    setSelectedPairs(current);
-  }, [settings.symbols]);
-
-  useEffect(() => {
-    setKlineInterval(settings.kline_interval ?? "5m");
-  }, [settings.kline_interval]);
-
-  function togglePair(pair) {
-    setSelectedPairs(prev =>
-      prev.includes(pair) ? prev.filter(p => p !== pair) : [...prev, pair]
-    );
-    setMsg(null);
-  }
-
-  function handleKlineIntervalChange(value) {
-    setKlineInterval(value);
-    setMsg(null);
-  }
-
-  async function handleSave() {
-    if (selectedPairs.length === 0) {
-      setMsg({ type: "error", text: "Selecione pelo menos um par." });
-      return;
-    }
-    setSaving(true);
-    try {
-      await api.updateSettings({
-        symbols: selectedPairs.join(","),
-        kline_interval: klineInterval,
-      });
-      setMsg({ type: "success", text: "Salvo. Reinicie o bot para aplicar." });
-      onSaved();
-    } catch (err) {
-      setMsg({ type: "error", text: err instanceof ApiError ? err.message : "Falha ao salvar." });
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Panel eyebrow="Feed de dados" title="Pares monitorados e mercado" className="dashboard__span-2">
-      <div className="pairs-market-layout">
-        <div className="pairs-market-layout__pairs">
-          <p className="settings__intro" style={{marginBottom: "0.75rem"}}>
-            Selecione os pares a monitorar. Lista validada contra a Binance. Requer reinicialização.
-          </p>
-          {!pairsLoaded ? (
-            <div className="loading-state">Validando pares…</div>
-          ) : (
-            <div className="pairs-grid">
-              {validPairs.map(pair => (
-                <button
-                  key={pair}
-                  className={`pair-btn ${selectedPairs.includes(pair) ? "pair-btn--active" : ""}`}
-                  onClick={() => togglePair(pair)}
-                  disabled={saving}
-                >
-                  {pair.replace("USDT", "")}
-                  <span className="pair-btn__quote">/USDT</span>
-                </button>
-              ))}
-            </div>
-          )}
-          {pairsLoaded && (
-            <div className="pairs-summary">
-              {selectedPairs.length === 0
-                ? "Nenhum par selecionado"
-                : `${selectedPairs.length} par${selectedPairs.length > 1 ? "es" : ""}: ${selectedPairs.join(", ")}`}
-            </div>
-          )}
-        </div>
-        <div className="pairs-market-layout__market">
-          <p className="pairs-market-layout__market-title">Mercado</p>
-          <ParamField
-            field={KLINE_INTERVAL_FIELD}
-            value={klineInterval}
-            onChange={handleKlineIntervalChange}
-            disabled={saving}
-          />
-        </div>
-      </div>
-
-      {msg && <div className={`form-message form-message--${msg.type}`}>{msg.text}</div>}
-      <div className="form-actions">
-        <button
-          className="button button--primary"
-          disabled={selectedPairs.length === 0 || saving || !pairsLoaded}
-          onClick={handleSave}
-        >
-          {saving ? "Salvando…" : "Salvar"}
-        </button>
-      </div>
-    </Panel>
-  );
-}
-
 // =====================================================
 // GRUPOS DE PARÂMETROS
 // =====================================================
+//
+// restartRequired: true em todos os grupos -- os agentes
+// (RiskAgent, PositionManagerAgent, etc.) recebem TRADING_CONFIG/
+// TRADE_MANAGEMENT_CONFIG/SIGNAL_QUALITY_CONFIG uma única vez, na
+// inicialização do processo (initialize_agents() em
+// apps/trader/runner.py). Esses dicts são "fotografias" estáticas
+// do .env calculadas no import (core/config/trading_config.py etc),
+// nunca relidas depois -- então qualquer campo salvo aqui só passa
+// a valer depois de um restart manual do bot, mesmo que a API
+// responda 200 imediatamente. Não é um valor arbitrário: reflete o
+// comportamento real do backend, não uma suposição da UI.
 
 const GROUPS = [
   {
     id: "risk",
     eyebrow: "Proteção de capital",
     title: "Gestão de risco",
-    restartRequired: false,
+    restartRequired: true,
     fields: [
       { key: "risk_per_trade_percent", label: "Risco por trade (%)", type: "float", min: 0.01, max: 100, hint: "Percentual do saldo arriscado em cada trade. 0.25% = R$0,025 em conta de R$10. Aumente para gerar ordens maiores e passar o tamanho mínimo da exchange." },
       { key: "max_open_positions", label: "Máx. posições abertas", type: "int", min: 1, max: 10, hint: "Número máximo de posições abertas ao mesmo tempo em todos os pares." },
@@ -179,7 +54,7 @@ const GROUPS = [
     id: "limits",
     eyebrow: "Disjuntores",
     title: "Limites diários",
-    restartRequired: false,
+    restartRequired: true,
     fields: [
       { key: "enable_daily_trade_limit", label: "Ativar limite de trades diários", type: "bool", hint: "Para o bot após atingir o número máximo de trades no dia." },
       { key: "max_daily_trades", label: "Máx. trades por dia", type: "int", min: 1, max: 200, hint: "Número máximo de trades concluídos por dia. Reinicia à meia-noite." },
@@ -193,7 +68,7 @@ const GROUPS = [
     id: "atr",
     eyebrow: "Motor de volatilidade",
     title: "ATR e multiplicadores",
-    restartRequired: false,
+    restartRequired: true,
     fields: [
       { key: "atr_period", label: "Período do ATR (candles)", type: "int", min: 1, max: 200, hint: "Número de candles usado para calcular o Average True Range (ATR). 14 é o padrão." },
       { key: "atr_stop_multiplier", label: "Multiplicador do stop loss", type: "float", min: 0.1, max: 10, hint: "Distância do stop = ATR × este valor. Ex: ATR=100, mult=2.0 → SL 200 pontos abaixo da entrada." },
@@ -206,7 +81,7 @@ const GROUPS = [
     id: "signal",
     eyebrow: "Filtros de entrada",
     title: "Qualidade do sinal",
-    restartRequired: false,
+    restartRequired: true,
     fields: [
       { key: "minimum_signal_strength", label: "Força mínima do sinal (0–1)", type: "float", min: 0, max: 1, hint: "Pontuação mínima de confiança que a estratégia deve produzir para o sinal prosseguir. 0.5 = 50% de confiança." },
       { key: "min_signal_confidence", label: "Confiança mínima do analista (0–1)", type: "float", min: 0, max: 1, hint: "Confiança mínima do agente analista. Filtra leituras de baixa qualidade antes que a estratégia seja executada." },
@@ -221,7 +96,7 @@ const GROUPS = [
     id: "structure",
     eyebrow: "Price action",
     title: "Estrutura de mercado",
-    restartRequired: false,
+    restartRequired: true,
     fields: [
       { key: "structure_min_score", label: "Pontuação mínima de estrutura (0–3)", type: "float", min: 0, max: 3, hint: "Pontuação mínima de qualidade da estrutura. Pontuação = topos mais altos (1) + fundos mais altos (1) + impulso (1). 2.0 exige 2 dos 3 confirmados. Reduza para aceitar setups mais fracos." },
       { key: "structure_min_impulse_percent", label: "Impulso mínimo (%)", type: "float", min: 0, max: 5, hint: "Variação percentual mínima para contar como perna de impulso válida. Muito baixo = ruído; muito alto = perde setups válidos." },
@@ -232,7 +107,7 @@ const GROUPS = [
     id: "position",
     eyebrow: "Ciclo de vida do trade",
     title: "Gestão de posição",
-    restartRequired: false,
+    restartRequired: true,
     fields: [
       { key: "enable_trailing_stop", label: "Ativar trailing stop", type: "bool", hint: "Ativa um stop que sobe com o preço, travando lucros conforme o trade evolui." },
       { key: "enable_breakeven", label: "Ativar breakeven", type: "bool", hint: "Move o stop loss para o preço de entrada ao atingir o gatilho de breakeven, eliminando o risco de perda." },
@@ -245,7 +120,7 @@ const GROUPS = [
     id: "exchange",
     eyebrow: "Formatação de ordens",
     title: "Precisão da exchange",
-    restartRequired: false,
+    restartRequired: true,
     fields: [
       { key: "quantity_precision", label: "Casas decimais da quantidade", type: "int", min: 0, max: 8, hint: "Número de casas decimais para a quantidade da ordem. BTCUSDT usa 5 na mainnet e 6 na testnet tipicamente." },
       { key: "price_precision", label: "Casas decimais do preço", type: "int", min: 0, max: 8, hint: "Número de casas decimais para os preços nas ordens OCO." },
@@ -257,7 +132,7 @@ const GROUPS = [
     id: "simulation",
     eyebrow: "Apenas no modo Paper",
     title: "Simulação",
-    restartRequired: false,
+    restartRequired: true,
     fields: [
       { key: "enable_fee_simulation", label: "Simular taxas de negociação", type: "bool", hint: "Desconta taxas simuladas da Binance no PnL do paper trading para resultados realistas." },
       { key: "maker_fee_percent", label: "Taxa maker (%)", type: "float", min: 0, max: 1, hint: "Taxa para ordens limitadas (maker). Padrão Binance é 0.1% = 0.001." },
@@ -300,8 +175,7 @@ export function Settings() {
         <div className="settings__grid">
           <ModePanel settings={settings} onSaved={handleSaved} />
           <CredentialsPanel settings={settings} onSaved={handleSaved} />
-          <PairsPanel settings={settings} onSaved={handleSaved} />
-          <AllParamsForm settings={settings} onSaved={handleSaved} />
+          <ParamsForm settings={settings} onSaved={handleSaved} />
         </div>
       )}
     </div>
@@ -685,49 +559,81 @@ function CredentialField({ label, value, onChange, isSet, masked, invalid, onCle
 }
 
 // =====================================================
-// PAINEL DE PARÂMETROS (genérico)
+// FORMULÁRIO UNIFICADO DE PARÂMETROS (pares, mercado e todos os grupos)
 // =====================================================
+//
+// Um único estado, uma única barra de salvar (sticky, só aparece
+// quando há alteração pendente) para TODOS os campos da tela --
+// pares monitorados, intervalo de candles e todos os grupos de
+// parâmetros. Sem modal de confirmação e sem restart automático do
+// bot: o usuário decide quando reiniciar manualmente (reiniciar
+// sozinho poderia interromper uma operação em andamento). A barra só
+// mostra um aviso ("Requer reinicialização") quando o campo alterado
+// de fato exige isso -- ver o comentário em cima de GROUPS.
 
-// =====================================================
-// FORMULÁRIO UNIFICADO DE PARÂMETROS
-// =====================================================
-// Um único estado, um único botão Salvar para todos os grupos.
-// Grupos com restartRequired mostram um aviso se algum campo
-// desse grupo foi alterado — mas o save ainda é único.
+function ParamsForm({ settings, onSaved }) {
 
-function AllParamsForm({ settings, onSaved }) {
+  const buildValues = (s) => {
+    const v = {
+      symbols: s.symbols
+        ? s.symbols.split(",").map(p => p.trim().toUpperCase()).filter(Boolean)
+        : [],
+      kline_interval: s.kline_interval ?? "5m",
+    };
+    GROUPS.forEach(g => g.fields.forEach(f => {
+      v[f.key] = s[f.key] ?? "";
+    }));
+    return v;
+  };
 
-  // Estado unificado de todos os campos de todos os grupos
-  const initial = {};
-  GROUPS.forEach(g => g.fields.forEach(f => {
-    initial[f.key] = settings[f.key] ?? "";
-  }));
+  // symbols/kline_interval também exigem restart -- ver
+  // apps/trader/runner.py (subscription do WebSocket montada uma
+  // única vez no startup a partir de settings.SYMBOLS/KLINE_INTERVAL).
+  const restartRequiredKeys = new Set([
+    "symbols",
+    "kline_interval",
+    ...GROUPS.filter(g => g.restartRequired).flatMap(g => g.fields.map(f => f.key)),
+  ]);
 
-  const [values, setValues] = useState(initial);
+  const [validPairs, setValidPairs] = useState(DEFAULT_PAIRS);
+  const [pairsLoaded, setPairsLoaded] = useState(false);
+  const [values, setValues] = useState(() => buildValues(settings));
   const [dirty, setDirty] = useState({});   // { key: true }
   const [isSaving, setIsSaving] = useState(false);
   const [msg, setMsg] = useState(null);
-  const [showRestartModal, setShowRestartModal] = useState(false);
 
   useEffect(() => {
-    const next = {};
-    GROUPS.forEach(g => g.fields.forEach(f => {
-      next[f.key] = settings[f.key] ?? "";
-    }));
-    setValues(next);
+    async function validatePairs() {
+      try {
+        const res = await fetch("https://api.binance.com/api/v3/exchangeInfo?permissions=SPOT");
+        const data = await res.json();
+        const available = new Set(
+          (data.symbols || [])
+            .filter(s => s.status === "TRADING" && s.quoteAsset === "USDT")
+            .map(s => s.symbol)
+        );
+        const valid = DEFAULT_PAIRS.filter(p => available.has(p));
+        const extras = [...available]
+          .filter(s => !DEFAULT_PAIRS.includes(s)).sort()
+          .slice(0, DEFAULT_PAIRS.length - valid.length);
+        setValidPairs([...valid, ...extras]);
+      } catch {
+        setValidPairs(DEFAULT_PAIRS);
+      } finally {
+        setPairsLoaded(true);
+      }
+    }
+    validatePairs();
+  }, []);
+
+  useEffect(() => {
+    setValues(buildValues(settings));
     setDirty({});
     setMsg(null);
   }, [settings]);
 
   const hasDirty = Object.keys(dirty).length > 0;
-
-  // Algum campo de grupo que requer restart foi alterado?
-  const dirtyRestartKeys = new Set(
-    GROUPS
-      .filter(g => g.restartRequired)
-      .flatMap(g => g.fields.map(f => f.key))
-  );
-  const needsRestart = Object.keys(dirty).some(k => dirtyRestartKeys.has(k));
+  const needsRestart = Object.keys(dirty).some(k => restartRequiredKeys.has(k));
 
   function handleChange(key, value) {
     setValues(v => ({ ...v, [key]: value }));
@@ -735,17 +641,29 @@ function AllParamsForm({ settings, onSaved }) {
     setMsg(null);
   }
 
-  function handleSaveClick() {
-    if (needsRestart) setShowRestartModal(true);
-    else doSave();
+  function togglePair(pair) {
+    setValues(v => ({
+      ...v,
+      symbols: v.symbols.includes(pair)
+        ? v.symbols.filter(p => p !== pair)
+        : [...v.symbols, pair],
+    }));
+    setDirty(d => ({ ...d, symbols: true }));
+    setMsg(null);
   }
 
-  async function doSave() {
-    setShowRestartModal(false);
+  async function handleSave() {
+    if (values.symbols.length === 0) {
+      setMsg({ type: "error", text: "Selecione pelo menos um par." });
+      return;
+    }
     setIsSaving(true);
     setMsg(null);
     const payload = {};
+    if (dirty.symbols) payload.symbols = values.symbols.join(",");
+    if (dirty.kline_interval) payload.kline_interval = values.kline_interval;
     GROUPS.forEach(g => g.fields.forEach(f => {
+      if (!dirty[f.key]) return;
       const raw = values[f.key];
       if (raw === "" || raw === null || raw === undefined) return;
       if (f.type === "int") payload[f.key] = parseInt(raw, 10);
@@ -759,7 +677,9 @@ function AllParamsForm({ settings, onSaved }) {
         type: "success",
         text: result.restart_triggered
           ? "Salvo — bot reiniciado."
-          : "Alterações salvas. Reinicie o bot para aplicar.",
+          : needsRestart
+            ? "Alterações salvas. Reinicie o bot para aplicar."
+            : "Alterações salvas.",
       });
       setDirty({});
       onSaved();
@@ -772,6 +692,49 @@ function AllParamsForm({ settings, onSaved }) {
 
   return (
     <>
+      <Panel eyebrow="Feed de dados" title="Pares monitorados e mercado" className="dashboard__span-2">
+        <div className="pairs-market-layout">
+          <div className="pairs-market-layout__pairs">
+            <p className="settings__intro" style={{marginBottom: "0.75rem"}}>
+              Selecione os pares a monitorar. Lista validada contra a Binance. Requer reinicialização.
+            </p>
+            {!pairsLoaded ? (
+              <div className="loading-state">Validando pares…</div>
+            ) : (
+              <div className="pairs-grid">
+                {validPairs.map(pair => (
+                  <button
+                    key={pair}
+                    className={`pair-btn ${values.symbols.includes(pair) ? "pair-btn--active" : ""}`}
+                    onClick={() => togglePair(pair)}
+                    disabled={isSaving}
+                  >
+                    {pair.replace("USDT", "")}
+                    <span className="pair-btn__quote">/USDT</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {pairsLoaded && (
+              <div className="pairs-summary">
+                {values.symbols.length === 0
+                  ? "Nenhum par selecionado"
+                  : `${values.symbols.length} par${values.symbols.length > 1 ? "es" : ""}: ${values.symbols.join(", ")}`}
+              </div>
+            )}
+          </div>
+          <div className="pairs-market-layout__market">
+            <p className="pairs-market-layout__market-title">Mercado</p>
+            <ParamField
+              field={KLINE_INTERVAL_FIELD}
+              value={values.kline_interval}
+              onChange={val => handleChange("kline_interval", val)}
+              disabled={isSaving}
+            />
+          </div>
+        </div>
+      </Panel>
+
       {GROUPS.map(group => (
         <Panel key={group.id} eyebrow={group.eyebrow} title={group.title}>
           <div className="param-grid">
@@ -788,7 +751,8 @@ function AllParamsForm({ settings, onSaved }) {
         </Panel>
       ))}
 
-      {/* Barra de salvar sticky */}
+      {/* Barra de salvar sticky -- única para toda a tela, só
+          aparece quando há alteração pendente. */}
       <div className={`params-save-bar ${hasDirty ? "params-save-bar--visible" : ""}`}>
         <div className="params-save-bar__inner">
           {needsRestart && (
@@ -802,21 +766,12 @@ function AllParamsForm({ settings, onSaved }) {
           <button
             className="button button--primary"
             disabled={!hasDirty || isSaving}
-            onClick={handleSaveClick}
+            onClick={handleSave}
           >
             {isSaving ? "Salvando…" : "Salvar alterações"}
           </button>
         </div>
       </div>
-
-      {showRestartModal && (
-        <RestartModal
-          title="Reinicialização necessária"
-          body="Algumas configurações alteradas requerem reinicialização do bot para ter efeito. O runner será parado e reconectado automaticamente."
-          onConfirm={doSave}
-          onCancel={() => setShowRestartModal(false)}
-        />
-      )}
     </>
   );
 }
@@ -886,21 +841,3 @@ function ParamField({ field, value, onChange, disabled }) {
   );
 }
 
-// =====================================================
-// MODAL DE REINICIALIZAÇÃO
-// =====================================================
-
-function RestartModal({ title, body, onConfirm, onCancel }) {
-  return (
-    <div className="modal-overlay" role="dialog" aria-modal="true">
-      <div className="modal">
-        <h3 className="modal__title">{title}</h3>
-        <p className="modal__body">{body}</p>
-        <div className="modal__actions">
-          <button type="button" className="button button--ghost" onClick={onCancel}>Cancelar</button>
-          <button type="button" className="button button--primary" onClick={onConfirm}>Salvar e reiniciar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
