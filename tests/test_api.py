@@ -1055,6 +1055,30 @@ class TestJobHistoryAndEstimate:
         assert "profile" in body
         assert "hardware" in body
 
+    def test_estimate_reflects_saved_symbols_without_restart(self, client):
+
+        """
+        core.config.settings.settings is a singleton read once at
+        process import -- /jobs/estimate used to build its workload
+        profile from that stale value instead of the .env file PUT
+        /settings just wrote, so changing the symbol count in the
+        Settings UI had no visible effect on the optimizer estimate
+        until the whole API process was restarted.
+        """
+
+        from core.config import settings_repository
+
+        settings_repository.update_settings(symbols="BTCUSDT")
+
+        try:
+            response = client.get("/jobs/estimate?jtype=optimizer&days=90")
+
+            assert response.status_code == 200
+            assert response.json()["profile"]["symbol_count"] == 1
+
+        finally:
+            settings_repository.update_settings(symbols="BTCUSDT,ETHUSDT")
+
 
 class TestLiveBalance:
 

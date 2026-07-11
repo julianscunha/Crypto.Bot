@@ -741,6 +741,33 @@ _HISTORY_FILE = (
 
 MAX_HISTORY = 5
 
+
+def _live_job_settings() -> tuple[list[str], str, float]:
+    """
+    core.config.settings.settings is a singleton computed once at
+    process import -- SYMBOLS/KLINE_INTERVAL/MINIMUM_RISK_REWARD_RATIO
+    stay stale in the running API process even after PUT /settings
+    writes new values to .env (only a process restart reloads them).
+    Job estimation/timeout must reflect what the user just saved, so
+    read the same live .env source build_startup_balance_report()
+    already uses instead of the stale static singleton.
+    """
+
+    live = settings_repository.get_settings()
+
+    symbols = [
+        symbol.strip().upper()
+        for symbol in str(live.get("symbols", "")).split(",")
+        if symbol.strip()
+    ] or settings.SYMBOLS
+
+    return (
+        symbols,
+        live.get("kline_interval", settings.KLINE_INTERVAL),
+        float(live.get("minimum_risk_reward_ratio", settings.MINIMUM_RISK_REWARD_RATIO)),
+    )
+
+
 # =====================================================
 # JOB TIMEOUT
 # =====================================================
@@ -761,12 +788,13 @@ JOB_TIMEOUT_CEILING_SECONDS = 6 * 3600
 
 def _compute_job_timeout_seconds(job_type: str, days: int) -> int:
     try:
+        symbols, interval, minimum_rr = _live_job_settings()
         estimate = estimate_job_duration_seconds(
             job_type=job_type,
             days=days,
-            symbols=settings.SYMBOLS,
-            interval=settings.KLINE_INTERVAL,
-            minimum_rr=settings.MINIMUM_RISK_REWARD_RATIO,
+            symbols=symbols,
+            interval=interval,
+            minimum_rr=minimum_rr,
             history=_load_history(),
         )
         timeout = estimate["estimate_seconds"] * JOB_TIMEOUT_SAFETY_FACTOR
@@ -804,13 +832,14 @@ def _save_history(entry: dict):
 
 def _build_history_workload(job_type: str, extra_args: list | None = None) -> dict:
     days = parse_days_from_extra_args(extra_args) if job_type == "optimizer" else 90
+    symbols, interval, minimum_rr = _live_job_settings()
 
     return build_job_profile(
         job_type=job_type,
         days=days,
-        symbols=settings.SYMBOLS,
-        interval=settings.KLINE_INTERVAL,
-        minimum_rr=settings.MINIMUM_RISK_REWARD_RATIO,
+        symbols=symbols,
+        interval=interval,
+        minimum_rr=minimum_rr,
     )
 
 
@@ -1020,13 +1049,14 @@ async def jobs_estimate(jtype: str = "optimizer", days: int = 90):
     Extrapola proporcionalmente: se 90d levou Xs, 30d leva ~X/3.
     """
     history = _load_history()
+    symbols, interval, minimum_rr = _live_job_settings()
 
     estimate = estimate_job_duration_seconds(
         job_type=jtype,
         days=days,
-        symbols=settings.SYMBOLS,
-        interval=settings.KLINE_INTERVAL,
-        minimum_rr=settings.MINIMUM_RISK_REWARD_RATIO,
+        symbols=symbols,
+        interval=interval,
+        minimum_rr=minimum_rr,
         history=history,
     )
 
