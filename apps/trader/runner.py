@@ -414,6 +414,63 @@ async def flush_runtime_state_periodically():
             )
 
 # =========================================================
+# PORTFOLIO SNAPSHOT (BACKGROUND)
+# =========================================================
+#
+# portfolio_service.build_snapshot() used to be called ONLY from
+# print_session_report(), i.e. once, at Runner shutdown. Every read
+# the Dashboard does (GET /dashboard, GET /portfolio) just returns
+# the latest row in the portfolio_snapshots table -- so while the bot
+# was running, Equity/Balance on the Dashboard stayed frozen at
+# whatever they were the last time the bot was STOPPED, potentially
+# stale by days and completely disconnected from the real, currently
+# changing Binance balance. This periodically writes a fresh
+# snapshot instead, same pattern as flush_runtime_state_periodically()
+# above. create_snapshot() always INSERTS a new row (it's an
+# append-only history table, used by get_max_equity() for the
+# all-time peak) -- 30s keeps the Dashboard reasonably live without
+# the granularity (and DB growth) of the 2s runtime-state flush,
+# which upserts a single row instead.
+
+PORTFOLIO_SNAPSHOT_INTERVAL_SECONDS = 30
+
+
+def _write_portfolio_snapshot():
+
+    from core.services.runtime_balance import get_balance
+
+    PortfolioService().build_snapshot(
+        user_id=0,
+        initial_balance=get_balance(
+            TRADING_CONFIG["account_balance"]
+        )
+    )
+
+
+async def flush_portfolio_snapshot_periodically():
+
+    while True:
+
+        try:
+
+            _write_portfolio_snapshot()
+
+        except Exception as error:
+
+            log(
+                "SYSTEM",
+                (
+                    "PORTFOLIO SNAPSHOT FLUSH FAILED "
+                    f"{error}"
+                ),
+                "WARNING"
+            )
+
+        await asyncio.sleep(
+            PORTFOLIO_SNAPSHOT_INTERVAL_SECONDS
+        )
+
+# =========================================================
 # MAIN
 # =========================================================
 
@@ -579,6 +636,10 @@ async def main():
         flush_runtime_state_periodically()
     )
 
+    portfolio_flush_task = asyncio.create_task(
+        flush_portfolio_snapshot_periodically()
+    )
+
     try:
 
         await websocket.start()
@@ -586,6 +647,8 @@ async def main():
     finally:
 
         flush_task.cancel()
+
+        portfolio_flush_task.cancel()
 
         # Final, best-effort flush -- the periodic task above only
         # persists every RUNTIME_STATE_FLUSH_INTERVAL_SECONDS, so

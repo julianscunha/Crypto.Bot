@@ -25,7 +25,9 @@ from apps.trader.runner import (
     initialize_agents,
     print_session_report,
     flush_runtime_state_periodically,
-    RUNTIME_STATE_FLUSH_INTERVAL_SECONDS
+    RUNTIME_STATE_FLUSH_INTERVAL_SECONDS,
+    flush_portfolio_snapshot_periodically,
+    PORTFOLIO_SNAPSHOT_INTERVAL_SECONDS
 )
 
 from core.bus.event_bus import (
@@ -38,6 +40,10 @@ from core.state.market_state import (
 
 from data.storage.repositories.runtime_state_repository import (
     runtime_state_repository
+)
+
+from data.storage.repositories.portfolio_repository import (
+    portfolio_repository
 )
 
 
@@ -237,3 +243,126 @@ class TestFlushRuntimeStatePeriodically:
         # frontend/src/pages/Dashboard.jsx) but not so frequent that
         # it's pointless overhead
         assert 1 <= RUNTIME_STATE_FLUSH_INTERVAL_SECONDS <= 10
+
+
+class TestFlushPortfolioSnapshotPeriodically:
+
+    """
+    Regression coverage for the bug this task fixes: before it
+    existed, portfolio_service.build_snapshot() was only ever called
+    from print_session_report() at Runner shutdown, so GET /dashboard
+    (which just reads the latest row in portfolio_snapshots) kept
+    showing Equity/Balance frozen at whatever they were the last time
+    the bot was stopped -- potentially days stale and completely
+    disconnected from the real, currently changing Binance balance
+    while the bot was actually running.
+    """
+
+    @pytest.mark.asyncio
+    async def test_writes_a_fresh_snapshot_using_the_live_balance(self):
+
+        from core.services.runtime_balance import set_balance
+
+        user_id = 9101
+
+        set_balance(42.0)
+
+        with patch(
+            "apps.trader.runner.PORTFOLIO_SNAPSHOT_INTERVAL_SECONDS",
+            0.01
+        ):
+
+            with patch(
+                "apps.trader.runner._write_portfolio_snapshot",
+                side_effect=lambda: portfolio_repository.create_snapshot(
+                    user_id=user_id,
+                    balance=42.0,
+                    equity=42.0,
+                    realized_pnl=0.0,
+                    unrealized_pnl=0.0,
+                    total_pnl=0.0,
+                    open_positions=0,
+                    closed_positions=0,
+                    exposure=0.0,
+                    drawdown=0.0,
+                    initial_balance=42.0
+                )
+            ):
+
+                task = asyncio.create_task(
+                    flush_portfolio_snapshot_periodically()
+                )
+
+                await asyncio.sleep(0.05)
+
+                task.cancel()
+
+                try:
+
+                    await task
+
+                except asyncio.CancelledError:
+
+                    pass
+
+        snapshot = portfolio_repository.get_latest_snapshot(
+            user_id=user_id
+        )
+
+        assert snapshot is not None
+
+        assert snapshot.balance == 42.0
+
+    @pytest.mark.asyncio
+    async def test_survives_a_failed_flush_without_raising(self):
+
+        # same reasoning as the equivalent runtime-state test above:
+        # a transient DB error writing a snapshot must not crash the
+        # whole Runner process
+
+        attempted = asyncio.Event()
+
+        def _raise_and_signal():
+
+            attempted.set()
+
+            raise Exception("simulated DB error")
+
+        with patch(
+            "apps.trader.runner.PORTFOLIO_SNAPSHOT_INTERVAL_SECONDS",
+            0.01
+        ):
+
+            with patch(
+                "apps.trader.runner._write_portfolio_snapshot",
+                side_effect=_raise_and_signal
+            ):
+
+                task = asyncio.create_task(
+                    flush_portfolio_snapshot_periodically()
+                )
+
+                await asyncio.wait_for(
+                    attempted.wait(),
+                    timeout=2
+                )
+
+                task.cancel()
+
+                try:
+
+                    await task
+
+                except asyncio.CancelledError:
+
+                    pass
+
+        assert attempted.is_set()
+
+    def test_flush_interval_is_reasonable(self):
+
+        # append-only history table (create_snapshot always INSERTs,
+        # unlike runtime_state's upsert) -- wider bound than the
+        # runtime-state flush since there's no reason to grow it as
+        # fast as that single-row telemetry upsert
+        assert 10 <= PORTFOLIO_SNAPSHOT_INTERVAL_SECONDS <= 120
