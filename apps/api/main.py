@@ -741,6 +741,43 @@ _HISTORY_FILE = (
 
 MAX_HISTORY = 5
 
+# =====================================================
+# JOB TIMEOUT
+# =====================================================
+#
+# subprocess.run's timeout used to be a flat 3600s regardless of
+# workload -- an optimizer run over 90 days x 4 symbols has ~4x the
+# work_units of the 90d x 1-symbol case the flat value was tuned
+# against, so it got killed mid-run with a bare "timed out" error
+# and no partial result. Reuse the same estimator that already
+# powers the /jobs/estimate UI, with a wide safety margin (real
+# runs vary a lot with market data size and machine load) and a
+# floor/ceiling so a bad estimate can't produce an unreasonably
+# short or effectively infinite timeout.
+JOB_TIMEOUT_SAFETY_FACTOR = 3
+JOB_TIMEOUT_FLOOR_SECONDS = 3600
+JOB_TIMEOUT_CEILING_SECONDS = 6 * 3600
+
+
+def _compute_job_timeout_seconds(job_type: str, days: int) -> int:
+    try:
+        estimate = estimate_job_duration_seconds(
+            job_type=job_type,
+            days=days,
+            symbols=settings.SYMBOLS,
+            interval=settings.KLINE_INTERVAL,
+            minimum_rr=settings.MINIMUM_RISK_REWARD_RATIO,
+            history=_load_history(),
+        )
+        timeout = estimate["estimate_seconds"] * JOB_TIMEOUT_SAFETY_FACTOR
+    except Exception:
+        timeout = JOB_TIMEOUT_FLOOR_SECONDS
+
+    return min(
+        max(timeout, JOB_TIMEOUT_FLOOR_SECONDS),
+        JOB_TIMEOUT_CEILING_SECONDS,
+    )
+
 
 def _load_history() -> list:
     try:
@@ -825,12 +862,17 @@ def _run_job_subprocess_inner(job_type: str, module: str, extra_args: list = Non
         _env = _os.environ.copy()
         _env["PYTHONPATH"] = PROJECT_ROOT_STR
 
+        job_timeout = _compute_job_timeout_seconds(
+            job_type,
+            workload.get("days", 90),
+        )
+
         proc = _subprocess.run(
             cmd,
             cwd=PROJECT_ROOT_STR,
             capture_output=True,
             text=True,
-            timeout=3600,
+            timeout=job_timeout,
             env=_env,
         )
 
