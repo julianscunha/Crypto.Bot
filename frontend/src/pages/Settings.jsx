@@ -3,6 +3,7 @@ import { usePolling } from "../hooks/usePolling";
 import { api, ApiError } from "../api/client";
 import { Panel } from "../components/Panel";
 import { Badge } from "../components/Badge";
+import { formatUsd } from "../lib/format";
 
 const KEY_LENGTH = 64;
 
@@ -44,7 +45,7 @@ const GROUPS = [
     title: "Gestão de risco",
     restartRequired: true,
     fields: [
-      { key: "risk_per_trade_percent", label: "Risco por trade (%)", type: "float", min: 0.01, max: 100, hint: "Percentual do saldo arriscado em cada trade. 0.25% = R$0,025 em conta de R$10. Aumente para gerar ordens maiores e passar o tamanho mínimo da exchange." },
+      { key: "risk_per_trade_percent", label: "Risco por trade (%)", type: "float", min: 0.01, max: 100, hint: "Percentual do saldo arriscado em cada trade. 0.25% = $0,025 em conta de $10. Aumente para gerar ordens maiores e passar o tamanho mínimo da exchange." },
       { key: "max_open_positions", label: "Máx. posições abertas", type: "int", min: 1, max: 10, hint: "Número máximo de posições abertas ao mesmo tempo em todos os pares." },
       { key: "max_position_exposure_percent", label: "Exposição máx. por posição (%)", type: "float", min: 1, max: 100, hint: "Percentual máximo do saldo que uma única posição pode representar." },
       { key: "minimum_risk_reward_ratio", label: "Relação risco/retorno mínima", type: "float", min: 0.1, max: 10, hint: "Proporção mínima entre lucro potencial e perda potencial. 1.2 significa que o take profit deve ser pelo menos 1.2× a distância do stop loss. Com ATR TP=3.0 e SL=2.0, a relação é 1.5." },
@@ -125,7 +126,7 @@ const GROUPS = [
       { key: "quantity_precision", label: "Casas decimais da quantidade", type: "int", min: 0, max: 8, hint: "Número de casas decimais para a quantidade da ordem. BTCUSDT usa 5 na mainnet e 6 na testnet tipicamente." },
       { key: "price_precision", label: "Casas decimais do preço", type: "int", min: 0, max: 8, hint: "Número de casas decimais para os preços nas ordens OCO." },
       { key: "min_order_quantity", label: "Quantidade mínima de ordem", type: "float", min: 0, max: 1, hint: "Quantidade mínima absoluta. Ordens abaixo disso são bloqueadas antes de chegar à exchange." },
-      { key: "min_order_notional", label: "Valor mínimo da ordem (R$)", type: "float", min: 0, max: 1000, hint: "Valor mínimo da ordem (quantidade × preço). Use 10 para Binance mainnet. Use 0 para desativar (testnet com saldo baixo)." },
+      { key: "min_order_notional", label: "Valor mínimo da ordem ($)", type: "float", min: 0, max: 1000, hint: "Valor mínimo da ordem (quantidade × preço). Use 10 para Binance mainnet. Use 0 para desativar (testnet com saldo baixo)." },
     ],
   },
   {
@@ -467,7 +468,7 @@ function CredentialsPanel({ settings, onSaved }) {
                 <span className="balance-auto-info__label">Saldo disponível</span>
                 <span className="balance-auto-info__value">
                   {isLive
-                    ? liveBalance !== null ? `$${liveBalance}` : "—"
+                    ? liveBalance !== null ? formatUsd(liveBalance) : "—"
                     : "—"}
                 </span>
               </div>

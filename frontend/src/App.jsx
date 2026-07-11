@@ -4,6 +4,7 @@ import { api, ApiError } from "./api/client";
 import { Dashboard } from "./pages/Dashboard";
 import { Settings } from "./pages/Settings";
 import { Tools } from "./pages/Tools";
+import { formatUsd } from "./lib/format";
 import "./App.css";
 import "./components.css";
 
@@ -163,13 +164,13 @@ export default function App() {
               <div className="runner-startup-check__row">
                 <span className="runner-startup-check__label">Saldo mínimo estimado</span>
                 <span className="runner-startup-check__value">
-                  ${startupCheck.required_balance_single_trade?.toFixed?.(2) ?? startupCheck.required_balance_single_trade}
+                  {formatUsd(startupCheck.required_balance_single_trade)}
                 </span>
               </div>
               <div className="runner-startup-check__row">
                 <span className="runner-startup-check__label">Saldo atual</span>
                 <span className="runner-startup-check__value">
-                  ${startupCheck.current_balance?.toFixed?.(2) ?? startupCheck.current_balance}
+                  {formatUsd(startupCheck.current_balance)}
                 </span>
               </div>
               {startupCheck.reason && (
