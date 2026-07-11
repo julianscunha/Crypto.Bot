@@ -451,6 +451,26 @@ Coberto em `tests/test_portfolio_service.py`
 
 Padronização visual:
 
+## Arquivos de log por processo
+
+Cada processo grava em seu próprio arquivo em `logs/` — não existe
+mais um único `runtime.log`/`errors.log` compartilhado:
+
+- Launcher: `logs/runtime.log` / `logs/errors.log` (nomes sem sufixo
+  -- é o processo "padrão")
+- Runner: `logs/runtime-runner.log` / `logs/errors-runner.log`
+- Optimizer: `logs/runtime-optimizer.log` / `logs/errors-optimizer.log`
+- Backtest: `logs/runtime-backtest.log` / `logs/errors-backtest.log`
+
+Corrige um bug real: dois processos distintos escrevendo
+concorrentemente no mesmo arquivo (sem nenhum lock entre eles)
+corrompe/derruba linhas silenciosamente — sem lançar exceção em
+nenhum dos dois lados. Confirmado reproduzindo diretamente (dois
+processos logando 300 linhas cada, concorrentemente, perderam dezenas
+de linhas cada um por corrupção). Controlado pela env var
+`CRYPTO_BOT_LOG_PROCESS`, setada no topo de cada entry point antes de
+qualquer outro import (ver `core/utils/console_logger.py`).
+
 ## Branco
 Eventos neutros:
 - MARKET
@@ -912,7 +932,7 @@ mainnet):
 1. **Cenário 1 (OCO já resolvida).** Abra uma posição pelo Runner em
    `MODE=live` + testnet, deixe a OCO ser preenchida manualmente pela
    UI da Testnet (ou aguarde o preço cruzar o take profit/stop loss),
-   pare o Runner, reinicie-o e confirme no console/`logs/runtime.log`
+   pare o Runner, reinicie-o e confirme no console/`logs/runtime-runner.log`
    a mensagem `OCO já resolvida — marcando como fechada` e que o
    trade aparece `CLOSED` com `RECONCILED_CLOSED` no banco.
 2. **Cenário 2 (OCO sumiu).** Abra uma posição, pare o Runner, cancele

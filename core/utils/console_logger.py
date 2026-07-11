@@ -2,6 +2,8 @@
 
 import logging
 
+import os
+
 from pathlib import Path
 
 from datetime import (
@@ -106,20 +108,74 @@ LOGS_DIR.mkdir(
     exist_ok=True
 )
 
+# =====================================================
+# PER-PROCESS LOG FILE
+# =====================================================
+#
+# API, Runner, and Optimizer/Backtest subprocesses all import this
+# module and used to share the exact same runtime.log/errors.log
+# files. WindowsSafeRotatingFileHandler above only guards against the
+# rollover-time PermissionError crash -- it does nothing about the
+# more basic problem that stdlib logging assumes a SINGLE process
+# owns the file. Two OS processes each holding their own independent
+# open handle and writing concurrently is not synchronized in any
+# way: interleaved writes routinely smash two lines together into one
+# unparseable line, silently destroying both (confirmed by
+# reproducing it directly -- two processes logging 300 lines each
+# concurrently lost dozens of lines apiece to corruption, no
+# exception raised anywhere). That's why a live Runner session could
+# show nothing recognizable in runtime.log despite the console
+# clearly working the whole time: the API process (or an
+# Optimizer/Backtest subprocess) was writing to the same file at the
+# same time.
+#
+# Fix: give each process its own log file, named via an optional tag
+# read from CRYPTO_BOT_LOG_PROCESS (set by the process itself before
+# any other imports -- see apps/trader/runner.py -- or injected into
+# a subprocess's environment by whatever spawned it -- see
+# apps/api/main.py's _run_job_subprocess_inner). Unset/empty keeps
+# the original runtime.log/errors.log filenames, so the API process
+# (the "default" one most tooling/tests expect) needs no changes.
+
+_LOG_PROCESS_TAG = (
+    os.environ.get(
+        "CRYPTO_BOT_LOG_PROCESS",
+        ""
+    )
+    .strip()
+    .lower()
+)
+
+
+def _tagged_filename(filename: str) -> str:
+
+    if not _LOG_PROCESS_TAG:
+
+        return filename
+
+    stem, _, ext = filename.rpartition(".")
+
+    return f"{stem}-{_LOG_PROCESS_TAG}.{ext}"
+
+
 RUNTIME_LOG_FILE = (
     LOGS_DIR
     /
-    LOGGING_CONFIG[
-        "runtime_log_filename"
-    ]
+    _tagged_filename(
+        LOGGING_CONFIG[
+            "runtime_log_filename"
+        ]
+    )
 )
 
 ERROR_LOG_FILE = (
     LOGS_DIR
     /
-    LOGGING_CONFIG[
-        "error_log_filename"
-    ]
+    _tagged_filename(
+        LOGGING_CONFIG[
+            "error_log_filename"
+        ]
+    )
 )
 
 # =====================================================

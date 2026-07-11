@@ -891,6 +891,12 @@ def _run_job_subprocess_inner(job_type: str, module: str, extra_args: list = Non
         _env = _os.environ.copy()
         _env["PYTHONPATH"] = PROJECT_ROOT_STR
 
+        # Own log file, not the API process's runtime.log/errors.log
+        # -- see core/utils/console_logger.py's "PER-PROCESS LOG
+        # FILE" comment for why two processes sharing one log file
+        # silently corrupts/drops lines.
+        _env["CRYPTO_BOT_LOG_PROCESS"] = job_type
+
         job_timeout = _compute_job_timeout_seconds(
             job_type,
             workload.get("days", 90),

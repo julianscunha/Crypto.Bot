@@ -5,6 +5,19 @@ import sys
 import shutil
 import os
 
+# Must run before the console_logger import below -- it reads this
+# env var at MODULE IMPORT time to pick the log filename. The
+# launcher stays alive for the whole session logging its own startup
+# checklist, running in parallel with the API process it spawns (also
+# writing to the default runtime.log/errors.log) -- see
+# core/utils/console_logger.py's "PER-PROCESS LOG FILE" comment for
+# why two processes sharing one log file silently corrupts/drops
+# lines.
+os.environ.setdefault(
+    "CRYPTO_BOT_LOG_PROCESS",
+    "launcher"
+)
+
 from pathlib import Path
 
 from core.utils.console_logger import (

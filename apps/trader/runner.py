@@ -1,5 +1,20 @@
 # -*- coding: utf-8 -*-
 
+import os
+
+# Must run before any other import in this file -- core.utils.
+# console_logger reads this env var at MODULE IMPORT time to decide
+# the log filename, and several of the imports below transitively
+# import it. Gives the Runner its own runtime-runner.log/
+# errors-runner.log instead of sharing the API process's
+# runtime.log/errors.log, which two unrelated OS processes writing to
+# concurrently can silently corrupt/drop lines from (see
+# core/utils/console_logger.py's "PER-PROCESS LOG FILE" comment).
+os.environ.setdefault(
+    "CRYPTO_BOT_LOG_PROCESS",
+    "runner"
+)
+
 import asyncio
 
 import atexit
