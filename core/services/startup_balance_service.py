@@ -104,7 +104,26 @@ async def build_startup_balance_report() -> dict:
     required_single_trade = 0.0
 
     for symbol in symbols:
-        filters = get_filters(symbol)
+        price_client = BinanceTradingClient(
+            api_key="",
+            api_secret="",
+            testnet=(mode == "live" and source == "binance_testnet"),
+            live_trading_confirmed=True
+        )
+
+        # get_filters() only returns real data once the Runner has
+        # populated exchange_filters._cache via load_filters() on its
+        # own LIVE startup -- this check runs from the API process,
+        # which never calls that, so it silently fell back to
+        # min_notional=0.0 and understated the real minimum required
+        # balance. Fetch the real filters directly (same public,
+        # unsigned exchangeInfo endpoint used by price_client below)
+        # instead of trusting a cache this process never fills.
+        try:
+            filters = await price_client.get_symbol_filters(symbol)
+        except Exception:
+            filters = get_filters(symbol)
+
         min_notional = max(
             min_order_notional_default,
             _float(filters.get("min_notional", 0.0))
@@ -116,12 +135,6 @@ async def build_startup_balance_report() -> dict:
 
         price = 0.0
         try:
-            price_client = BinanceTradingClient(
-                api_key="",
-                api_secret="",
-                testnet=(mode == "live" and source == "binance_testnet"),
-                live_trading_confirmed=True
-            )
             ticker = await price_client.get_symbol_price(symbol)
             price = _float(ticker.get("price", 0.0))
         except Exception as exc:
