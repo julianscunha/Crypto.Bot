@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { usePolling } from "./hooks/usePolling";
 import { api, ApiError } from "./api/client";
 import { Dashboard } from "./pages/Dashboard";
+import { Operation } from "./pages/Operation";
 import { Settings } from "./pages/Settings";
 import { Tools } from "./pages/Tools";
 import { formatUsd } from "./lib/format";
@@ -10,6 +11,7 @@ import "./components.css";
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "MONITOR" },
+  { id: "operation", label: "OPERAÇÃO" },
   { id: "tools", label: "FERRAMENTAS" },
   { id: "settings", label: "CONFIGURAÇÕES" },
 ];
@@ -205,6 +207,7 @@ export default function App() {
 
       <main className="shell__main">
         {activePage === "dashboard" && <Dashboard />}
+        {activePage === "operation" && <Operation />}
         {activePage === "tools" && <Tools />}
         {activePage === "settings" && <Settings />}
       </main>

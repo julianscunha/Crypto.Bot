@@ -18,7 +18,6 @@ vi.mock("../api/client", async () => {
     api: {
       getSettings: vi.fn(),
       updateSettings: vi.fn(),
-      getLiveBalance: vi.fn(),
     },
   };
 });
@@ -119,84 +118,25 @@ describe("Settings", () => {
     );
   });
 
-  it("renders the mode, credentials and parameter panels once settings load", async () => {
+  it("renders the parameter panels once settings load", async () => {
     api.getSettings.mockResolvedValue(SETTINGS_FIXTURE);
 
     render(<Settings />);
 
     await waitFor(() =>
-      expect(screen.getByText("Modo de execução")).toBeInTheDocument(),
+      expect(
+        screen.getByText("Pares monitorados e mercado"),
+      ).toBeInTheDocument(),
     );
 
-    expect(screen.getByText("Credenciais da carteira")).toBeInTheDocument();
-    expect(
-      screen.getByText("Pares monitorados e mercado"),
-    ).toBeInTheDocument();
     expect(screen.getByText("Gestão de risco")).toBeInTheDocument();
 
-    // paper mode is active by default in the fixture
-    expect(screen.getAllByText("Ativo").length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("locks Live mode options until live trading is confirmed", async () => {
-    api.getSettings.mockResolvedValue(SETTINGS_FIXTURE);
-
-    render(<Settings />);
-
-    await waitFor(() =>
-      expect(screen.getByText("Modo de execução")).toBeInTheDocument(),
-    );
-
+    // Mode/credentials panels moved to the Operação page -- Settings
+    // no longer renders them.
+    expect(screen.queryByText("Modo de execução")).not.toBeInTheDocument();
     expect(
-      screen.getByText((_, element) =>
-        element?.tagName.toLowerCase() === "p" &&
-        element.textContent.includes(
-          "Para habilitar os modos Live, vá em Credenciais",
-        ),
-      ),
-    ).toBeInTheDocument();
-
-    const liveTestnetButton = screen
-      .getByText("Live Testnet")
-      .closest("button");
-
-    expect(liveTestnetButton).toBeDisabled();
-  });
-
-  it("opens a confirmation modal when switching to an available mode", async () => {
-    const user = userEvent.setup();
-
-    api.getSettings.mockResolvedValue({
-      ...SETTINGS_FIXTURE,
-      live_trading_available: true,
-    });
-    api.updateSettings.mockResolvedValue({
-      ...SETTINGS_FIXTURE,
-      mode: "live",
-      binance_testnet: true,
-      restart_triggered: true,
-    });
-
-    render(<Settings />);
-
-    await waitFor(() =>
-      expect(screen.getByText("Modo de execução")).toBeInTheDocument(),
-    );
-
-    await user.click(screen.getByText("Live Testnet").closest("button"));
-
-    expect(screen.getByText("Trocar para Live Testnet?")).toBeInTheDocument();
-
-    await user.click(
-      screen.getByRole("button", { name: "Trocar para Live Testnet" }),
-    );
-
-    await waitFor(() =>
-      expect(api.updateSettings).toHaveBeenCalledWith({
-        mode: "live",
-        binance_testnet: true,
-      }),
-    );
+      screen.queryByText("Credenciais da carteira"),
+    ).not.toBeInTheDocument();
   });
 
   it("marks a parameter field dirty and saves parsed values", async () => {
@@ -223,8 +163,6 @@ describe("Settings", () => {
     // this test doesn't care about.
     fireEvent.change(riskInput, { target: { value: "2.5" } });
 
-    // "Salvar alterações" is also the CredentialsPanel submit button's
-    // label -- scope to the sticky params save bar specifically.
     const saveBar = document.querySelector(".params-save-bar");
 
     const saveButton = within(saveBar).getByRole("button", {
