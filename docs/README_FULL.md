@@ -413,6 +413,38 @@ fazendo assert contra o mesmo objeto que escreveu os dados.
 
 ---
 
+# PORTFOLIO SNAPSHOT (TAMBÉM CROSS-PROCESS)
+
+Mesma classe de problema do RUNTIME STATE acima, só que para
+Equity/Balance em vez de telemetria de WebSocket.
+`PortfolioService.build_snapshot()` é a única função que grava uma
+linha nova em `portfolio_snapshots` — e por muito tempo só era
+chamada de um lugar: `print_session_report()`, no encerramento do
+Runner (`Ctrl+C` ou stop pela UI). `GET /dashboard`/`GET /portfolio`
+sempre leem só a última linha (`get_latest_snapshot()`), então
+Equity/Balance no Monitor ficavam **congelados** no valor da última
+vez que o bot foi *parado* — potencialmente dias desatualizado, e
+completamente desconectado do saldo real da Binance mudando o tempo
+todo enquanto o bot rodava normalmente.
+
+**Correção:** `flush_portfolio_snapshot_periodically()` em
+`apps/trader/runner.py`, mesma task `asyncio` em background que
+`flush_runtime_state_periodically()`, gravando um snapshot fresco a
+cada `PORTFOLIO_SNAPSHOT_INTERVAL_SECONDS` (30s) usando o saldo real
+(`core.services.runtime_balance.get_balance()`, o mesmo já usado pelo
+painel ENGINE/relatório de sessão). Diferente do `runtime_state`
+(uma única linha sobrescrita), `create_snapshot()` sempre faz
+`INSERT` — é uma tabela apêndice-only, usada por
+`get_max_equity()` para o pico histórico de equity (ver DRAWDOWN:
+ESCOPO DE SESSÃO abaixo) — por isso o intervalo é mais largo que o do
+`runtime_state` (30s vs. 2s): não há razão para crescer a tabela tão
+rápido quanto aquele upsert de linha única.
+
+Coberto em `tests/test_trader_runner.py`
+(`TestFlushPortfolioSnapshotPeriodically`).
+
+---
+
 # DRAWDOWN: ESCOPO DE SESSÃO
 
 `PortfolioService.build_snapshot()` calcula o % de drawdown contra o
@@ -629,19 +661,23 @@ algum estado específico.
 frontend/
 ├── src/
 │   ├── api/client.js          -- fetch wrapper para a API
-│   ├── hooks/usePolling.js    -- polling hook usado pelas duas páginas
+│   ├── hooks/usePolling.js    -- polling hook usado pelas páginas
 │   ├── lib/format.js          -- formatação de currency/percent/date
 │   ├── components/            -- Panel, StatCard, Badge, TradesTable,
 │   │                             PnlChart, EventLog
 │   └── pages/
 │       ├── Dashboard.jsx      -- página Monitor
-│       └── Settings.jsx       -- página Settings
+│       ├── Operation.jsx      -- página Operação (modo + credenciais)
+│       ├── Tools.jsx          -- página Ferramentas (optimizer/backtest)
+│       └── Settings.jsx       -- página Configurações (parâmetros)
 └── vite.config.js             -- fixado na porta 5173 (bate com o CORS da API)
 ```
 
 React + Vite. O estado é buscado via polling (`usePolling`, intervalo
-de 3s no dashboard, 15s nas settings) em vez de WebSocket — mais
-simples, e a API já é uma superfície REST simples.
+de 3s no dashboard, 15s em Operação/Configurações) em vez de
+WebSocket — mais simples, e a API já é uma superfície REST simples.
+Barra lateral: **Monitor** → **Operação** → **Ferramentas** →
+**Configurações**.
 
 ## Monitor (`pages/Dashboard.jsx`)
 
@@ -666,10 +702,11 @@ dashboard — mudam com menos frequência):
   Sortino, max drawdown histórico, profit factor e sequências de
   vitórias/derrotas atual/melhor. Ver ANÁLISE AVANÇADA DE TRADES.
 
-## Settings (`pages/Settings.jsx`)
+## Operação (`pages/Operation.jsx`)
 
-Quatro painéis, todos salvando via `PUT /settings` (campos opcionais
-— só o que mudou é enviado) e disparando `handleSaved` (que dá
+Separa "o que é operação/carteira" de "o que é parâmetro de trading"
+(este último fica em Configurações, abaixo). Dois painéis, ambos
+salvando via `PUT /settings` e disparando `handleSaved` (que dá
 `refresh()` e emite o evento `window` `crypto-bot-settings-updated`,
 escutado por `Tools.jsx` para recarregar seus próprios settings):
 
@@ -682,7 +719,9 @@ escutado por `Tools.jsx` para recarregar seus próprios settings):
   de modo abre um modal de confirmação (`ModeConfirmModal`) antes de
   enviar `PUT /settings`; a API já bloqueia a troca com posição
   aberta (409 — ver `Bloqueação de troca de modo com posição aberta`
-  no LIVE TRADING abaixo).
+  no LIVE TRADING abaixo). Ação imediata (dispara restart do bot ao
+  confirmar), por isso fica fora da barra de salvar sticky abaixo —
+  trocar de modo não é um campo de formulário acumulável.
 - **Credenciais da carteira (`CredentialsPanel`)** — key/secret da
   Binance (Testnet ou mainnet, conforme o modo ativo). Credenciais já
   configuradas são exibidas como uma máscara de tamanho fixo
@@ -690,25 +729,39 @@ escutado por `Tools.jsx` para recarregar seus próprios settings):
   depois de salvo. Um botão "Limpar" por campo é a única forma de
   remover uma chave salva. Em modo `live`, mostra o saldo real da
   conta (`GET /account/live-balance`, atualizado a cada 30s); em modo
-  `paper`, o saldo é editável manualmente.
-- **Pares monitorados e mercado (`PairsPanel` + `MarketFields`)** —
-  grade de pares para ativar/desativar (validada contra a API pública
-  da Binance direto do browser, `GET api.binance.com/.../exchangeInfo`
-  — não passa pelo backend, então não é afetada pelo CORS restrito de
-  `apps/api/main.py`) e o timeframe dos candles. Ambos requerem
-  restart do bot para valer.
-- **Formulário unificado de parâmetros (`AllParamsForm`)** — todos os
-  demais parâmetros (risco, limites diários, ATR, qualidade de sinal,
-  estrutura de mercado, gestão de posição, precisão de exchange,
-  simulação) num único formulário com um único botão salvar, gerado
-  declarativamente a partir do array `GROUPS`. Cada campo tem um
-  tooltip com hint (hover no label, delay de 400ms).
+  `paper`, o saldo é editável manualmente. Usa a mesma barra de salvar
+  sticky (`.params-save-bar`, só aparece quando há alteração
+  pendente) do formulário de Configurações, em vez de um botão
+  estático próprio.
+
+## Configurações (`pages/Settings.jsx`)
+
+Um único componente (`ParamsForm`) e uma única barra de salvar sticky
+para toda a página — pares monitorados, intervalo de candles e todos
+os demais parâmetros:
+
+- **Pares monitorados e mercado** — grade de pares para
+  ativar/desativar (validada contra a API pública da Binance direto
+  do browser, `GET api.binance.com/.../exchangeInfo` — não passa pelo
+  backend, então não é afetada pelo CORS restrito de
+  `apps/api/main.py`) e o timeframe dos candles.
+- **Grupos de parâmetros** — risco, limites diários, ATR, qualidade
+  de sinal, estrutura de mercado, gestão de posição, precisão de
+  exchange, simulação — gerados declarativamente a partir do array
+  `GROUPS`. Cada campo tem um tooltip com hint (hover no label, delay
+  de 400ms).
+- **Barra de salvar sticky** (`.params-save-bar`) — só aparece quando
+  há alteração pendente em qualquer campo da página. O bot nunca
+  reinicia sozinho ao salvar: a barra mostra um aviso
+  ("⚠ Requer reinicialização do bot") só quando o(s) campo(s) alterado(s)
+  de fato exige(m) restart para valer (`restartRequiredKeys`,
+  validado campo a campo — `symbols`/`kline_interval` mais qualquer
+  grupo com `restartRequired: true`), nunca de forma genérica.
 
 ## Ferramentas (`pages/Tools.jsx`)
 
-Terceira página do frontend (não documentada anteriormente no README
-raiz) — roda o **Optimizer** e o **Backtest** direto pela interface,
-sem precisar do terminal:
+Roda o **Optimizer** e o **Backtest** direto pela interface, sem
+precisar do terminal:
 
 - Botões para disparar `POST /jobs/optimizer` (com seletor de janela
   de dias: 30/60/90) ou `POST /jobs/backtest`, bloqueados enquanto o
@@ -759,13 +812,19 @@ Cobertura atual:
   do portfolio após resolver, error state quando a API está
   inacessível, badge de feed de mercado conectado/desconectado.
   `api` é mockado via `vi.mock` — nenhum destes testes faz rede real.
-- `src/pages/Settings.test.jsx` — loading/error state, render dos
-  quatro painéis, bloqueio dos modos Live sem
+- `src/pages/Operation.test.jsx` — loading/error state, render dos
+  painéis de Modo e Credenciais, bloqueio dos modos Live sem
   `live_trading_available`, fluxo completo de troca de modo
-  (clique → modal de confirmação → `PUT /settings`), e edição de um
-  parâmetro no formulário unificado até o payload salvo (valores
-  `int`/`float` são convertidos antes do envio, testado
-  explicitamente). `PairsPanel`'s `fetch` direto à Binance é mockado
+  (clique → modal de confirmação → `PUT /settings`), e a barra de
+  salvar sticky do painel de Credenciais oculta até um campo ficar
+  dirty (mesmo padrão de `Settings.test.jsx` abaixo).
+- `src/pages/Settings.test.jsx` — loading/error state, render dos
+  painéis de pares/mercado e parâmetros (confirma que Modo/Credenciais
+  NÃO aparecem mais aqui, já que moveram para Operação), edição de um
+  parâmetro até o payload salvo (valores `int`/`float` são convertidos
+  antes do envio, testado explicitamente), e uma única barra de salvar
+  sticky compartilhada entre pares/mercado e todos os grupos de
+  parâmetros. `fetch` direto à Binance (validação de pares) é mockado
   para falhar rápido e cair no fallback local (`DEFAULT_PAIRS`), já
   que não há rede disponível no ambiente de teste.
 
@@ -792,7 +851,7 @@ destruiria tudo isso). Pontos-chave:
 Execução real de ordens contra a Binance, de ponta a ponta: uma
 entrada MARKET BUY, uma OCO protetora (stop loss + take profit)
 colocada imediatamente depois, e um restart automático do Runner ao
-trocar de modo pelo painel Settings.
+trocar de modo pelo painel Operação.
 
 ```text
 core/services/binance_trading_client.py    -- cliente REST autenticado
@@ -800,7 +859,7 @@ core/services/execution_router.py          -- ponto de decisão paper vs. live
 core/services/process_manager_service.py    -- reinicia o processo Runner
 core/utils/runner_pid.py                    -- ponte de PID file API <-> Runner
 apps/api/main.py                            -- PUT /settings: bloqueio + restart
-frontend/src/pages/Settings.jsx             -- seletor de modo + modal de confirmação
+frontend/src/pages/Operation.jsx            -- seletor de modo + modal de confirmação
 ```
 
 ### Por que um restart é necessário para trocar de modo
@@ -833,6 +892,24 @@ lança `MainnetNotConfirmedError` se solicitado a mirar a mainnet sem
 isso — aplicado de novo no momento da construção, não só por quem
 quer que o tenha chamado, caso um bug futuro na própria verificação
 de `execution_router.py` seja algum dia introduzido.
+
+### Checagem de saldo mínimo antes de iniciar (`core/services/startup_balance_service.py`)
+
+`GET /runner/start-check`, consultado pelo frontend (barra lateral do
+`App.jsx`) antes de habilitar "▶ INICIAR BOT", estima se o saldo atual
+cobre o mínimo real da Binance para os pares selecionados. Para cada
+símbolo, busca o filtro `MIN_NOTIONAL`/`NOTIONAL` real via
+`exchangeInfo` (não confia no cache de `core/services/exchange_filters.py`,
+que só é populado pelo próprio Runner no seu startup em modo LIVE — a
+API nunca chama isso, então usar aquele cache aqui sempre voltava
+`min_notional=0.0` e subestimava o mínimo necessário) e calcula o
+maior valor entre: mínimo por `MIN_NOTIONAL`, mínimo por quantidade
+mínima, e mínimo pela exposição máxima configurada
+(`MAX_POSITION_EXPOSURE_PERCENT`). O saldo atual, em modo `live`, vem
+de `get_account_info()` (USDT livre na Spot Wallet — saldo em outro
+ativo ou em Earn/Savings não conta). `allowed=false` bloqueia o botão
+de iniciar com uma mensagem citando o par mais exigente e o mínimo
+estimado; nunca impede iniciar em modo `paper`.
 
 ### Sequência de execução ao vivo
 
@@ -1198,6 +1275,33 @@ Coberto em `tests/test_binance_history.py` e
 `tests/test_optimizer_engine.py` (`TestPrepareDatasetsFallback`,
 `TestPrepareDatasetsSuccess`, `TestValidationGate`).
 
+## Execução como subprocesso e timeout (`apps/api/main.py`)
+
+`POST /jobs/optimizer` e `POST /jobs/backtest` rodam o Optimizer/Backtest
+como subprocesso separado (`_run_job_subprocess_inner`), para não
+bloquear a API enquanto o job roda. **Bug corrigido:** o timeout do
+`subprocess.run` era um valor fixo de 3600s (1h) — um optimizer de 90
+dias com vários pares tem várias vezes o volume de trabalho do caso
+"padrão" contra o qual esse valor tinha sido calibrado, e era abortado
+no meio sem gerar `optimizer_report.json`, com um erro genérico de
+"timed out". Corrigido: o timeout agora é calculado por
+`_compute_job_timeout_seconds()`, reaproveitando o mesmo estimador de
+`core/services/job_estimation_service.py` que já alimenta
+`GET /jobs/estimate` (baseado em `work_units` = símbolos × candles ×
+combinações, ajustado pela capacidade da máquina), multiplicado por
+uma margem de segurança de 3x, com piso de 1h e teto de 6h.
+
+Cada subprocesso também recebe seu próprio arquivo de log via
+`CRYPTO_BOT_LOG_PROCESS` no ambiente do processo filho (ver CONSOLE
+ENGINE) e o workload/símbolos usados no cálculo do timeout e da
+estimativa são sempre lidos do `.env` ao vivo
+(`settings_repository.get_settings()`), nunca do singleton estático
+`core.config.settings.settings` — que fica desatualizado no processo
+da API assim que o usuário salva um novo conjunto de pares em
+Configurações sem reiniciar a API (mesma classe de bug do `MODE`
+descrito em LIVE TRADING, só que afetando a própria API em vez do
+Runner).
+
 ## Backtest (`backtest/runner.py`)
 
 `backtest/runner.py` (opção de menu `[3]`) é um entrypoint
@@ -1504,9 +1608,9 @@ lacuna.
 **`Frontend`** (60% → 75%) — página `Tools.jsx` (optimizer/backtest
 pela interface) documentada, antes ausente do README. Testes
 automatizados (Vitest + Testing Library) cobrindo o wrapper de API
-(`client.js`), `usePolling` e as páginas Dashboard/Settings — ainda
-sem cobertura de `Tools.jsx` nem dos componentes visuais menores
-(`TradesTable`, `PnlChart`, etc.), por isso não é 100%.
+(`client.js`), `usePolling` e as páginas Dashboard/Operation/Settings —
+ainda sem cobertura de `Tools.jsx` nem dos componentes visuais
+menores (`TradesTable`, `PnlChart`, etc.), por isso não é 100%.
 
 **`Deploy (Docker)`** (módulo novo, 90%) — `Dockerfile` multi-stage +
 `docker-compose.yml`, testado manualmente de ponta a ponta (build das

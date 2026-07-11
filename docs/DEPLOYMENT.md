@@ -50,11 +50,23 @@ escreve trades e a API os lê, exatamente como já acontece hoje fora
 do Docker quando os dois rodam como processos separados na mesma
 máquina.
 
+Também compartilham o volume `runner_logs` (`/app/logs`) — os dois
+containers gravam no mesmo diretório de log, então cada um precisa
+escrever em arquivos com nomes diferentes: `api` usa
+`runtime.log`/`errors.log`, `runner` usa
+`runtime-runner.log`/`errors-runner.log` (o próprio `apps/trader/runner.py`
+já seta a env var `CRYPTO_BOT_LOG_PROCESS` antes de qualquer import,
+não é algo que precise ser configurado no `Dockerfile`/
+`docker-compose.yml`). Dois processos gravando concorrentemente no
+mesmo arquivo corrompe/derruba linhas silenciosamente sem essa
+separação (ver CONSOLE ENGINE em `docs/README_FULL.md`).
+
 `api` e `runner` também montam o `.env` real do host como bind mount
 (`./.env:/app/.env`) — não é só o `env_file:` do Compose (que injeta
 variáveis uma única vez, na criação do container). `PUT /settings`
-(o painel Settings do frontend) lê e escreve o arquivo `.env`
-diretamente em disco via `core/config/settings_repository.py`; sem
+(usado pelas páginas Operação e Configurações do frontend) lê e
+escreve o arquivo `.env` diretamente em disco via
+`core/config/settings_repository.py`; sem
 esse bind mount, essas escritas cairiam na camada de filesystem
 efêmera do container e seriam perdidas no próximo
 `docker compose up`/recreate. Validado manualmente: `PUT /settings`
@@ -125,7 +137,7 @@ remoto, um domínio público):
    Traefik) — nem a API nem o nginx deste `docker-compose.yml`
    servem HTTPS diretamente. Tráfego sem TLS expõe o
    `X-API-Token` e as credenciais da Binance (quando configuradas via
-   painel Settings) em texto puro.
+   painel Operação) em texto puro.
 3. **Restrinja `CORS_ALLOWED_ORIGINS`** ao(s) domínio(s) real(is) do
    frontend publicado — nunca use um wildcard aqui. (`apps/api/main.py`
    já roda com `allow_credentials=False` — a autenticação aqui é o

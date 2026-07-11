@@ -15,7 +15,7 @@ BinanceWS → EventBus → AnalystAgent → StrategyAgent → RiskAgent → Exec
 - `core/config/` — configs tipadas (ATR, EMA, market structure, regimes em `core/config/regimes/`, `best_config.json`).
 - `data/storage/` — models SQLAlchemy + `trades.db` (SQLite). `data/ingestion/` — WebSocket da Binance.
 - `backtest/` — engine, optimizer, runner; fixtures em `backtest/datasets/`.
-- `frontend/` — dashboard React + Vite (`Monitor` e `Settings`), fala com a API via `VITE_API_BASE_URL`.
+- `frontend/` — dashboard React + Vite (`Monitor`, `Operação`, `Ferramentas`, `Configurações`), fala com a API via `VITE_API_BASE_URL`.
 - Detalhe completo de status/roadmap em `docs/README_FULL.md`.
 
 ## Regras de domínio (nunca violar)
@@ -28,7 +28,7 @@ BinanceWS → EventBus → AnalystAgent → StrategyAgent → RiskAgent → Exec
 ## Runtime modes
 
 - `MODE=paper|live` no `.env`. Mesmo com `MODE=live` e `BINANCE_TESTNET=false`, ordens reais só saem se `LIVE_TRADING_CONFIRMED=true` também estiver setado — é uma trava proposital separada do `MODE`.
-- Exchange Integration está em ~50%: sem validação real contra a API da Binance (nem testnet — sem acesso de rede neste ambiente de dev), sem rate-limit no client de ordens, sem reconciliação de startup entre posições locais e da exchange.
+- Exchange Integration está em ~78%: rate-limit no client de ordens e reconciliação de startup (`core/services/startup_reconciler.py`) já existem. **Ainda falta**: validação real contra a API da Binance (nem testnet — sem acesso de rede neste ambiente de dev); ver checklist manual em `docs/README_FULL.md`.
 
 ## Testes
 
@@ -37,3 +37,9 @@ BinanceWS → EventBus → AnalystAgent → StrategyAgent → RiskAgent → Exec
 ## Console Engine (padrão visual de logs)
 
 Branco = neutro, verde = positivo, vermelho = erro/bloqueio, amarelo = warning/trailing.
+
+Cada processo grava em seu próprio arquivo (`logs/runtime.log` = API/launcher,
+`logs/runtime-runner.log` = Runner, `logs/runtime-<job>.log` = Optimizer/Backtest)
+— nunca compartilhe um arquivo de log entre processos: escritas concorrentes de
+processos diferentes no mesmo arquivo corrompem/derrubam linhas silenciosamente,
+sem lançar exceção (ver `core/utils/console_logger.py`).
