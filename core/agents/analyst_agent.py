@@ -293,16 +293,31 @@ class AnalystAgent:
         # =================================================
         # ANALYSIS LOG
         # =================================================
+        #
+        # NEUTRAL is the outcome for most candles (no directional
+        # read) -- logging it unconditionally meant every single
+        # candle replayed (Optimizer/Backtest fetch 90 days of real
+        # history per symbol, tens of thousands of candles) wrote a
+        # line to disk whether or not anything worth seeing happened.
+        # This was masked for a long time by an unrelated bug (see
+        # alembic/env.py's fileConfig fix) that silently disabled
+        # file logging after the first migration ran, so the real
+        # cost of this volume only became visible once that bug was
+        # fixed. Only BULLISH/BEARISH reads -- an actual directional
+        # signal -- are worth a line here; STRATEGY/RISK already only
+        # log on an actual signal/block, not every candle.
 
-        log(
-            "ANALYST",
-            (
-                f"analysis={analysis} "
-                f"confidence={confidence} "
-                f"regime={regime} "
-                f"volatility={volatility_regime}"
+        if analysis != "NEUTRAL":
+
+            log(
+                "ANALYST",
+                (
+                    f"analysis={analysis} "
+                    f"confidence={confidence} "
+                    f"regime={regime} "
+                    f"volatility={volatility_regime}"
+                )
             )
-        )
 
         # =================================================
         # PUBLISH

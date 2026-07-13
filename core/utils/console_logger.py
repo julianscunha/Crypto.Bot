@@ -306,6 +306,61 @@ error_logger = build_logger(
 )
 
 # =====================================================
+# RUNTIME RETAG (for pool workers spawned after import)
+# =====================================================
+#
+# CRYPTO_BOT_LOG_PROCESS only works for the *first* process to import
+# this module -- everything above already ran by the time a
+# ProcessPoolExecutor worker starts, because the worker has to import
+# this module's owning package just to find the function it was told
+# to run, and that import is what freezes _LOG_PROCESS_TAG from the
+# inherited env var. So every worker in a pool would otherwise get the
+# exact same tag as their parent (and each other) and silently share
+# one log file again -- see backtest/optimizer/optimizer_engine.py's
+# parallel combination workers, the first caller of this.
+
+def retag_process(tag: str) -> None:
+
+    global _LOG_PROCESS_TAG, RUNTIME_LOG_FILE, ERROR_LOG_FILE
+    global runtime_logger, error_logger
+
+    _LOG_PROCESS_TAG = tag.strip().lower()
+
+    RUNTIME_LOG_FILE = (
+        LOGS_DIR
+        /
+        _tagged_filename(
+            LOGGING_CONFIG["runtime_log_filename"]
+        )
+    )
+
+    ERROR_LOG_FILE = (
+        LOGS_DIR
+        /
+        _tagged_filename(
+            LOGGING_CONFIG["error_log_filename"]
+        )
+    )
+
+    for handler in list(runtime_logger.handlers):
+        handler.close()
+
+    for handler in list(error_logger.handlers):
+        handler.close()
+
+    runtime_logger = build_logger(
+        name="runtime_logger",
+        level=logging.INFO,
+        filename=RUNTIME_LOG_FILE
+    )
+
+    error_logger = build_logger(
+        name="error_logger",
+        level=logging.ERROR,
+        filename=ERROR_LOG_FILE
+    )
+
+# =====================================================
 # HELPERS
 # =====================================================
 

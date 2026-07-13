@@ -2,6 +2,9 @@
 
 import asyncio
 import json
+import os
+
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from itertools import product
 
@@ -58,6 +61,125 @@ from data.ingestion.binance_history import (
 )
 
 
+# =====================================================
+# PARALLEL COMBINATION WORKER
+# =====================================================
+#
+# Combinations used to run sequentially in the same process --
+# 90d x 4 symbols x 24 combinations took over 6h wall-clock on a
+# 4-core dev machine, blowing past apps/api/main.py's
+# JOB_TIMEOUT_CEILING_SECONDS and killing the whole run with zero
+# usable output. apply_config()/restore_config() mutate the
+# process-global TRADING_CONFIG/TRADE_MANAGEMENT_CONFIG dicts (see
+# config_runtime.py), which makes them unsafe to run concurrently as
+# threads/asyncio tasks in one process -- but ReplayEngine/
+# MetricsEngine/trades_repository are already fully parametrized by
+# user_id, so separate OS processes (ProcessPoolExecutor), each given
+# its own sandbox user_id, can each safely apply/replay/restore their
+# own config without racing each other. SQLite already runs
+# WAL + busy_timeout=5000 (data/storage/database.py), so concurrent
+# writes from multiple worker processes to the same trades.db are
+# safe, just serialized under the hood.
+
+def _tag_worker_log_process():
+
+    # Runs once per worker process, before any task/log call.
+    # Setting CRYPTO_BOT_LOG_PROCESS here would be too late -- by the
+    # time this initializer runs, the worker has already imported
+    # this module (to find the initializer itself), which already
+    # froze console_logger's file handlers using the *inherited*
+    # env var from the parent subprocess. Every worker would end up
+    # tagged identically (and identically to the parent), silently
+    # sharing one log file and corrupting/losing lines exactly like
+    # the bug console_logger.py's per-process tagging already fixed
+    # for API vs Runner vs Optimizer/Backtest. retag_process()
+    # re-points the already-open handlers instead.
+    from core.utils.console_logger import retag_process
+
+    retag_process(f"optimizer-w{os.getpid()}")
+
+    from data.storage.database import init_db
+
+    init_db()
+
+
+def _evaluate_combination(task: dict) -> dict:
+
+    index = task["index"]
+    params = task["params"]
+    train_datasets = task["train_datasets"]
+    user_id = task["user_id"]
+
+    snapshot = get_config_snapshot()
+
+    apply_config(params)
+
+    trades_repository.reset(user_id=user_id)
+
+    try:
+
+        for dataset in train_datasets:
+
+            market_structure_service.reset()
+
+            replay = ReplayEngine(
+                csv_path=dataset,
+                user_id=user_id
+            )
+
+            asyncio.run(
+                replay.replay()
+            )
+
+        metrics = MetricsEngine().generate(user_id)
+
+    finally:
+
+        restore_config(snapshot)
+
+    if metrics["total_trades"] < 5:
+
+        return {
+            "index": index,
+            "params": params,
+            "status": "skipped_low_sample"
+        }
+
+    score = (
+        (metrics["pnl"] * 0.30)
+        + (metrics["profit_factor"] * 100 * 0.25)
+        + (metrics["expectancy"] * 10 * 0.20)
+        + (metrics["recovery_factor"] * 50 * 0.15)
+        + (metrics["risk_reward"] * 25 * 0.10)
+    )
+
+    score -= abs(metrics["max_drawdown"]) * 0.20
+
+    score = round(score, 2)
+
+    if (
+        metrics["profit_factor"] <= 1.0
+        or metrics["pnl"] <= 0
+        or metrics["expectancy"] <= 0
+    ):
+
+        return {
+            "index": index,
+            "params": params,
+            "metrics": metrics,
+            "score": score,
+            "status": "filtered"
+        }
+
+    return {
+        "index": index,
+        "params": params,
+        "metrics": metrics,
+        "score": score,
+        "status": "valid"
+    }
+
+
 class OptimizerEngine:
 
     TRAIN_DATASETS = [
@@ -76,6 +198,14 @@ class OptimizerEngine:
     )
 
     USER_ID = 999
+
+    # Base sandbox user_id for parallel workers -- each combination
+    # gets USER_ID_BASE + index (e.g. 90001, 90002, ...) so
+    # trades_repository.reset()/inserts never collide between
+    # combinations running concurrently in separate processes. Kept
+    # far from both real account ids (0) and the single-run sandbox
+    # id (999) used by the walk-forward validation step below.
+    WORKER_USER_ID_BASE = 90000
 
     # =====================================================
     # REAL HISTORICAL DATA
@@ -348,6 +478,102 @@ class OptimizerEngine:
         return combinations
 
     # =====================================================
+    # OUTCOME HANDLING (shared by sequential and parallel paths)
+    # =====================================================
+
+    def _process_outcome(
+        self,
+        index: int,
+        total: int,
+        params: dict,
+        outcome: dict,
+        results: list
+    ):
+
+        print()
+        print("=" * 60)
+
+        log(
+            "OPTIMIZER",
+            f"TEST {index}/{total} {params}"
+        )
+
+        if outcome["status"] == "skipped_low_sample":
+
+            log(
+                "OPTIMIZER",
+                "SKIPPED LOW_SAMPLE",
+                "WARNING"
+            )
+
+            return
+
+        metrics = outcome["metrics"]
+
+        log(
+            "RESULT",
+            (
+                f"PNL={metrics['pnl']} "
+                f"PF={metrics['profit_factor']} "
+                f"WR={metrics['winrate']:.2%} "
+                f"SCORE={outcome['score']}"
+            ),
+            "SUCCESS"
+        )
+
+        if outcome["status"] == "valid":
+
+            results.append({
+                "params": dict(outcome["params"]),
+                "metrics": dict(outcome["metrics"]),
+                "score": outcome["score"]
+            })
+
+    # =====================================================
+    # CHECKPOINT
+    # =====================================================
+    #
+    # Overwrites the same file the final "SAVE REPORT" step writes,
+    # with whatever valid results have been scored so far. If the
+    # job is killed mid-run (e.g. by apps/api/main.py's subprocess
+    # timeout), this is what survives on disk instead of nothing --
+    # the final write below simply overwrites it once the full run
+    # completes normally.
+
+    def _write_checkpoint_report(self, results: list):
+
+        sorted_partial = sorted(
+            results,
+            key=lambda x: x["score"],
+            reverse=True
+        )
+
+        try:
+
+            Path(
+                "backtest/reports"
+            ).mkdir(
+                parents=True,
+                exist_ok=True
+            )
+
+            with open(
+                "backtest/reports/optimizer_report.json",
+                "w",
+                encoding="utf-8"
+            ) as f:
+
+                json.dump(
+                    sorted_partial,
+                    f,
+                    indent=4
+                )
+
+        except OSError:
+
+            pass
+
+    # =====================================================
     # OPTIMIZER
     # =====================================================
 
@@ -370,190 +596,113 @@ class OptimizerEngine:
         results = []
 
         # =====================================================
-        # ITERATIONS
+        # ITERATIONS (PARALLEL, ONE OS PROCESS PER WORKER)
         # =====================================================
+        #
+        # See the module-level comment above _evaluate_combination
+        # for why this needs separate processes (not threads) and
+        # per-combination sandbox user_ids. Checkpointing the report
+        # after every completed combination means a job killed by
+        # apps/api/main.py's timeout still leaves a usable partial
+        # optimizer_report.json instead of losing all prior work.
 
-        for index, params in enumerate(
-            combinations,
-            start=1
-        ):
+        total = len(combinations)
 
-            print()
+        tasks = [
+            {
+                "index": index,
+                "params": params,
+                "train_datasets": list(self.TRAIN_DATASETS),
+                "user_id": self.WORKER_USER_ID_BASE + index,
+            }
+            for index, params in enumerate(combinations, start=1)
+        ]
 
-            print("=" * 60)
+        completed = 0
 
-            log(
-                "OPTIMIZER",
-                (
-                    f"TEST {index}/{len(combinations)} "
-                    f"{params}"
-                )
-            )
+        if total <= 1:
 
-            write_progress(
-                current=index,
-                total=len(combinations),
-                phase=(
-                    f"Testando combinação {index} de {len(combinations)}: "
-                    f"TP×{params.get('atr_take_profit_multiplier')} "
-                    f"SL×{params.get('atr_stop_multiplier')}"
-                )
-            )
+            # No point paying process-pool startup cost for a single
+            # combination (also keeps this path fully in-process,
+            # which is what makes ReplayEngine/MetricsEngine mockable
+            # in tests -- a real ProcessPoolExecutor worker re-imports
+            # the real classes from scratch and would never see
+            # patches applied in the test process).
 
-            apply_config(
-                params
-            )
+            for task in tasks:
 
-            trades_repository.reset(
-                user_id=self.USER_ID
-            )
+                outcome = _evaluate_combination(task)
 
-            for dataset in self.TRAIN_DATASETS:
+                completed += 1
 
-                log(
-                    "DATASET",
-                    dataset
+                self._process_outcome(
+                    task["index"], total, task["params"], outcome, results
                 )
 
-                market_structure_service.reset()
+                write_progress(
+                    current=completed,
+                    total=total,
+                    phase=f"Testando combinação {completed} de {total}"
+                )
 
-                replay = (
-                    ReplayEngine(
-                        csv_path=dataset,
-                        user_id=self.USER_ID
+                if results:
+
+                    self._write_checkpoint_report(results)
+
+        else:
+
+            worker_count = min(os.cpu_count() or 1, total)
+
+            with ProcessPoolExecutor(
+                max_workers=worker_count,
+                initializer=_tag_worker_log_process
+            ) as pool:
+
+                futures = {
+                    pool.submit(_evaluate_combination, task): task
+                    for task in tasks
+                }
+
+                for future in as_completed(futures):
+
+                    task = futures[future]
+                    index = task["index"]
+                    params = task["params"]
+
+                    completed += 1
+
+                    try:
+
+                        outcome = future.result()
+
+                    except Exception as error:
+
+                        print()
+                        print("=" * 60)
+
+                        log(
+                            "OPTIMIZER",
+                            f"TEST {index}/{total} {params} FAILED {error}",
+                            "ERROR"
+                        )
+
+                    else:
+
+                        self._process_outcome(
+                            index, total, params, outcome, results
+                        )
+
+                    write_progress(
+                        current=completed,
+                        total=total,
+                        phase=(
+                            f"Testando combinação {completed} de {total}"
+                        )
                     )
-                )
 
-                asyncio.run(
-                    replay.replay()
-                )
+                    if results:
 
-            # =================================================
-            # METRICS
-            # =================================================
-
-            metrics = (
-                MetricsEngine()
-                .generate(
-                    self.USER_ID
-                )
-            )
-
-            # =================================================
-            # VALIDATION
-            # =================================================
-
-            if metrics["total_trades"] < 5:
-
-                log(
-                    "OPTIMIZER",
-                    "SKIPPED LOW_SAMPLE",
-                    "WARNING"
-                )
-
-                restore_config(
-                    snapshot
-                )
-
-                continue
-
-            # =================================================
-            # SCORE
-            # =================================================
-
-            score = (
-
-                (
-                    metrics["pnl"] * 0.30
-                )
-
-                +
-
-                (
-                    metrics["profit_factor"]
-                    * 100
-                    * 0.25
-                )
-
-                +
-
-                (
-                    metrics["expectancy"]
-                    * 10
-                    * 0.20
-                )
-
-                +
-
-                (
-                    metrics["recovery_factor"]
-                    * 50
-                    * 0.15
-                )
-
-                +
-
-                (
-                    metrics["risk_reward"]
-                    * 25
-                    * 0.10
-                )
-            )
-
-            score -= (
-
-                abs(
-                    metrics["max_drawdown"]
-                )
-
-                * 0.20
-            )
-
-            score = round(
-                score,
-                2
-            )
-
-            # =================================================
-            # RESULT
-            # =================================================
-
-            log(
-                "RESULT",
-                (
-                    f"PNL={metrics['pnl']} "
-                    f"PF={metrics['profit_factor']} "
-                    f"WR={metrics['winrate']:.2%} "
-                    f"SCORE={score}"
-                ),
-                "SUCCESS"
-            )
-
-            # =================================================
-            # FILTER INVALID CONFIGS
-            # =================================================
-
-            if metrics["profit_factor"] <= 1.0:
-                continue
-
-            if metrics["pnl"] <= 0:
-                continue
-
-            if metrics["expectancy"] <= 0:
-                continue
-
-            results.append({
-
-                "params": dict(params),
-
-                "metrics": dict(metrics),
-
-                "score": score
-            })
-
-            restore_config(
-                snapshot
-            )
+                        self._write_checkpoint_report(results)
 
         # =====================================================
         # NO VALID RESULTS

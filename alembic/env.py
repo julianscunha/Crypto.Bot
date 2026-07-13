@@ -22,7 +22,19 @@ from data.storage.models import Base
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers defaults to True in fileConfig(), which
+    # disables every logger that already exists at call time and isn't
+    # explicitly listed in alembic.ini's [loggers] section -- including
+    # this project's own runtime_logger/error_logger from
+    # core/utils/console_logger.py. init_db() (data/storage/database.py)
+    # runs this migration on every call -- at Runner/API startup, and
+    # again on every single ReplayEngine construction during
+    # Optimizer/Backtest replay -- so runtime.log/errors.log would go
+    # silent right after the first migration ran, while console print()
+    # output (unaffected by the logging module) kept looking normal.
+    # Confirmed by direct reproduction: log() calls after init_db()
+    # stopped reaching the file handler with zero exceptions raised.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
