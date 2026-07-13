@@ -75,6 +75,13 @@ class AnalystAgent:
         )
 
         # =================================================
+        # LAST ANALYSIS (per user_id + symbol, for edge-only
+        # logging -- see ANALYSIS LOG below)
+        # =================================================
+
+        self._last_analysis = {}
+
+        # =================================================
         # BUS
         # =================================================
 
@@ -306,8 +313,29 @@ class AnalystAgent:
         # fixed. Only BULLISH/BEARISH reads -- an actual directional
         # signal -- are worth a line here; STRATEGY/RISK already only
         # log on an actual signal/block, not every candle.
+        #
+        # A long BULLISH streak in real market data still produced one
+        # line per candle even after the NEUTRAL filter above, since
+        # market_structure keeps returning "valid" for many consecutive
+        # candles during a real trend. Only the edge (the candle where
+        # the analysis actually changes) is informative -- repeating
+        # the same reading candle after candle is not.
 
-        if analysis != "NEUTRAL":
+        analysis_key = (
+            payload.user_id,
+            payload.symbol
+        )
+
+        analysis_changed = (
+            self._last_analysis.get(analysis_key)
+            != analysis
+        )
+
+        self._last_analysis[analysis_key] = (
+            analysis
+        )
+
+        if analysis != "NEUTRAL" and analysis_changed:
 
             log(
                 "ANALYST",
