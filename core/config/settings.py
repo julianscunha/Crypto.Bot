@@ -272,6 +272,26 @@ class Settings:
     )
 
     # =================================================
+    # LOGGING
+    # =================================================
+    #
+    # Read by core/config/logging_config.py -- max size per log file
+    # before it rotates + gzip-compresses, and how many compacted
+    # (.gz) files to retain per log type before the oldest is
+    # discarded. See core/utils/console_logger.py.
+    MAX_LOG_FILE_SIZE = env_int(
+        "MAX_LOG_FILE_SIZE",
+        10_000_000,
+        minimum=1
+    )
+
+    LOG_BACKUP_COUNT = env_int(
+        "LOG_BACKUP_COUNT",
+        5,
+        minimum=0
+    )
+
+    # =================================================
     # DATABASE
     # =================================================
 

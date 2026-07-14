@@ -44,10 +44,10 @@ LOGGING_CONFIG = {
             getattr(
                 settings,
                 "MAX_LOG_FILE_SIZE",
-                1_000_000
+                10_000_000
             ),
 
-            1_000_000
+            10_000_000
         ),
 
     "log_backup_count":
@@ -57,10 +57,10 @@ LOGGING_CONFIG = {
             getattr(
                 settings,
                 "LOG_BACKUP_COUNT",
-                3
+                5
             ),
 
-            3
+            5
         ),
 
     "file_log_format":

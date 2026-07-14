@@ -49,6 +49,14 @@ Responsável por:
 - atualização de ATR
 - geração de análise inicial
 
+Log da categoria `ANALYST` só é emitido na **borda de transição** da
+análise (quando `analysis` muda de valor para um dado `user_id` +
+`symbol`), não mais a cada candle — um streak longo de BULLISH em
+dados reais gerava uma linha por candle mesmo já filtrando NEUTRAL
+(maioria esmagadora dos casos), o que era volume desnecessário em
+replays de 90 dias. `StrategyAgent`/`RiskAgent` já seguiam esse
+padrão (só logam em sinal/bloqueio real).
+
 ---
 
 ## StrategyAgent
@@ -501,7 +509,42 @@ nenhum dos dois lados. Confirmado reproduzindo diretamente (dois
 processos logando 300 linhas cada, concorrentemente, perderam dezenas
 de linhas cada um por corrupção). Controlado pela env var
 `CRYPTO_BOT_LOG_PROCESS`, setada no topo de cada entry point antes de
-qualquer outro import (ver `core/utils/console_logger.py`).
+qualquer outro import (ver `core/utils/console_logger.py`). Workers
+gerados por `ProcessPoolExecutor` (ver Optimizer paralelo, abaixo) não
+herdam a env var a tempo — usam `retag_process(tag)` para reapontar os
+handlers já abertos em runtime (`logs/runtime-optimizer-w<pid>.log`).
+
+Corrigido também um bug em que os logs de execução/erro do Optimizer
+apareciam completamente vazios: `alembic/env.py` chamava
+`fileConfig()` (rodado a cada `init_db()`, ou seja, a cada
+`ReplayEngine` construído durante um replay) com o default
+`disable_existing_loggers=True`, o que desabilitava silenciosamente
+`runtime_logger`/`error_logger` já registrados — sem lançar exceção,
+então o `print()` no console continuava normal enquanto o arquivo
+ficava mudo. Fix: `disable_existing_loggers=False`. Coberto por
+`tests/test_console_logger.py::TestInitDbDoesNotDisableLoggers`.
+
+## Rotação e retenção de log
+
+Cada arquivo (`runtime*.log`/`errors*.log`) roda via
+`WindowsSafeRotatingFileHandler` (subclasse de
+`logging.handlers.RotatingFileHandler`) com tamanho máximo de 10MB
+(`LOGGING_CONFIG["max_log_file_size"]`). Ao atingir o limite, o
+arquivo é rotacionado e comprimido em `.gz`
+(`runtime-optimizer.log.1.gz`, `.2.gz`, ...), com retenção máxima de 5
+arquivos compactados por tipo (`LOGGING_CONFIG["log_backup_count"]`) —
+os mais antigos são descartados automaticamente. Ambos os valores são
+configuráveis via `.env` (`MAX_LOG_FILE_SIZE`, `LOG_BACKUP_COUNT`), com
+esses defaults caso não estejam setados.
+
+A subclasse `WindowsSafeRotatingFileHandler` só existe para engolir o
+`PermissionError` do Windows quando outro processo ainda tem o arquivo
+aberto no momento da rotação (`os.rename` falha com `WinError 32`
+nesse caso) — sem isso, a rotação derrubava o processo inteiro no meio
+de uma execução (confirmado: `OptimizerEngine.optimize()` morrendo por
+esse motivo). Quando isso acontece, a rotação é simplesmente adiada
+para a próxima tentativa; o arquivo pode temporariamente passar de
+10MB até lá.
 
 ## Branco
 Eventos neutros:
@@ -772,9 +815,16 @@ precisar do terminal:
 - Estimativa de duração antes de rodar (`GET /jobs/estimate`) —
   heurística baseada em execuções anteriores do mesmo tipo/janela,
   guardadas em `backtest/reports/jobs_history.json`.
-- Histórico paginado dos últimos jobs (`GET /jobs/history`), com
-  resumo de resultado por item (winrate, PnL, profit factor para
-  backtest; melhores parâmetros + score para optimizer).
+- Histórico dos últimos jobs (`GET /jobs/history`), com resumo de
+  resultado por item (winrate, PnL, profit factor para backtest;
+  melhores parâmetros + score para optimizer). Retenção de **5
+  execuções por tipo** (`MAX_HISTORY` em `apps/api/main.py`) — o
+  arquivo `backtest/reports/jobs_history.json` guarda os 5 mais
+  recentes de cada tipo (optimizer e backtest contam
+  independentemente; rodar o optimizer 5x não apaga o histórico de
+  backtest). A paginação da UI existe só como salvaguarda e não
+  aparece na prática, já que o histórico nunca ultrapassa 5 itens por
+  tipo.
 - Preview antes de aplicar a melhor configuração encontrada pelo
   Optimizer (`GET /jobs/preview-apply`, mostra config atual vs. nova
   lado a lado) e confirmação explícita (`POST /jobs/apply`).
@@ -1301,6 +1351,35 @@ da API assim que o usuário salva um novo conjunto de pares em
 Configurações sem reiniciar a API (mesma classe de bug do `MODE`
 descrito em LIVE TRADING, só que afetando a própria API em vez do
 Runner).
+
+## Paralelização e checkpoint incremental
+
+**Bug corrigido:** com o timeout dinâmico acima (teto de 6h), um
+optimizer de 90 dias × 4 símbolos ainda estourava o teto quando as 24
+combinações de parâmetros eram avaliadas sequencialmente, uma por uma,
+sem gerar `optimizer_report.json` algum se fosse morto no meio.
+
+Corrigido em `OptimizerEngine.optimize()`: quando há mais de 1
+combinação, cada uma roda em um processo separado via
+`ProcessPoolExecutor` (`max_workers=min(os.cpu_count(), total)`) — tem
+que ser processo, não thread, porque `apply_config()`/`restore_config()`
+(`backtest/optimizer/config_runtime.py`) mutam dicts globais do
+processo (`TRADING_CONFIG`/`TRADE_MANAGEMENT_CONFIG`), inseguro entre
+threads do mesmo processo mas seguro entre processos isolados. Cada
+combinação usa um `user_id` de sandbox próprio
+(`WORKER_USER_ID_BASE + índice`) para gravar/ler trades no SQLite
+compartilhado sem colidir com as outras (já suportado nativamente por
+`trades_repository`/`ReplayEngine`/`MetricsEngine`, que já eram
+parametrizados por `user_id`, mais `PRAGMA journal_mode=WAL` +
+`busy_timeout=5000` em `data/storage/database.py`). O relatório
+(`_write_checkpoint_report`) é regravado com o resultado parcial
+ordenado a cada combinação concluída — um job morto pelo timeout do
+subprocesso ainda deixa um `optimizer_report.json` utilizável com o
+que já tinha sido avaliado até ali. O caso de exatamente 1 combinação
+continua rodando em processo único (sem pool), preservando o
+comportamento esperado pelos mocks de `tests/test_optimizer_engine.py`.
+
+Coberto em `tests/test_optimizer_engine.py`.
 
 ## Backtest (`backtest/runner.py`)
 

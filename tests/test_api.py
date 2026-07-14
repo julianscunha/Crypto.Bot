@@ -1044,6 +1044,40 @@ class TestJobHistoryAndEstimate:
         assert len(body["items"]) == 1
         assert body["items"][0]["type"] == "optimizer"
 
+    def test_save_history_keeps_max_history_per_type_not_globally(self, tmp_path, monkeypatch):
+
+        history_file = tmp_path / "jobs_history.json"
+
+        monkeypatch.setattr(api_main, "_HISTORY_FILE", history_file)
+
+        # 5 optimizer runs (MAX_HISTORY) followed by 1 backtest run --
+        # a global truncation would have wiped the backtest entries'
+        # older siblings and, if the cap were reached first, could
+        # push a still-recent entry of a *different* type out of the
+        # file. Here it must only cap each type independently.
+        for i in range(api_main.MAX_HISTORY):
+            api_main._save_history({
+                "type": "optimizer",
+                "status": "done",
+                "started_at": i,
+                "elapsed_seconds": 1,
+            })
+
+        api_main._save_history({
+            "type": "backtest",
+            "status": "done",
+            "started_at": 999,
+            "elapsed_seconds": 1,
+        })
+
+        history = api_main._load_history()
+
+        optimizer_entries = [h for h in history if h["type"] == "optimizer"]
+        backtest_entries = [h for h in history if h["type"] == "backtest"]
+
+        assert len(optimizer_entries) == api_main.MAX_HISTORY
+        assert len(backtest_entries) == 1
+
     def test_estimate_returns_resource_snapshot(self, client):
 
         response = client.get("/jobs/estimate?jtype=backtest")

@@ -819,7 +819,22 @@ def _load_history() -> list:
 def _save_history(entry: dict):
     history = _load_history()
     history.insert(0, entry)
-    history = history[:MAX_HISTORY]
+
+    # keep the MAX_HISTORY most recent entries per job type, not
+    # MAX_HISTORY total -- truncating the mixed list globally meant
+    # running the optimizer 5x wiped backtest's entries out of the
+    # file entirely, even though GET /jobs/history already filters
+    # by type correctly.
+    kept = []
+    counts = {}
+    for item in history:
+        item_type = item.get("type")
+        if counts.get(item_type, 0) >= MAX_HISTORY:
+            continue
+        kept.append(item)
+        counts[item_type] = counts.get(item_type, 0) + 1
+    history = kept
+
     try:
         _HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
         _HISTORY_FILE.write_text(

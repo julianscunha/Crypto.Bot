@@ -42,4 +42,7 @@ Cada processo grava em seu próprio arquivo (`logs/runtime.log` = API/launcher,
 `logs/runtime-runner.log` = Runner, `logs/runtime-<job>.log` = Optimizer/Backtest)
 — nunca compartilhe um arquivo de log entre processos: escritas concorrentes de
 processos diferentes no mesmo arquivo corrompem/derrubam linhas silenciosamente,
-sem lançar exceção (ver `core/utils/console_logger.py`).
+sem lançar exceção (ver `core/utils/console_logger.py`). Cada arquivo roda aos
+10MB e é compactado em `.gz`, retendo no máximo 5 arquivos compactados por tipo
+(`LOGGING_CONFIG["max_log_file_size"]`/`"log_backup_count"` em
+`core/config/logging_config.py`, configuráveis via `.env`).

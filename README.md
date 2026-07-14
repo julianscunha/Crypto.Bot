@@ -217,7 +217,10 @@ Padronização visual institucional:
 Cada processo grava em seu próprio arquivo de log em `logs/` — API/launcher
 em `runtime.log`/`errors.log`, Runner em `runtime-runner.log`/
 `errors-runner.log`, Optimizer/Backtest em `runtime-<job>.log`/
-`errors-<job>.log` (detalhe e motivo em `docs/README_FULL.md`).
+`errors-<job>.log` (detalhe e motivo em `docs/README_FULL.md`). Cada
+arquivo roda ao atingir 10MB e é compactado em `.gz`, com retenção
+máxima de 5 arquivos compactados por tipo (mais antigos descartados
+automaticamente).
 
 ---
 
@@ -249,8 +252,12 @@ Abra `http://localhost:5173`. Quatro páginas:
 - **Ferramentas** — roda o Optimizer e o Backtest contra dados reais da
   Binance direto pela interface (sem precisar do terminal), com progresso
   em tempo real, estimativa de duração baseada em execuções anteriores,
-  histórico paginado dos últimos jobs e um preview antes de aplicar a
-  melhor configuração encontrada pelo Optimizer.
+  histórico das últimas 5 execuções por tipo (Optimizer e Backtest contam
+  separadamente) e um preview antes de aplicar a melhor configuração
+  encontrada pelo Optimizer. O Optimizer paraleliza a avaliação das
+  combinações de parâmetros em múltiplos processos e salva progresso
+  incremental — uma execução interrompida pelo timeout ainda deixa um
+  relatório parcial utilizável.
 - **Configurações** — pares monitorados, intervalo de candles e todos os
   parâmetros de risco/ATR/sinal/estrutura/gestão de posição, numa única
   barra de salvar sticky (só aparece quando há alteração pendente) que

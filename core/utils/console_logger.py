@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 
+import gzip
+
 import logging
 
 import os
+
+import shutil
 
 from pathlib import Path
 
@@ -73,6 +77,38 @@ class WindowsSafeRotatingFileHandler(
             ):
 
                 self.stream = self._open()
+
+# =====================================================
+# GZIP ROTATION
+# =====================================================
+#
+# The stdlib's default rotation just renames runtime.log ->
+# runtime.log.1, .2, etc, uncompressed -- with backupCount=5 files
+# capped at 10MB each, that's up to 50MB per log type sitting on
+# disk uncompressed. RotatingFileHandler supports swapping in a
+# custom .rotator/.namer pair (stdlib hook since Python 3.3) to
+# compress each rotated file instead of just renaming it.
+
+def _gzip_rotator(
+    source,
+    dest
+):
+
+    with open(source, "rb") as source_file:
+
+        with gzip.open(dest, "wb") as dest_file:
+
+            shutil.copyfileobj(
+                source_file,
+                dest_file
+            )
+
+    os.remove(source)
+
+
+def _gzip_namer(name):
+
+    return f"{name}.gz"
 
 # =====================================================
 # COLORAMA
@@ -263,6 +299,10 @@ def build_logger(
 
         encoding="utf-8"
     )
+
+    handler.rotator = _gzip_rotator
+
+    handler.namer = _gzip_namer
 
     formatter = logging.Formatter(
 
