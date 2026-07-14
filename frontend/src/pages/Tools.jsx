@@ -396,11 +396,14 @@ function HistoryItem({ item }) {
   const days = item.extra_args?.includes("--days")
     ? item.extra_args[item.extra_args.indexOf("--days") + 1]
     : null;
+  const symbols = item.workload?.symbols;
 
   return (
     <div className="history-item">
       <div className="history-item__header">
-        <span className="history-item__type">{typeLabel}{days ? ` · ${days}d` : ""}</span>
+        <span className="history-item__type">
+          {typeLabel}{days ? ` · ${days}d` : ""}{symbols?.length ? ` · ${symbols.join(", ")}` : ""}
+        </span>
         <Badge tone={isOk ? "positive" : "negative"}>{isOk ? "OK" : "Erro"}</Badge>
         <span className="history-item__meta">{formatDate(item.started_at)}</span>
         <span className="history-item__meta">{formatElapsed(item.elapsed_seconds)}</span>

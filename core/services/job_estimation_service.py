@@ -169,6 +169,7 @@ def build_job_profile(
     return {
         "job_type": job_type,
         "days": days,
+        "symbols": symbols_list,
         "symbol_count": symbol_count,
         "interval": interval,
         "interval_ms": interval_ms,
