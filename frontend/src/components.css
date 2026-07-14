@@ -669,6 +669,11 @@
   color: var(--signal-positive);
 }
 
+.form-message--warning {
+  background: var(--signal-warning-dim);
+  color: var(--signal-warning);
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;

@@ -8,6 +8,8 @@ import pytest
 
 import json
 
+import os
+
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
@@ -1088,6 +1090,107 @@ class TestJobHistoryAndEstimate:
         assert "estimate_seconds" in body
         assert "profile" in body
         assert "hardware" in body
+
+
+class TestBestConfigStaleness:
+
+    def test_warns_when_best_config_predates_latest_done_optimizer_run(self, tmp_path, monkeypatch):
+
+        history_file = tmp_path / "jobs_history.json"
+        history_file.write_text(
+            json.dumps([
+                {
+                    "type": "optimizer",
+                    "status": "done",
+                    "started_at": 100,
+                    "finished_at": 200,
+                    "workload": {"symbols": ["DOGEUSDT"]},
+                },
+            ]),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(api_main, "_HISTORY_FILE", history_file)
+
+        # best_config.json's mtime (100) predates the optimizer run's
+        # finished_at (200) -- the run didn't actually update it (no
+        # combination passed the minimum-sample gate), so it's stale
+        # from something else entirely.
+        warning = api_main._best_config_staleness_warning(100)
+
+        assert warning is not None
+        assert "DOGEUSDT" in warning
+
+    def test_no_warning_when_best_config_is_fresh(self, tmp_path, monkeypatch):
+
+        history_file = tmp_path / "jobs_history.json"
+        history_file.write_text(
+            json.dumps([
+                {
+                    "type": "optimizer",
+                    "status": "done",
+                    "started_at": 100,
+                    "finished_at": 200,
+                    "workload": {"symbols": ["DOGEUSDT"]},
+                },
+            ]),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(api_main, "_HISTORY_FILE", history_file)
+
+        warning = api_main._best_config_staleness_warning(300)
+
+        assert warning is None
+
+    def test_no_warning_when_no_optimizer_history_exists(self, tmp_path, monkeypatch):
+
+        history_file = tmp_path / "jobs_history.json"
+        history_file.write_text("[]", encoding="utf-8")
+
+        monkeypatch.setattr(api_main, "_HISTORY_FILE", history_file)
+
+        warning = api_main._best_config_staleness_warning(100)
+
+        assert warning is None
+
+    def test_preview_apply_surfaces_warning(self, client, tmp_path, monkeypatch):
+
+        config_file = tmp_path / "best_config.json"
+        config_file.write_text(
+            json.dumps({
+                "atr_take_profit_multiplier": 3.0,
+                "atr_stop_multiplier": 2.0,
+                "atr_trailing_multiplier": 0.5,
+            }),
+            encoding="utf-8",
+        )
+        os.utime(config_file, (100, 100))
+
+        history_file = tmp_path / "jobs_history.json"
+        history_file.write_text(
+            json.dumps([
+                {
+                    "type": "optimizer",
+                    "status": "done",
+                    "started_at": 100,
+                    "finished_at": 200,
+                    "workload": {"symbols": ["DOGEUSDT"]},
+                },
+            ]),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(api_main, "_BEST_CONFIG_FILE", config_file)
+        monkeypatch.setattr(api_main, "_HISTORY_FILE", history_file)
+
+        response = client.get("/jobs/preview-apply")
+
+        assert response.status_code == 200
+        body = response.json()
+
+        assert body["warning"] is not None
+        assert "DOGEUSDT" in body["warning"]
 
     def test_estimate_reflects_saved_symbols_without_restart(self, client):
 

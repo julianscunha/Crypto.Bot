@@ -198,10 +198,10 @@ EXCHANGE_CONFIG = {
             getattr(
                 settings,
                 "PRICE_PRECISION",
-                2
+                6
             ),
 
-            2
+            6
         ),
 
     "quantity_precision":

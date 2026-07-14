@@ -739,6 +739,11 @@ _HISTORY_FILE = (
     / "backtest" / "reports" / "jobs_history.json"
 )
 
+_BEST_CONFIG_FILE = (
+    Path(__file__).resolve().parents[2]
+    / "core" / "config" / "best_config.json"
+)
+
 MAX_HISTORY = 5
 
 
@@ -902,6 +907,24 @@ def _run_job_subprocess_inner(job_type: str, module: str, extra_args: list = Non
         except Exception:
             pass
 
+        # Same reasoning as progress_file above: optimizer_engine.py
+        # only (re)writes optimizer_report.json/report.json when it
+        # has at least one valid (non skipped_low_sample) result --
+        # if every combination gets skipped (e.g. too few trades for
+        # the symbol/window), it deliberately leaves the file alone
+        # rather than overwrite it with nothing. Without clearing it
+        # first, a run that found nothing would silently be reported
+        # as if it reused an older, unrelated run's "best" result.
+        stale_report_path = (
+            Path(PROJECT_ROOT_STR) / "backtest" / "reports" /
+            ("optimizer_report.json" if job_type == "optimizer" else "report.json")
+        )
+
+        try:
+            stale_report_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
         import os as _os
         _env = _os.environ.copy()
         _env["PYTHONPATH"] = PROJECT_ROOT_STR
@@ -932,11 +955,10 @@ def _run_job_subprocess_inner(job_type: str, module: str, extra_args: list = Non
                 f"returncode={proc.returncode} | {stderr_tail or 'sem stderr'}"
             )
 
-        # Ler o report JSON gerado pelo processo
-        if job_type == "optimizer":
-            report_path = Path(PROJECT_ROOT_STR) / "backtest" / "reports" / "optimizer_report.json"
-        else:
-            report_path = Path(PROJECT_ROOT_STR) / "backtest" / "reports" / "report.json"
+        # Ler o report JSON gerado pelo processo (ou ausente, se
+        # nenhuma combinação/execução válida foi produzida -- ver
+        # stale_report_path acima)
+        report_path = stale_report_path
 
         result = None
         if report_path.exists():
@@ -1116,11 +1138,57 @@ async def jobs_history(page: int = 1, jtype: str = "all"):
     }
 
 
+def _best_config_staleness_warning(config_mtime: float) -> str | None:
+    """
+    best_config.json is only overwritten by an optimizer run that
+    found at least one statistically valid combination (see
+    optimizer_engine.py's NO_EDGE_FOUND / skipped_low_sample path,
+    which deliberately leaves a previous file untouched rather than
+    overwrite it with nothing). That means it can silently still hold
+    the result of a much older run -- for a different symbol/.env
+    entirely -- with nothing to tell the user it's not what the
+    optimizer run they just watched actually produced. Compare its
+    mtime against the most recently completed optimizer job to catch
+    that case before the user applies (and then backtests) a config
+    that has nothing to do with their current setup.
+    """
+
+    history = _load_history()
+
+    latest_done = next(
+        (
+            item for item in history
+            if item.get("type") == "optimizer"
+            and item.get("status") == "done"
+        ),
+        None
+    )
+
+    if latest_done is None:
+        return None
+
+    finished_at = latest_done.get("finished_at")
+
+    if finished_at and config_mtime < finished_at:
+        symbols = latest_done.get("workload", {}).get("symbols")
+        symbols_note = f" ({', '.join(symbols)})" if symbols else ""
+        return (
+            "Este resultado é de uma execução anterior do Optimizer -- "
+            f"a última execução concluída{symbols_note} não encontrou "
+            "nenhuma combinação de parâmetros com amostra suficiente "
+            "(sem resultado válido), então o arquivo não foi atualizado. "
+            "Aplicar agora usaria parâmetros de outra execução, "
+            "possivelmente de outro par."
+        )
+
+    return None
+
+
 @app.get("/jobs/preview-apply")
 async def jobs_preview_apply():
     """Retorna config atual vs nova (best_config.json) para o usuário confirmar."""
 
-    config_path = Path(PROJECT_ROOT_STR) / "core" / "config" / "best_config.json"
+    config_path = _BEST_CONFIG_FILE
 
     if not config_path.exists():
         raise HTTPException(status_code=404, detail="Rode o optimizer primeiro.")
@@ -1141,6 +1209,9 @@ async def jobs_preview_apply():
             "atr_stop_multiplier":        best.get("atr_stop_multiplier"),
             "atr_trailing_multiplier":    best.get("atr_trailing_multiplier"),
         },
+        "warning": _best_config_staleness_warning(
+            config_path.stat().st_mtime
+        ),
     }
 
 
@@ -1259,15 +1330,17 @@ async def jobs_apply_best_config():
     atr_trailing_multiplier). O usuário confirma antes de chamar.
     """
 
-    config_path = (
-        Path(PROJECT_ROOT_STR) / "core" / "config" / "best_config.json"
-    )
+    config_path = _BEST_CONFIG_FILE
 
     if not config_path.exists():
         raise HTTPException(
             status_code=404,
             detail="Nenhum best_config.json encontrado. Rode o optimizer primeiro."
         )
+
+    warning = _best_config_staleness_warning(
+        config_path.stat().st_mtime
+    )
 
     with open(config_path, encoding="utf-8") as f:
         best = _json.load(f)
@@ -1278,7 +1351,7 @@ async def jobs_apply_best_config():
         atr_trailing_multiplier=best.get("atr_trailing_multiplier"),
     )
 
-    return {"applied": True, "config": best}
+    return {"applied": True, "config": best, "warning": warning}
 
 
 

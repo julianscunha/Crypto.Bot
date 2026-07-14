@@ -309,9 +309,16 @@ export function Tools() {
               )}
 
               {applyResult && (
-                <div className="form-message form-message--success" style={{ marginTop: "1rem" }}>
-                  ✓ Aplicado: TP×{applyResult.config.atr_take_profit_multiplier} SL×{applyResult.config.atr_stop_multiplier} Trailing×{applyResult.config.atr_trailing_multiplier}
-                </div>
+                <>
+                  <div className="form-message form-message--success" style={{ marginTop: "1rem" }}>
+                    ✓ Aplicado: TP×{applyResult.config.atr_take_profit_multiplier} SL×{applyResult.config.atr_stop_multiplier} Trailing×{applyResult.config.atr_trailing_multiplier}
+                  </div>
+                  {applyResult.warning && (
+                    <div className="form-message form-message--warning" style={{ marginTop: "0.5rem" }}>
+                      ⚠ {applyResult.warning}
+                    </div>
+                  )}
+                </>
               )}
             </Panel>
           </div>
@@ -442,13 +449,18 @@ function HistoryItem({ item }) {
 // =====================================================
 
 function ApplyPreviewModal({ preview, onConfirm, onCancel }) {
-  const { current, new: next } = preview;
+  const { current, new: next, warning } = preview;
   const changed = Object.keys(next).filter(k => current[k] !== next[k]);
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true">
       <div className="modal">
         <h3 className="modal__title">Aplicar melhores configurações?</h3>
+
+        {warning && (
+          <p className="form-message form-message--warning">⚠ {warning}</p>
+        )}
+
         <p className="modal__body">Alterações que serão aplicadas:</p>
 
         <div className="apply-preview">

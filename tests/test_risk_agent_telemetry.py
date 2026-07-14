@@ -238,29 +238,35 @@ class TestRiskAgentTelemetry:
 
     @pytest.mark.asyncio
     async def test_low_rr_is_registered_when_risk_reward_too_low(
-        self
+        self,
+        monkeypatch
     ):
 
         from core.config.trading_config import (
             TRADING_CONFIG
         )
 
+        # Force LOW_RR deterministically by raising the required
+        # minimum above whatever ratio the default ATR multipliers
+        # would naturally produce -- a signal's actual rr is a
+        # function of atr_take_profit_multiplier/atr_stop_multiplier,
+        # not of entry_price/atr magnitude, so it shouldn't depend on
+        # PRICE_PRECISION-driven rounding of stop_loss/take_profit.
+        monkeypatch.setitem(
+            TRADING_CONFIG,
+            "minimum_risk_reward_ratio",
+            1000.0
+        )
+
         bus = EventBus()
 
         RiskAgent(bus)
-
-        minimum_rr = TRADING_CONFIG[
-            "minimum_risk_reward_ratio"
-        ]
-
-        assert minimum_rr > 0
 
         await bus.publish(
             StrategySignalMessage(
                 sender="test",
                 payload=_make_payload(
-                    user_id=50006,
-                    atr=0.0001
+                    user_id=50006
                 )
             )
         )
@@ -270,15 +276,7 @@ class TestRiskAgentTelemetry:
             .get_blocked_signal_reasons()
         )
 
-        # this scenario may resolve to LOW_RR depending on the
-        # configured ATR multipliers -- what matters for this
-        # regression is that IF it's rejected by RiskAgent, it shows
-        # up in telemetry rather than vanishing silently
-        total_registered = sum(
-            reasons.values()
-        )
-
-        assert total_registered >= 1
+        assert reasons.get("LOW_RR") == 1
 
     @pytest.mark.asyncio
     async def test_does_not_register_anything_for_a_valid_signal(

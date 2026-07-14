@@ -434,7 +434,7 @@ def get_settings():
         # EXCHANGE
         # =====================================================
         "quantity_precision":  _int("QUANTITY_PRECISION", 6),
-        "price_precision":     _int("PRICE_PRECISION", 2),
+        "price_precision":     _int("PRICE_PRECISION", 6),
         "min_order_quantity":  _float("MIN_ORDER_QUANTITY", 0.00001),
         "min_order_notional":  _float("MIN_ORDER_NOTIONAL", 0.0),
 

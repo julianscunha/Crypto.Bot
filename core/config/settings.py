@@ -844,6 +844,28 @@ class Settings:
     )
 
     # =================================================
+    # EXCHANGE PRECISION
+    # =================================================
+    #
+    # Read by core/config/exchange_config.py. Used to round
+    # ATR-based stop_loss/take_profit in RiskAgent -- was never
+    # actually wired to this Settings class before (exchange_config.py
+    # did getattr(settings, "PRICE_PRECISION", 2), but this attribute
+    # never existed here, so any .env value was silently ignored and
+    # it was always the hardcoded default of 2). For low-priced
+    # symbols (e.g. DOGEUSDT, price ~$0.08) that fallback of 2
+    # decimals is coarser than a realistic ATR-based stop distance --
+    # stop_loss and take_profit round to the same value as entry
+    # price, and RiskAgent rejects every single signal as
+    # INVALID_RISK_LEVELS. 6 decimals covers sub-$1 assets while still
+    # being a sane default for higher-priced ones.
+    PRICE_PRECISION = env_int(
+        "PRICE_PRECISION",
+        6,
+        minimum=0
+    )
+
+    # =================================================
     # LOGGING
     # =================================================
 
