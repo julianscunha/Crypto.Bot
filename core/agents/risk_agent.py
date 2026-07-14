@@ -539,6 +539,15 @@ class RiskAgent:
 
             return None
 
+        # risk_distance/reward_distance feed position sizing and the
+        # R:R math below, not an order sent to the exchange -- they
+        # don't need to be limited to the exchange's price_precision
+        # (2 decimals by default). Rounding them to that same
+        # precision used to zero out the distance for low-priced
+        # symbols (e.g. DOGEUSDT, where a real ATR-based stop is only
+        # a few thousandths of a dollar away from entry_price), making
+        # every single signal fail here with INVALID_RISK_LEVELS even
+        # though stop_loss/take_profit were both valid.
         risk_distance = round(
 
             abs(
@@ -547,7 +556,7 @@ class RiskAgent:
                 stop_loss
             ),
 
-            precision
+            8
         )
 
         reward_distance = round(
@@ -556,7 +565,7 @@ class RiskAgent:
             -
             entry_price,
 
-            precision
+            8
         )
 
         if risk_distance <= 0:

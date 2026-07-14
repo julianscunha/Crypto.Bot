@@ -209,9 +209,18 @@ class StrategyAgent:
 
                 signal_strength=confidence,
 
+                # rounding to 2 decimals here used to truncate the raw
+                # ATR to 0.00 for low-priced symbols (e.g. DOGEUSDT,
+                # where a real ATR of a few thousandths of a dollar is
+                # smaller than one cent) -- RiskAgent then rejected
+                # every single signal as INVALID_ATR (payload.atr <= 0),
+                # even though the underlying ATR was perfectly valid.
+                # Final order prices are still rounded to the exchange's
+                # configured price_precision downstream in RiskAgent, so
+                # this doesn't affect what actually gets sent to Binance.
                 atr=round(
                     atr_value,
-                    2
+                    8
                 )
             )
         )
