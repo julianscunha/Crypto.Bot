@@ -33,7 +33,7 @@ class TradeMetricsService:
         self
     ):
 
-        pass
+        self._advanced_metrics_cache = {}
 
     # =====================================================
     # SESSION
@@ -402,6 +402,33 @@ class TradeMetricsService:
 
         try:
 
+            # Cheap invalidation key: (how many closed trades, most
+            # recent closed_at). Recomputing Sharpe/Sortino/streaks
+            # over the full history is wasted work on every 5s
+            # dashboard poll when nothing closed since the last call.
+            cache_key = (
+
+                session.query(
+                    func.count(Trade.id),
+                    func.max(Trade.closed_at)
+                )
+
+                .filter(
+
+                    Trade.user_id == user_id,
+
+                    Trade.status == "CLOSED"
+                )
+
+                .one()
+            )
+
+            cached = self._advanced_metrics_cache.get(user_id)
+
+            if cached and cached[0] == cache_key:
+
+                return cached[1]
+
             closed_trades = (
 
                 session.query(
@@ -451,7 +478,7 @@ class TradeMetricsService:
             )
         )
 
-        return {
+        result = {
 
             "sharpe_ratio":
                 compute_sharpe_ratio(
@@ -499,6 +526,13 @@ class TradeMetricsService:
             "sample_size":
                 len(pnls)
         }
+
+        self._advanced_metrics_cache[user_id] = (
+            cache_key,
+            result
+        )
+
+        return result
 
     # =====================================================
     # PERFORMANCE SUMMARY

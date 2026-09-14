@@ -4,6 +4,8 @@ from datetime import (
     datetime
 )
 
+import hmac
+
 import sys
 
 from pathlib import Path
@@ -181,7 +183,7 @@ async def require_api_token(
     if not token:
         return
 
-    if x_api_token != token:
+    if not x_api_token or not hmac.compare_digest(x_api_token, token):
 
         raise HTTPException(
             status_code=401,
