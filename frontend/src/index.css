@@ -14,7 +14,7 @@
   /* text */
   --text-primary: #e4e9f2;
   --text-secondary: #8b96a8;
-  --text-tertiary: #566073;
+  --text-tertiary: #7c8699;
 
   /* signal colors (mirrors core/utils/console_logger.py) */
   --signal-positive: #00e08f;

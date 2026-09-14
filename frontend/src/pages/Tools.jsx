@@ -3,6 +3,7 @@ import { usePolling } from "../hooks/usePolling";
 import { api, ApiError } from "../api/client";
 import { Panel } from "../components/Panel";
 import { Badge } from "../components/Badge";
+import { Icon } from "../components/Icon";
 
 function useEstimate(type, days, symbolsKey = "", intervalKey = "") {
   const [estimate, setEstimate] = useState(null);
@@ -185,7 +186,7 @@ export function Tools() {
         {runnerRunning && !isRunningJob && (
           <div className="dashboard__span-2">
             <div className="tools-warning-bar">
-              ⚠ O bot está em execução. Pare o bot antes de rodar o optimizer ou backtest.
+              <Icon name="warning" size={12} /> O bot está em execução. Pare o bot antes de rodar o optimizer ou backtest.
             </div>
           </div>
         )}
@@ -311,11 +312,11 @@ export function Tools() {
               {applyResult && (
                 <>
                   <div className="form-message form-message--success" style={{ marginTop: "1rem" }}>
-                    ✓ Aplicado: TP×{applyResult.config.atr_take_profit_multiplier} SL×{applyResult.config.atr_stop_multiplier} Trailing×{applyResult.config.atr_trailing_multiplier}
+                    <Icon name="check" size={12} /> Aplicado: TP×{applyResult.config.atr_take_profit_multiplier} SL×{applyResult.config.atr_stop_multiplier} Trailing×{applyResult.config.atr_trailing_multiplier}
                   </div>
                   {applyResult.warning && (
                     <div className="form-message form-message--warning" style={{ marginTop: "0.5rem" }}>
-                      ⚠ {applyResult.warning}
+                      <Icon name="warning" size={12} /> {applyResult.warning}
                     </div>
                   )}
                 </>
@@ -458,7 +459,7 @@ function ApplyPreviewModal({ preview, onConfirm, onCancel }) {
         <h3 className="modal__title">Aplicar melhores configurações?</h3>
 
         {warning && (
-          <p className="form-message form-message--warning">⚠ {warning}</p>
+          <p className="form-message form-message--warning"><Icon name="warning" size={12} /> {warning}</p>
         )}
 
         <p className="modal__body">Alterações que serão aplicadas:</p>
@@ -476,7 +477,7 @@ function ApplyPreviewModal({ preview, onConfirm, onCancel }) {
                 <span className="apply-preview__label">{label}</span>
                 <span className="apply-preview__from">{current[k]}</span>
                 <span className="apply-preview__arrow">{isChanged ? "→" : "="}</span>
-                <span className="apply-preview__to" style={{ color: isChanged ? "var(--signal-positive)" : "var(--text-muted)" }}>{next[k]}</span>
+                <span className="apply-preview__to" style={{ color: isChanged ? "var(--signal-positive)" : "var(--text-tertiary)" }}>{next[k]}</span>
               </div>
             );
           })}
@@ -503,14 +504,17 @@ function ApplyPreviewModal({ preview, onConfirm, onCancel }) {
 
 function JobStatus({ job, progress }) {
   const elapsed = job.elapsed_seconds;
-  const statusLabel = { running: "⏳ Rodando…", done: "✓ Concluído", error: "✗ Erro" }[job.status] ?? job.status;
-  const statusColor = { running: "#f0b429", done: "var(--signal-positive)", error: "var(--signal-negative)" }[job.status];
+  const statusIcon = { running: "hourglass", done: "check", error: "cross" }[job.status];
+  const statusText = { running: "Rodando…", done: "Concluído", error: "Erro" }[job.status] ?? job.status;
+  const statusColor = { running: "var(--signal-warning)", done: "var(--signal-positive)", error: "var(--signal-negative)" }[job.status];
   const showRealProgress = job.status === "running" && progress?.total > 0;
 
   return (
     <div className="job-status">
       <div className="job-status__header">
-        <span className="job-status__label" style={{ color: statusColor }}>{statusLabel}</span>
+        <span className="job-status__label" style={{ color: statusColor }}>
+          {statusIcon && <Icon name={statusIcon} size={12} />} {statusText}
+        </span>
         {elapsed != null && <span className="job-status__elapsed">{formatElapsed(elapsed)}</span>}
       </div>
       {job.status === "running" && (

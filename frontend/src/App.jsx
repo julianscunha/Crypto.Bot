@@ -83,7 +83,7 @@ export default function App() {
     ? "var(--signal-negative)"
     : modeKey === "live_testnet"
     ? "var(--signal-positive)"
-    : "var(--text-muted)";
+    : "var(--text-tertiary)";
 
   async function handleToggleRunner() {
     setIsTogglingRunner(true);
@@ -108,9 +108,9 @@ export default function App() {
   }
 
   const pingColor = ping == null
-    ? "var(--text-muted)"
+    ? "var(--text-tertiary)"
     : ping < 100 ? "var(--signal-positive)"
-    : ping < 300 ? "#f0b429"
+    : ping < 300 ? "var(--signal-warning)"
     : "var(--signal-negative)";
 
 

@@ -155,6 +155,10 @@
 /* Play/Stop button - refined */
 .runner-toggle {
   width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 10px 12px;
   border-radius: var(--radius);
   border: 1px solid var(--hairline);

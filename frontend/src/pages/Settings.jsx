@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { usePolling } from "../hooks/usePolling";
 import { api, ApiError } from "../api/client";
 import { Panel } from "../components/Panel";
+import { Icon } from "../components/Icon";
 
 const DEFAULT_PAIRS = [
   "BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT",
@@ -375,7 +376,7 @@ function ParamsForm({ settings, onSaved }) {
       <div className={`params-save-bar ${hasDirty ? "params-save-bar--visible" : ""}`}>
         <div className="params-save-bar__inner">
           {needsRestart && (
-            <span className="restart-badge">⚠ Requer reinicialização do bot</span>
+            <span className="restart-badge"><Icon name="warning" size={11} /> Requer reinicialização do bot</span>
           )}
           {msg && (
             <span className={`params-save-bar__msg params-save-bar__msg--${msg.type}`}>

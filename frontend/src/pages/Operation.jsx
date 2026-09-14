@@ -3,6 +3,7 @@ import { usePolling } from "../hooks/usePolling";
 import { api, ApiError } from "../api/client";
 import { Panel } from "../components/Panel";
 import { Badge } from "../components/Badge";
+import { Icon } from "../components/Icon";
 import { formatUsd } from "../lib/format";
 
 const KEY_LENGTH = 64;
@@ -179,7 +180,7 @@ function ModeOption({ mode, active, locked, disabled, onSelect }) {
         <span className="mode-row__name">{mode.label}</span>
         {active && <Badge tone="positive">Ativo</Badge>}
         {!active && locked && <Badge tone="neutral">Bloqueado</Badge>}
-        {!active && !locked && mode.danger && <Badge tone="negative">⚠ Real</Badge>}
+        {!active && !locked && mode.danger && <Badge tone="negative"><Icon name="warning" size={11} /> Real</Badge>}
       </div>
       <p className="mode-row__desc">{mode.description}</p>
     </button>
@@ -325,7 +326,7 @@ function CredentialsPanel({ settings, onSaved }) {
               />
               {isLive && (
                 <span className="field__hint field__hint--info">
-                  🔒 Travado em modo LIVE. Edite em modo Paper.
+                  <Icon name="lock" size={11} label="Travado" /> Travado em modo LIVE. Edite em modo Paper.
                 </span>
               )}
             </div>
@@ -367,7 +368,7 @@ function CredentialsPanel({ settings, onSaved }) {
                 </div>
                 {liveBalanceError && (
                   <span className="field__hint field__hint--error" style={{fontSize:"0.7rem"}}>
-                    ⚠ {liveBalanceError}
+                    <Icon name="warning" size={11} label="Erro" /> {liveBalanceError}
                   </span>
                 )}
               </div>
