@@ -24,6 +24,9 @@ BinanceWS → EventBus → AnalystAgent → StrategyAgent → RiskAgent → Exec
 - Nunca usar `payload.price`; usar sempre `entry_price`.
 - Toda comunicação entre agentes passa pelo EventBus.
 - Todo agente implementa `async def on_message`.
+- `RiskAgent`/`ExecutionAgent` validam `user_id` (int, não-negativo) e `symbol` (contra `settings.SYMBOLS`) como fronteira de confiança antes de qualquer cálculo de risco/execução — nunca remover essa validação, mesmo que hoje só o próprio `AnalystAgent`/`StrategyAgent` publique no bus.
+
+**Limitação conhecida:** `DEFAULT_USER_ID = 0` está hardcoded em `apps/api/main.py` e `core/services/startup_reconciler.py`. Na prática o sistema roda hoje como single-tenant por instância (uma conta Binance por processo) apesar do campo `user_id` existir para suportar multi-tenant no futuro. Se um segundo `user_id` real for introduzido, a reconciliação de startup e as rotas da API vão ignorar silenciosamente as posições desse tenant — isso precisa ser resolvido (iterar sobre todos os `user_id` com trades abertas) antes de qualquer plano de suportar múltiplos tenants por instância.
 
 ## Runtime modes
 
@@ -46,3 +49,16 @@ sem lançar exceção (ver `core/utils/console_logger.py`). Cada arquivo roda ao
 10MB e é compactado em `.gz`, retendo no máximo 5 arquivos compactados por tipo
 (`LOGGING_CONFIG["max_log_file_size"]`/`"log_backup_count"` em
 `core/config/logging_config.py`, configuráveis via `.env`).
+
+## Agentes especializados (Agent tool) por área
+
+Ao delegar análise/revisão neste repo, usar o agente com encaixe real em vez de escolher por nome:
+
+- **Segurança / chaves / live trading** (`core/services/startup_reconciler.py`, gate `LIVE_TRADING_CONFIRMED`, client de ordens Binance) → `agent-skills:security-auditor`.
+- **Testes** (`tests/`) → `agent-skills:test-engineer`.
+- **Frontend / dashboard** (`frontend/`, React/Vite) → `agent-skills:web-performance-auditor` (perf) e `agent-skills:frontend-ui-engineering` (build de UI).
+- **Revisão geral antes de merge** → `agent-skills:code-reviewer`.
+- **Backtest/optimizer, `apps/api` (FastAPI)** → `Performance Benchmarker`.
+- **Concorrência asyncio / race conditions no EventBus** → sem agente dedicado; usar `agent-skills:debugging-and-error-recovery` + revisão manual.
+
+Agentes de contabilidade/finanças corporativas (Bookkeeper & Controller, FP&A Analyst, Tax Strategist, Investment Researcher, Financial Analyst) e o roteador de custo entre providers de LLM (Autonomous Optimization Architect) **não se aplicam** a este repo — são personas de outro domínio, não de engenharia deste bot.

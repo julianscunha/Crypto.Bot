@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import asyncio
 import pandas as pd
 
 from core.bus.event_bus import EventBus
@@ -75,5 +74,3 @@ class ReplayEngine:
             await self.bus.publish(
                 message
             )
-
-            await asyncio.sleep(0.001)

@@ -1557,7 +1557,9 @@ async def dashboard():
         trades_repository
         .get_closed_trades(
 
-            user_id=DEFAULT_USER_ID
+            user_id=DEFAULT_USER_ID,
+
+            limit=RECENT_CLOSED_TRADES_LIMIT
         )
     )
 
@@ -1588,9 +1590,7 @@ async def dashboard():
                 trade
             )
 
-            for trade in closed_positions[
-                -RECENT_CLOSED_TRADES_LIMIT:
-            ]
+            for trade in closed_positions
         ]
     )
 

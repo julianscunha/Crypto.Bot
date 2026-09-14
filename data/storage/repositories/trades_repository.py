@@ -270,14 +270,15 @@ class TradesRepository:
 
     def get_closed_trades(
         self,
-        user_id: int
+        user_id: int,
+        limit: int = None
     ):
 
         session = self._session()
 
         try:
 
-            return (
+            query = (
 
                 session.query(Trade)
 
@@ -291,9 +292,13 @@ class TradesRepository:
                 .order_by(
                     desc(Trade.closed_at)
                 )
-
-                .all()
             )
+
+            if limit is not None:
+
+                query = query.limit(limit)
+
+            return query.all()
 
         finally:
 

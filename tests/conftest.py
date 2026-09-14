@@ -31,6 +31,13 @@ os.environ.setdefault("LIVE_TRADING_CONFIRMED", "false")
 os.environ.setdefault("BINANCE_API_KEY", "")
 os.environ.setdefault("BINANCE_SECRET_KEY", "")
 
+# RiskAgent/ExecutionAgent validate payload.symbol against
+# settings.SYMBOLS as a tenant/symbol trust boundary -- without this
+# default, the suite would inherit whatever SYMBOLS happens to be set
+# to in the developer's real .env, and test fixtures using "BTCUSDT"
+# would be silently rejected as SYMBOL_NOT_ALLOWED.
+os.environ.setdefault("SYMBOLS", "BTCUSDT,ETHUSDT")
+
 # apps/api/main.py rate-limits sensitive endpoints (PUT /settings,
 # POST /runner/start, POST /runner/stop) at settings.API_RATE_LIMIT
 # (default "10/minute") -- several test modules call PUT /settings

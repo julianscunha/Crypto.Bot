@@ -36,6 +36,10 @@ from core.state.market_state import (
     market_state
 )
 
+from core.config.settings import (
+    settings
+)
+
 
 class ExecutionAgent:
 
@@ -219,6 +223,24 @@ class ExecutionAgent:
         self,
         payload
     ):
+
+        # =================================================
+        # TENANT / SYMBOL BOUNDARY
+        # =================================================
+
+        if not isinstance(payload.user_id, int) or payload.user_id < 0:
+
+            return (
+                False,
+                "INVALID_USER_ID"
+            )
+
+        if payload.symbol not in settings.SYMBOLS:
+
+            return (
+                False,
+                "SYMBOL_NOT_ALLOWED"
+            )
 
         # =================================================
         # SIGNAL
