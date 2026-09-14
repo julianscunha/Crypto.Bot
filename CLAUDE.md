@@ -11,7 +11,7 @@ BinanceWS → EventBus → AnalystAgent → StrategyAgent → RiskAgent → Exec
 ```
 
 - `apps/` — entry points (`apps/api` FastAPI, `apps/trader` runner).
-- `core/agents/` — cada agente herda `base_agent` e implementa `async def on_message`. Toda comunicação entre agentes passa pelo `core/bus` (EventBus) — nunca chame um agente diretamente.
+- `core/agents/` — cada agente implementa `async def on_message` e gerencia seu próprio `bus.subscribe()`/`await bus.publish()` (`base_agent.py` é scaffolding não utilizado por nenhum agente real). Toda comunicação entre agentes passa pelo `core/bus` (EventBus) — nunca chame um agente diretamente.
 - `core/config/` — configs tipadas (ATR, EMA, market structure, regimes em `core/config/regimes/`, `best_config.json`).
 - `data/storage/` — models SQLAlchemy + `trades.db` (SQLite). `data/ingestion/` — WebSocket da Binance.
 - `backtest/` — engine, optimizer, runner; fixtures em `backtest/datasets/`.
