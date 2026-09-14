@@ -1,0 +1,4 @@
+[lint.per-file-ignores]
+# apps/api/main.py organiza imports por seção de feature (comentário em
+# apps/api/main.py:701-707 explica o motivo) -- E402 é esperado, não um bug.
+"apps/api/main.py" = ["E402"]
