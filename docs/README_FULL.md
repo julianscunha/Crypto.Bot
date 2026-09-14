@@ -1,19 +1,19 @@
 # CRYPTO.BOT — DOCUMENTAÇÃO COMPLETA
 
-Última atualização: 2026-06-27 18:25
+Última atualização: 2026-09-14
+
+Referência técnica completa do projeto. Para uma visão geral rápida,
+badges e início rápido, veja o [`README.md`](../README.md) na raiz.
 
 ---
 
 # VISÃO GERAL
 
-Crypto.Bot é uma plataforma modular de trading algorítmico baseada em:
-
-- arquitetura event-driven
-- processamento async
-- isolamento multi-tenant
-- agentes desacoplados
-- pipelines operacionais
-- engines independentes
+Crypto.Bot é uma plataforma modular de trading algorítmico: arquitetura
+event-driven, processamento 100% async, isolamento multi-tenant e agentes
+desacoplados conversando exclusivamente por um `EventBus` — cada engine
+(análise, estratégia, risco, execução, lifecycle, analytics) é
+independente e testável isoladamente.
 
 ---
 

@@ -1,89 +1,117 @@
-# 🤖 CRYPTO.BOT
-
-<p>
-  <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white">
-  <img alt="Node.js" src="https://img.shields.io/badge/node-20%2B-339933?logo=node.js&logoColor=white">
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
-  <img alt="Status" src="https://img.shields.io/badge/status-em%20desenvolvimento-yellow">
-  <img alt="Trading Mode" src="https://img.shields.io/badge/live%20trading-experimental-orange">
+<p align="center">
+  <img src=".github/assets/banner.svg" alt="Crypto.Bot — event-driven multi-agent trading engine" width="100%">
 </p>
 
-Motor de trading algorítmico orientado a eventos, com arquitetura
-**multi-agent** e **async**, construído em Python. Ingestão de mercado via
-WebSocket da Binance, pipeline de agentes desacoplados (análise → estratégia
-→ risco → execução → lifecycle de posição), backtesting/optimizer com dados
-históricos reais e um dashboard React para acompanhar tudo em tempo real.
+<h1 align="center">CRYPTO.BOT</h1>
 
-> ⚠️ **Aviso de risco.** Este projeto é oferecido apenas para fins educacionais
-> e de pesquisa. Trading de criptoativos envolve risco real de perda de
-> capital. O modo `live` (ordens reais na Binance) é experimental e possui
-> lacunas conhecidas — veja [Status Atual](#status-atual). Use `paper`
-> ou testnet até entender completamente o código e assumir o risco por sua
-> conta.
+<p align="center">
+  Motor de trading algorítmico <strong>orientado a eventos</strong>, com arquitetura
+  <strong>multi-agent</strong> e <strong>async</strong> — do sinal de mercado à execução,
+  com um dashboard em tempo real e uma trava de segurança que ninguém consegue burlar por acidente.
+</p>
+
+<p align="center">
+  <a href="https://github.com/julianscunha/Crypto.Bot/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/julianscunha/Crypto.Bot/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/react-19-149eca?logo=react&logoColor=white">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-649%20passing-2ea44f">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue">
+  <a href="CONTRIBUTING.md"><img alt="PRs Welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen"></a>
+  <a href="SECURITY.md"><img alt="Security Policy" src="https://img.shields.io/badge/security-policy-purple"></a>
+</p>
+
+<p align="center">
+  <a href="#início-rápido">Início rápido</a> ·
+  <a href="#por-que-cryptobot">Por que Crypto.Bot</a> ·
+  <a href="#arquitetura">Arquitetura</a> ·
+  <a href="#dashboard">Dashboard</a> ·
+  <a href="#segurança-e-guardrails">Segurança</a> ·
+  <a href="docs/README_FULL.md">Documentação completa</a>
+</p>
+
+---
+
+> ⚠️ **Trading envolve risco real de perda de capital.** Este projeto é
+> oferecido para fins educacionais e de pesquisa. O modo `paper` (simulado)
+> é o padrão e a forma recomendada de explorar o projeto; o modo `live`
+> exige três confirmações explícitas (veja [Segurança e guardrails](#segurança-e-guardrails))
+> e ainda não foi validado contra a API real da Binance neste ambiente de
+> desenvolvimento — veja [Maturidade do projeto](#maturidade-do-projeto).
+
+## Por que Crypto.Bot?
+
+- **Arquitetura de verdade, não um script.** Cinco agentes desacoplados
+  (`Analyst → Strategy → Risk → Execution → PositionManager`) conversam
+  exclusivamente por um `EventBus` — nenhum atalho, nenhuma chamada direta
+  entre eles. Trocar ou testar um agente isoladamente não quebra o resto.
+- **Segurança de dinheiro real como default, não como opção.** Enviar uma
+  ordem real exige três flags simultâneas (`MODE=live` + `BINANCE_TESTNET=false`
+  + `LIVE_TRADING_CONFIRMED=true`), checadas em pontos independentes do
+  código. Fronteira de tenant/símbolo validada em `RiskAgent`/`ExecutionAgent`
+  antes de qualquer cálculo de risco.
+- **Testado de verdade.** 649 testes automatizados (`pytest` + `pytest-asyncio`)
+  cobrindo os 5 agentes, o gate de live trading, reconciliação de startup e
+  o client da Binance — rodando em CI a cada PR, junto com o lint (`ruff`,
+  `oxlint`) e a suíte do frontend (`vitest`).
+- **Dashboard que parece produto, não painel de debug.** React 19 + Vite,
+  tema dark "terminal" desenhado para leitura rápida de números — equity,
+  PnL, drawdown, win rate e performance ajustada a risco (Sharpe, Sortino)
+  em tempo real.
+- **Backtest e optimizer com dados reais da Binance** (com fallback para
+  fixtures sintéticas só se o fetch falhar) — rodáveis direto pela
+  interface, com progresso em tempo real e histórico
+  das últimas execuções.
+- **Honesto sobre o que ainda não foi validado.** Veja [Maturidade do
+  projeto](#maturidade-do-projeto) — preferimos um número exato do que
+  falta a uma promessa vaga de "100% pronto".
 
 ---
 
 ## Índice
 
-- [Pré-requisitos](#pré-requisitos)
-- [Instalação / Início Rápido](#instalação--início-rápido)
+- [Início rápido](#início-rápido)
 - [Docker](#docker)
 - [Configuração](#configuração)
-- [Arquitetura Principal](#arquitetura-principal)
+- [Arquitetura](#arquitetura)
 - [Funcionalidades](#funcionalidades)
-- [Stack de Trading](#stack-de-trading)
-- [Modos de Execução](#modos-de-execução)
-- [Console Engine](#console-engine)
-- [Frontend](#frontend)
+- [Stack](#stack)
+- [Modos de execução](#modos-de-execução)
+- [Dashboard](#dashboard)
+- [Segurança e guardrails](#segurança-e-guardrails)
 - [Testes](#testes)
-- [Banco de Dados](#banco-de-dados)
-- [Regras Importantes](#regras-importantes)
-- [Status Atual](#status-atual)
+- [Banco de dados](#banco-de-dados)
+- [Regras de domínio](#regras-de-domínio)
+- [Maturidade do projeto](#maturidade-do-projeto)
+- [Contribuindo](#contribuindo)
 - [Documentação completa](#documentação-completa)
 - [Licença](#licença)
 
 ---
 
-## Pré-requisitos
+## Início rápido
 
-- **Python 3.11+**
-- **Node.js 20+** e **npm** (apenas se for usar o dashboard/frontend)
-- **git**
-- Uma conta na Binance — opcional, só necessária para o modo `live` ou para
-  usar a Testnet da Binance. Nenhuma conta é necessária para rodar em
-  `paper` (simulado) ou para backtests.
-
----
-
-## Instalação / Início Rápido
+**Pré-requisitos:** Python 3.11+, Node.js 20+ (só para o dashboard), git.
+Conta na Binance é opcional — só necessária para os modos `live`/testnet;
+`paper` e backtest rodam sem nenhuma credencial.
 
 ```bash
 git clone https://github.com/julianscunha/Crypto.Bot.git
 cd Crypto.Bot
-
-# copie o template de configuração e ajuste os valores
 cp .env.example .env
 ```
 
-Depois de configurar o `.env` (veja [Configuração](#configuração) abaixo),
-suba o sistema com o launcher interativo:
-
-Windows:
-
-```powershell
-./scripts/start.ps1
-```
-
-Linux / macOS:
+Depois de ajustar o `.env` (veja [Configuração](#configuração)):
 
 ```bash
+# Windows
+./scripts/start.ps1
+
+# Linux / macOS
 ./scripts/start.sh
 ```
 
-Ambos os scripts delegam para o mesmo launcher interativo
-(`scripts/bootstrap/launcher.py`), que valida o ambiente, instala as
-dependências Python automaticamente (`scripts/bootstrap/requirements.txt`) e
-mostra um menu:
+Ambos abrem o launcher interativo (`scripts/bootstrap/launcher.py`), que
+valida o ambiente, instala as dependências Python automaticamente e mostra:
 
 ```text
 [1] Runner       -> apps.trader.runner (paper/live trading)
@@ -93,180 +121,140 @@ mostra um menu:
 [5] Full Stack   -> API + Runner + Frontend
 ```
 
-`Full Stack` sobe a API (`apps.api.main`, via uvicorn em
-`http://127.0.0.1:8000`), o Runner e o Frontend
-(`http://localhost:5173`) juntos. Se `frontend/node_modules` estiver
-ausente (um checkout novo nunca tem — não é versionado), o launcher roda
-`npm install` automaticamente antes de iniciar o dev server. Se `frontend/`
-não existir ou `npm` não for encontrado, ele registra um aviso e continua
-rodando só com API + Runner — o Full Stack nunca depende do frontend
-existir.
+`Full Stack` sobe a API (`http://127.0.0.1:8000`), o Runner e o dashboard
+(`http://localhost:5173`) juntos, instalando `frontend/node_modules`
+automaticamente se ausente.
 
 ---
 
 ## Docker
-
-Alternativa ao launcher local: `Dockerfile` (multi-stage) +
-`docker-compose.yml` sobem API, Runner e frontend (nginx) como três
-containers separados.
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-Frontend em `http://localhost:8080`, API em `http://localhost:8000`.
-Guia completo (variáveis específicas do Docker, segurança antes de
-expor além de localhost, backup do banco em container) em
-[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+Três containers (API, Runner, frontend via nginx) — dashboard em
+`http://localhost:8080`, API em `http://localhost:8000`. Guia completo
+(variáveis, segurança antes de expor além de localhost, backup do banco
+em container) em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ---
 
 ## Configuração
 
-Toda a configuração vive no `.env` (nunca commitado — veja `.env.example`
-para o template completo com todos os valores). As variáveis mais
-importantes:
+Toda a configuração vive no `.env` (nunca commitado — use `.env.example`
+como template). As variáveis mais importantes:
 
 | Variável | Padrão | O que faz |
 |---|---|---|
-| `MODE` | `paper` | `paper` simula execuções; `live` tenta ordens reais (veja trava abaixo). |
+| `MODE` | `paper` | `paper` simula execuções; `live` tenta ordens reais (veja a trava abaixo). |
 | `BINANCE_TESTNET` | `true` | `true` usa a Testnet da Binance; `false` aponta para mainnet. |
-| `BINANCE_API_KEY` / `BINANCE_SECRET_KEY` | vazio | Credenciais da API da Binance. Deixe vazio para rodar só em `paper`. |
-| `LIVE_TRADING_CONFIRMED` | `false` | Trava explícita e separada de `MODE`/`BINANCE_TESTNET`. Só com as três condições juntas (`MODE=live`, `BINANCE_TESTNET=false`, `LIVE_TRADING_CONFIRMED=true`) o bot chega a enviar ordens reais em dinheiro real. |
+| `BINANCE_API_KEY` / `BINANCE_SECRET_KEY` | vazio | Credenciais da API. Deixe vazio para rodar só em `paper`. |
+| `LIVE_TRADING_CONFIRMED` | `false` | Trava explícita e separada de `MODE`/`BINANCE_TESTNET` — só as três condições juntas liberam ordens reais em dinheiro real. |
 | `ACCOUNT_BALANCE` | `100.0` | Saldo usado pelo motor de risco para dimensionar posições. |
 | `SYMBOLS` | `BTCUSDT,ETHUSDT,SOLUSDT` | Pares monitorados. |
 | `KLINE_INTERVAL` | `1m` | Timeframe dos candles. |
+| `API_ACCESS_TOKEN` | vazio | Token exigido no header `X-API-Token` para as rotas sensíveis da API. Obrigatório se `API_HOST` for além de `localhost` — trate como uma credencial de produção. |
 
-**Nunca coloque credenciais reais no `.env.example`** nem em qualquer
-arquivo commitado — o `.env` real já está no `.gitignore` e não deve ser
-versionado.
-
-Você também pode gerenciar Binance API key/secret e o modo de execução pela
-aba **Settings** do dashboard, em vez de editar o `.env` manualmente.
+Você também pode gerenciar chaves da Binance e o modo de execução pela
+aba **Operação** do dashboard, sem editar o `.env` manualmente.
 
 ---
 
-## Arquitetura Principal
+## Arquitetura
 
 ```text
 BinanceWS
     ↓
 EventBus
     ↓
-AnalystAgent
-    ↓
-StrategyAgent
-    ↓
-RiskAgent
-    ↓
-ExecutionAgent
-    ↓
-PositionManagerAgent
+AnalystAgent  →  StrategyAgent  →  RiskAgent  →  ExecutionAgent  →  PositionManagerAgent
 ```
+
+Cada agente implementa `async def on_message` e só fala com o resto do
+sistema publicando/assinando mensagens no `EventBus` — nunca chamando
+outro agente diretamente. Isso mantém cada estágio do pipeline testável
+isoladamente (veja [Testes](#testes)) e torna adicionar um sexto agente,
+ou trocar a estratégia, uma mudança localizada.
 
 ---
 
 ## Funcionalidades
 
-- Engine orientada a eventos, async
-- Trading multi-symbol
-- Isolamento multi-tenant (`user_id`)
-- Engine de volatilidade ATR
-- Validação de tendência EMA
-- Validação de market structure
-- Gestão de risco
-- Engine de trailing stop
-- Analytics de portfolio
-- Métricas de runtime
-- Ingestão via WebSocket da Binance
-- Engine de replay para backtest
-- Arquitetura pronta para IA
+- Engine orientada a eventos, 100% async
+- Trading multi-symbol com isolamento por `user_id`
+- Engine de volatilidade ATR + validação de tendência EMA + market structure
+- Gestão de risco com limite de exposição e position sizing dinâmico
+- Trailing stop, breakeven e take-profit dinâmico
+- Analytics de portfolio (Sharpe, Sortino, drawdown, profit factor, streaks)
+- Ingestão via WebSocket da Binance + reconciliação de startup
+- Backtest/optimizer paralelizado com dados históricos reais
+- Dashboard React em tempo real com 4 telas dedicadas
 
 ---
 
-## Stack de Trading
+## Stack
 
-- Python 3.11
-- AsyncIO
-- SQLAlchemy
-- SQLite
-- Alembic
-- Binance Websocket
-- EventBus Architecture
+**Backend:** Python 3.11 · AsyncIO · FastAPI · SQLAlchemy · SQLite · Alembic
+**Frontend:** React 19 · Vite · Vitest
+**Infra:** Docker · GitHub Actions (CI) · `ruff` / `oxlint`
 
 ---
 
-## Modos de Execução
+## Modos de execução
 
-- **PAPER** — execuções simuladas, sem conexão de ordens reais. Modo padrão e recomendado para explorar o projeto.
-- **LIVE** — ordens reais na Binance. Experimental, com lacunas conhecidas (veja [Status Atual](#status-atual)) e travado por design atrás de `LIVE_TRADING_CONFIRMED`.
-- **BACKTEST** — replay de dados históricos via `backtest/runner.py` / Optimizer.
-
----
-
-## Console Engine
-
-Padronização visual institucional:
-
-- Branco → eventos neutros
-- Verde → eventos positivos
-- Vermelho → erros/bloqueios
-- Amarelo → warnings/trailing
-
-Cada processo grava em seu próprio arquivo de log em `logs/` — API/launcher
-em `runtime.log`/`errors.log`, Runner em `runtime-runner.log`/
-`errors-runner.log`, Optimizer/Backtest em `runtime-<job>.log`/
-`errors-<job>.log` (detalhe e motivo em `docs/README_FULL.md`). Cada
-arquivo roda ao atingir 10MB e é compactado em `.gz`, com retenção
-máxima de 5 arquivos compactados por tipo (mais antigos descartados
-automaticamente).
+- **PAPER** — execuções simuladas, sem ordens reais. Padrão e forma
+  recomendada de explorar o projeto.
+- **LIVE** — ordens reais na Binance (testnet ou mainnet), travado atrás de
+  três confirmações independentes — veja [Segurança e guardrails](#segurança-e-guardrails).
+- **BACKTEST** — replay de dados históricos via `backtest/runner.py` ou o Optimizer.
 
 ---
 
-## Frontend
+## Dashboard
 
-Um dashboard de monitoramento em React + Vite vive em `frontend/`. O
-launcher (`[4]`/`[5]` no menu) instala as dependências e o inicia
-automaticamente. Para rodar isoladamente:
+React + Vite, tema dark desenhado para leitura rápida em produção — não é
+uma tela de debug. Quatro telas:
+
+- **Monitor** — equity/PnL/drawdown em tempo real, win rate, trades abertos
+  e recém-fechados, atividade do pipeline de sinais, gráfico de PnL,
+  circuit breaker de risco diário e performance ajustada a risco.
+- **Operação** — troca de modo (Paper/Live, com confirmação e reinício
+  automático — bloqueado com posição aberta) e credenciais da Binance
+  (segredos nunca são reenviados pela API depois de salvos).
+- **Ferramentas** — Optimizer e Backtest contra dados reais da Binance
+  direto pela interface, com progresso em tempo real, estimativa de
+  duração e histórico das últimas execuções.
+- **Configurações** — pares monitorados, candles e todos os parâmetros de
+  risco/ATR/sinal/estrutura, com aviso claro de quando uma mudança exige
+  reiniciar o bot manualmente — ele nunca reinicia sozinho.
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
-Abra `http://localhost:5173`. Quatro páginas:
+---
 
-- **Monitor** — equity/PnL/drawdown do portfolio em tempo real, win rate,
-  trades abertos e recém-fechados, atividade do pipeline de sinais, gráfico
-  de PnL, status de risco diário (banner de circuit breaker) e performance
-  ajustada a risco (Sharpe, Sortino, max drawdown, streaks). Atualiza a
-  cada 3-5s.
-- **Operação** — seletor de modo de trading (Paper/Live, com modal de
-  confirmação e reinício automático do bot ao trocar — bloqueado enquanto
-  houver posição aberta) e credenciais da carteira (Binance API key/secret
-  para Testnet ou mainnet, saldo real da conta em modo live atualizado a
-  cada 30s). Segredos nunca são reenviados pela API depois de salvos — só
-  se um valor está definido ou não.
-- **Ferramentas** — roda o Optimizer e o Backtest contra dados reais da
-  Binance direto pela interface (sem precisar do terminal), com progresso
-  em tempo real, estimativa de duração baseada em execuções anteriores,
-  histórico das últimas 5 execuções por tipo (Optimizer e Backtest contam
-  separadamente) e um preview antes de aplicar a melhor configuração
-  encontrada pelo Optimizer. O Optimizer paraleliza a avaliação das
-  combinações de parâmetros em múltiplos processos e salva progresso
-  incremental — uma execução interrompida pelo timeout ainda deixa um
-  relatório parcial utilizável.
-- **Configurações** — pares monitorados, intervalo de candles e todos os
-  parâmetros de risco/ATR/sinal/estrutura/gestão de posição, numa única
-  barra de salvar sticky (só aparece quando há alteração pendente) que
-  avisa quando o campo alterado exige reiniciar o bot manualmente para
-  valer — o bot nunca reinicia sozinho.
+## Segurança e guardrails
 
-O frontend fala com a API pela URL definida em `frontend/.env`
-(`VITE_API_BASE_URL`, padrão `http://127.0.0.1:8000`). A API permite CORS
-apenas para a origem do dev server do Vite (`apps/api/main.py`).
+Dinheiro real não sai por acidente. O caminho até uma ordem real passa por
+quatro camadas independentes, cada uma capaz de bloquear por conta própria:
+
+1. **Gate de três flags** — `MODE=live` **e** `BINANCE_TESTNET=false` **e**
+   `LIVE_TRADING_CONFIRMED=true`, checado tanto no `BinanceTradingClient`
+   quanto no `execution_router` — nunca só num lugar.
+2. **Fronteira de tenant/símbolo** — `RiskAgent`/`ExecutionAgent` validam
+   `user_id` e `symbol` (contra a allowlist configurada) antes de qualquer
+   cálculo de risco ou execução.
+3. **Reconciliação de startup** — ao subir, o sistema audita posições
+   abertas, OCOs órfãs na Binance e ordens sem trade local, antes de deixar
+   o bot operar.
+4. **Comparação de token constant-time** na API (`hmac.compare_digest`),
+   rate limiting e CORS restrito nas rotas sensíveis.
+
+Encontrou uma falha de segurança? Veja [`SECURITY.md`](SECURITY.md) — não
+abra uma issue pública.
 
 ---
 
@@ -277,48 +265,46 @@ pip install -r scripts/bootstrap/requirements.txt pytest pytest-asyncio pytest-c
 python -m pytest tests/
 ```
 
-A suíte de testes usa um banco SQLite, `.env` e arquivos de log isolados e
-temporários (veja `tests/conftest.py`) — rodá-la nunca toca o
-`data/storage/trades.db`, o `.env` ou os `logs/` reais.
-
-Frontend (Vitest + Testing Library):
+649 testes, banco SQLite/`.env`/logs isolados e temporários — a suíte
+nunca toca `data/storage/trades.db`, o `.env` ou os `logs/` reais (veja
+`tests/conftest.py`). Roda em CI a cada PR junto com `ruff check`.
 
 ```bash
-cd frontend
-npm test
+cd frontend && npm test   # Vitest + Testing Library
 ```
 
 ---
 
-## Banco de Dados
+## Banco de dados
 
-```powershell
+```bash
 alembic upgrade head
 ```
 
 ---
 
-## Regras Importantes
+## Regras de domínio
 
-Regras de domínio que o código depende para funcionar corretamente — veja
-também `CLAUDE.md`/`AGENTS.md` para o detalhe completo:
+Invariantes que o código inteiro depende para funcionar corretamente —
+detalhe completo em `CLAUDE.md`/`AGENTS.md`:
 
-- Nunca remover `user_id`
-- Nunca quebrar payload contracts
-- Nunca utilizar `payload.price`
-- Utilizar sempre `entry_price`
-- Toda comunicação deve passar pelo EventBus
-- Todos os agentes devem usar `async def on_message`
+- Nunca remover `user_id` dos payloads — o sistema é multi-tenant.
+- Nunca usar `payload.price`; sempre `entry_price`.
+- Toda comunicação entre agentes passa pelo `EventBus`.
+- Todo agente implementa `async def on_message`.
 
 ---
 
-## Status Atual
+## Maturidade do projeto
+
+Preferimos dizer exatamente o que já foi validado e o que ainda depende de
+teste manual, em vez de arredondar para "pronto":
 
 ```text
-Core Infrastructure .......... 96%
-Trading Engine ............... 93%
-Lifecycle Engine ............. 94%
-Portfolio Engine ............. 90%
+Core Infrastructure ........... 96%
+Trading Engine ................ 93%
+Lifecycle Engine .............. 94%
+Portfolio Engine .............. 90%
 Persistence Layer ............. 90%
 Exchange Integration .......... 78%
 Risk & Analytics ............... 85%
@@ -329,56 +315,30 @@ Deploy (Docker) ................ 90%
 TOTAL: ~88%
 ```
 
-Depois da limpeza de segurança para tornar o repositório público, um
-roadmap de 6 fases fechou a maior parte das lacunas concretas que
-sustentavam os números anteriores (`Exchange Integration` 50%,
-`Production Hardening` 75%, `Persistence Layer` 84%, `Frontend` 60%) —
-ver `ROADMAP ATUAL` em [`docs/README_FULL.md`](docs/README_FULL.md)
-para o detalhe de cada fase. Resumo do que mudou:
+Esses números são autoavaliação qualitativa (não cobertura de linhas ou
+requisitos formais fechados) — trate como maturidade relativa entre
+módulos. O gap real, único e conhecido: **nenhuma parte do fluxo de
+execução foi validada contra a API real da Binance** (nem testnet) neste
+ambiente de desenvolvimento, por falta de acesso de rede — só pode ser
+feito manualmente, com um checklist dedicado em
+[`docs/README_FULL.md`](docs/README_FULL.md#live-trading). Use `paper`
+até rodar esse checklist você mesmo.
 
-- **`Exchange Integration`** — reconciliação de startup implementada
-  (posição fechada enquanto offline, OCO sumida, ordens órfãs na
-  Binance sem trade local), com o fechamento de emergência agora
-  restrito ao erro `-2013` confirmado (em vez de qualquer exceção).
-  O rate-limiting no client de ordens já existia (a doc anterior
-  estava desatualizada nesse ponto). **Ainda falta**: validação real
-  contra a API da Binance (nem testnet) — impossível neste ambiente
-  de desenvolvimento sem acesso de rede; há um checklist de validação
-  manual em `docs/README_FULL.md`.
-- **`Production Hardening`** — autenticação por token, rate limiting,
-  handler global de exceção, shutdown gracioso (`SIGTERM`/`SIGINT`)
-  e alerta externo via webhook, todos novos.
-- **`Persistence Layer`** — `PRAGMA busy_timeout` e script de backup
-  com rotação. PostgreSQL segue fora de escopo, por decisão.
-- **`Frontend`** — página `Tools.jsx` documentada; testes
-  automatizados (Vitest + Testing Library) cobrindo o wrapper de API,
-  `usePolling` e as páginas Dashboard/Settings — ainda não cobre
-  `Tools.jsx` nem os componentes visuais menores.
-- **`Deploy (Docker)`** — módulo novo: `Dockerfile` multi-stage +
-  `docker-compose.yml`, testado de ponta a ponta manualmente.
+---
 
-> **Sobre o `TOTAL: ~88%`.** Esse número (e o de cada módulo) é uma
-> autoavaliação qualitativa, não uma métrica calculada por alguma
-> metodologia formal (cobertura de linhas, requisitos fechados,
-> etc.) — trate como uma indicação aproximada de maturidade relativa
-> entre módulos, não como um placar preciso. O maior gap restante é a
-> falta de validação contra a Binance real (testnet ou mainnet) em
-> qualquer parte do fluxo de execução — algo que só pode ser feito
-> manualmente, fora deste ambiente de desenvolvimento. Não há uma
-> lista fixa e definitiva do que soma exatamente até 100% — o roadmap
-> completo (`docs/README_FULL.md`, seção `ROADMAP ATUAL`) é a
-> referência mais precisa do que ainda falta.
+## Contribuindo
 
-Veja `LIVE TRADING` em [`docs/README_FULL.md`](docs/README_FULL.md) para o detalhe completo.
+Contribuições são bem-vindas — veja [`CONTRIBUTING.md`](CONTRIBUTING.md)
+para como configurar o ambiente de dev, rodar a suíte antes de abrir um PR
+e o padrão de commit esperado.
 
 ---
 
 ## Documentação completa
 
-Este README cobre o essencial para rodar o projeto. Para o detalhamento
-completo de cada engine, payload contracts, bugs históricos e o motivo por
-trás de decisões de design não óbvias, veja
-[`docs/README_FULL.md`](docs/README_FULL.md).
+Este README cobre o essencial para rodar o projeto. Para o detalhamento de
+cada engine, payload contracts e o motivo por trás de decisões de design
+não óbvias, veja [`docs/README_FULL.md`](docs/README_FULL.md).
 
 ---
 
