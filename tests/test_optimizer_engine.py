@@ -278,8 +278,12 @@ class TestPrepareDatasetsSuccess:
         # candles puts everything in validation (see
         # split_train_validation's edge-case behavior); use enough
         # candles here that some land in train, to meaningfully
-        # check ordering
-        candles_per_symbol = 10_000
+        # check ordering. Must clear VALIDATION_DAYS (15) even at the
+        # finest KLINE_INTERVAL this project supports (1m -> 15 * 24 *
+        # 60 = 21_600 candles) -- 10_000 only worked by accident on a
+        # dev .env with a coarser interval (e.g. 5m), and silently put
+        # everything in validation with the .env.example default (1m).
+        candles_per_symbol = 30_000
 
         fake_session = _FakeSession(
             candles_per_symbol=candles_per_symbol
